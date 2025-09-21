@@ -1,15 +1,25 @@
 version: "3.9"
 
 services:
-  backend:
-    build: ./backend
+  auth:
+  
+  auth_db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: auth_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: root
     ports:
-      - "5000:5000"
+      - "3306:3306"
+    volumes:
+      #Acá debe estar el script SQL para crear las tablas owo
+      - ./auth/sql-script:/docker-entrypoint-initdb.d
 
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
+  #frontend:
+    #build: ./frontend
+    #ports:
+    #  - "3000:3000"
 
   gateway:
     image: nginx:alpine
@@ -32,3 +42,40 @@ services:
     build: ./backend/resourceMonitoring
     ports:
       - "5003:5003"
+
+  serviceA_db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: serviceA_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      #Acá debe estar el script SQL para crear las tablas owo
+      - ./resourceMonitoring/sql-script:/docker-entrypoint-initdb.d
+
+  serviceB_db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: serviceB_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      #Acá debe estar el script SQL para crear las tablas owo
+      - ./userService/sql-script:/docker-entrypoint-initdb.d
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - loki
