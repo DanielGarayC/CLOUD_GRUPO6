@@ -1,0 +1,17 @@
+# 1. Imagen base
+FROM python:3.11-slim
+
+# 2. Directorio de trabajo dentro del contenedor
+WORKDIR /app
+
+# 3. Copiar archivos desde tu PC al contenedor
+COPY . /app
+
+# 4. Instalar dependencias
+RUN pip install -r requirements.txt
+
+# 5. Exponer un puerto (opcional, informativo)
+EXPOSE 5000
+
+# 6. Comando de inicio del contenedor
+CMD ["py", "app.py"]
