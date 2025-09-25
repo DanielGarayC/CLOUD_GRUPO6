@@ -18,6 +18,6 @@ CREATE TABLE IF NOT EXISTS usuario (
 
 INSERT INTO rol (nombreRol) VALUES ('admin'), ('user');
 
--- Hash generado con Python: bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode()
+
 INSERT INTO usuario (nombre, contrasenha, rol_idrol)
 VALUES ('admin', '$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 1);
