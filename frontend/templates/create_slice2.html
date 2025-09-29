@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VNRT - Crear Slice</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .slice-designer {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f8f9fa;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+
+        .step-title {
+            margin: 0;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .vm-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 15px 0;
+            transition: all 0.3s ease;
+        }
+
+        .vm-card:hover {
+            border-color: #28a745;
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.2);
+        }
+
+        .topology-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            margin: 20px 0;
+        }
+
+        .topology-controls {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+        }
+
+        .topology-option {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .topology-option:hover {
+            border-color: #28a745;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.2);
+        }
+
+        .topology-option.active {
+            border-color: #28a745;
+            background: linear-gradient(45deg, rgba(40, 167, 69, 0.1), rgba(32, 201, 151, 0.1));
+        }
+
+        .topology-option i {
+            font-size: 2.5rem;
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+
+        .topology-visualizer {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            height: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .custom-controls {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 100;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
+        .topology-stats {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .preset-topologies {
+            margin: 20px 0;
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .preset-btn {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .preset-btn:hover {
+            border-color: #17a2b8;
+            background: rgba(23, 162, 184, 0.1);
+        }
+
+        .preset-btn.active {
+            border-color: #17a2b8;
+            background: rgba(23, 162, 184, 0.2);
+        }
+
+        .form-floating {
+            margin-bottom: 20px;
+        }
+
+        .btn-gradient {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 12px 30px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-gradient:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(40, 167, 69, 0.3);
+            color: white;
+        }
+
+        .progress-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .progress-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+
+        .progress-step::before {
+            content: '';
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #e9ecef;
+            display: block;
+            margin: 0 auto 10px;
+            transition: all 0.3s ease;
+        }
+
+        .progress-step.active::before {
+            background: #28a745;
+        }
+
+        .progress-step.completed::before {
+            background: #20c997;
+        }
+
+        .progress-line {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            right: -50%;
+            height: 2px;
+            background: #e9ecef;
+            z-index: -1;
+        }
+
+        .progress-step:last-child .progress-line {
+            display: none;
+        }
+
+        .alert {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        #network-container {
+            height: 100%;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid">
+            <div class="navbar-brand">
+                <i class="fas fa-cloud me-2"></i>
+                <strong>VNRT</strong>
+                <span class="ms-2 text-muted">| Diseñador de Slice</span>
+            </div>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-1"></i>Usuario
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end">
+                        <a class="dropdown-item" href="#"><i class="fas fa-tachometer-alt me-1"></i>Dashboard</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="#"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <!-- Progress Indicator -->
+        <div class="progress-indicator">
+            <div class="progress-step active">
+                <span>Información Básica</span>
+                <div class="progress-line"></div>
+            </div>
+            <div class="progress-step">
+                <span>Configuración VMs</span>
+                <div class="progress-line"></div>
+            </div>
+            <div class="progress-step">
+                <span>Diseño de Red</span>
+                <div class="progress-line"></div>
+            </div>
+            <div class="progress-step">
+                <span>Revisión</span>
+            </div>
+        </div>
+
+        <form method="POST" id="create-slice-form">
+            <!-- Step 1: Información Básica -->
+            <div class="slice-designer" id="step-1">
+                <div class="step-header">
+                    <div class="step-number">1</div>
+                    <h3 class="step-title">Información del Slice</h3>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <input type="text" class="form-control" id="slice-name" name="slice_name" placeholder="Nombre del slice" required>
+                            <label for="slice-name">Nombre del Slice</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <input type="number" class="form-control" id="vm-count" name="num_vms" placeholder="Número de VMs" min="2" max="20" value="3" required>
+                            <label for="vm-count">Número de VMs</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-floating">
+                    <textarea class="form-control" id="slice-description" name="slice_description" placeholder="Descripción" style="height: 100px"></textarea>
+                    <label for="slice-description">Descripción (opcional)</label>
+                </div>
+                
+                <div class="text-end">
+                    <button type="button" class="btn btn-gradient" onclick="nextStep()">
+                        Configurar VMs <i class="fas fa-arrow-right ms-2"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Configuración de VMs -->
+            <div class="slice-designer" id="step-2" style="display: none;">
+                <div class="step-header">
+                    <div class="step-number">2</div>
+                    <h3 class="step-title">Configuración de Máquinas Virtuales</h3>
+                </div>
+                
+                <div id="vm-configurations">
+                    <!-- VM cards will be generated here -->
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="previousStep()">
+                        <i class="fas fa-arrow-left me-2"></i>Anterior
+                    </button>
+                    <button type="button" class="btn btn-gradient" onclick="nextStep()">
+                        Diseñar Red <i class="fas fa-arrow-right ms-2"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Diseño de Red -->
+            <div class="slice-designer" id="step-3" style="display: none;">
+                <div class="step-header">
+                    <div class="step-number">3</div>
+                    <h3 class="step-title">Diseño de Topología de Red</h3>
+                </div>
+                
+                <div class="topology-container">
+                    <div class="topology-controls">
+                        <h5><i class="fas fa-tools me-2"></i>Herramientas de Diseño</h5>
+                        
+                        <!-- Topology Type Selection -->
+                        <div class="mb-4">
+                            <h6>Tipo de Topología</h6>
+                            <div class="topology-option active" data-type="custom" onclick="selectTopologyType('custom')">
+                                <i class="fas fa-paint-brush"></i>
+                                <div><strong>Personalizada</strong></div>
+                                <small>Diseño libre</small>
+                            </div>
+                            <div class="topology-option" data-type="template" onclick="selectTopologyType('template')">
+                                <i class="fas fa-shapes"></i>
+                                <div><strong>Plantilla</strong></div>
+                                <small>Topologías predefinidas</small>
+                            </div>
+                        </div>
+
+                        <!-- Custom Topology Controls -->
+                        <div id="custom-controls">
+                            <h6>Controles</h6>
+                            <button type="button" class="btn btn-success btn-sm w-100 mb-2" onclick="addNode()">
+                                <i class="fas fa-plus me-1"></i>Agregar Nodo
+                            </button>
+                            <button type="button" class="btn btn-primary btn-sm w-100 mb-2" onclick="toggleConnectionMode()">
+                                <i class="fas fa-link me-1"></i>Modo Conexión
+                            </button>
+                            <button type="button" class="btn btn-warning btn-sm w-100 mb-2" onclick="clearTopology()">
+                                <i class="fas fa-trash me-1"></i>Limpiar Todo
+                            </button>
+                            
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Click en los nodos para conectarlos
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Template Controls -->
+                        <div id="template-controls" style="display: none;">
+                            <div class="preset-topologies">
+                                <h6>Plantillas Disponibles</h6>
+                                <div class="preset-grid">
+                                    <div class="preset-btn active" data-template="star" onclick="applyTemplate('star')">
+                                        <i class="fas fa-star"></i>
+                                        <div><small>Estrella</small></div>
+                                    </div>
+                                    <div class="preset-btn" data-template="tree" onclick="applyTemplate('tree')">
+                                        <i class="fas fa-sitemap"></i>
+                                        <div><small>Árbol</small></div>
+                                    </div>
+                                    <div class="preset-btn" data-template="ring" onclick="applyTemplate('ring')">
+                                        <i class="fas fa-circle-notch"></i>
+                                        <div><small>Anillo</small></div>
+                                    </div>
+                                    <div class="preset-btn" data-template="mesh" onclick="applyTemplate('mesh')">
+                                        <i class="fas fa-project-diagram"></i>
+                                        <div><small>Malla</small></div>
+                                    </div>
+                                    <div class="preset-btn" data-template="linear" onclick="applyTemplate('linear')">
+                                        <i class="fas fa-grip-lines"></i>
+                                        <div><small>Lineal</small></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="topology-visualizer">
+                        <div id="network-container"></div>
+                        <div class="topology-stats">
+                            <span id="node-count">Nodos: 0</span> | 
+                            <span id="edge-count">Conexiones: 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <input type="hidden" id="topology_data" name="topology_data">
+                <input type="hidden" id="topology_type" name="topology_type" value="custom">
+
+                
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="previousStep()">
+                        <i class="fas fa-arrow-left me-2"></i>Anterior
+                    </button>
+                    <button type="button" class="btn btn-gradient" onclick="nextStep()">
+                        Revisar Configuración <i class="fas fa-arrow-right ms-2"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 4: Revisión -->
+            <div class="slice-designer" id="step-4" style="display: none;">
+                <div class="step-header">
+                    <div class="step-number">4</div>
+                    <h3 class="step-title">Revisión y Creación</h3>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="vm-card">
+                            <h5><i class="fas fa-info-circle me-2"></i>Información del Slice</h5>
+                            <p><strong>Nombre:</strong> <span id="review-name"></span></p>
+                            <p><strong>VMs:</strong> <span id="review-vm-count"></span></p>
+                            <p><strong>Descripción:</strong> <span id="review-description"></span></p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="vm-card">
+                            <h5><i class="fas fa-project-diagram me-2"></i>Topología</h5>
+                            <p><strong>Nodos:</strong> <span id="review-nodes"></span></p>
+                            <p><strong>Conexiones:</strong> <span id="review-connections"></span></p>
+                            <p><strong>Tipo:</strong> <span id="review-topology-type"></span></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="vm-card">
+                    <h5><i class="fas fa-server me-2"></i>Configuración de VMs</h5>
+                    <div id="vm-review-list">
+                        <!-- VM review will be generated here -->
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="previousStep()">
+                        <i class="fas fa-arrow-left me-2"></i>Anterior
+                    </button>
+                    <button type="submit" class="btn btn-gradient btn-lg">
+                        <i class="fas fa-rocket me-2"></i>Crear Slice
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentStep = 1;
+        let network = null;
+        let nodes = new vis.DataSet();
+        let edges = new vis.DataSet();
+        let nodeId = 1;
+        let connectionMode = false;
+        let selectedNode = null;
+        let topologyType = 'custom';
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeNetworkVisualization();
+            generateVMConfiguration();
+        });
+
+        function nextStep() {
+            // Validate current step
+            if (!validateStep(currentStep)) return;
+            
+            // Hide current step
+            document.getElementById(`step-${currentStep}`).style.display = 'none';
+            
+            // Update progress
+            updateProgress(currentStep, 'completed');
+            currentStep++;
+            updateProgress(currentStep, 'active');
+            
+            // Show next step
+            document.getElementById(`step-${currentStep}`).style.display = 'block';
+            
+            // Special actions for specific steps
+            if (currentStep === 2) {
+                generateVMConfiguration();
+            } else if (currentStep === 4) {
+                generateReview();
+            }
+        }
+
+        function previousStep() {
+            // Hide current step
+            document.getElementById(`step-${currentStep}`).style.display = 'none';
+            
+            // Update progress
+            updateProgress(currentStep, '');
+            currentStep--;
+            updateProgress(currentStep, 'active');
+            
+            // Show previous step
+            document.getElementById(`step-${currentStep}`).style.display = 'block';
+        }
+
+        function updateProgress(step, status) {
+            const progressStep = document.querySelectorAll('.progress-step')[step - 1];
+            progressStep.className = `progress-step ${status}`;
+        }
+
+        function validateStep(step) {
+            switch(step) {
+                case 1:
+                    const sliceName = document.getElementById('slice-name').value;
+                    const vmCount = document.getElementById('vm-count').value;
+                    if (!sliceName.trim()) {
+                        alert('Por favor ingresa un nombre para el slice');
+                        return false;
+                    }
+                    if (!vmCount || vmCount < 2) {
+                        alert('El número mínimo de VMs es 2');
+                        return false;
+                    }
+                    return true;
+                case 2:
+                    // Validate VM configurations
+                    const vmCards = document.querySelectorAll('.vm-card');
+                    for (let card of vmCards) {
+                        const inputs = card.querySelectorAll('input[required], select[required]');
+                        for (let input of inputs) {
+                            if (!input.value.trim()) {
+                                alert('Por favor completa todas las configuraciones de las VMs');
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                case 3:
+                    if (nodes.length < 2) {
+                        alert('La topología debe tener al menos 2 nodos');
+                        return false;
+                    }
+                    // Update topology data before proceeding
+                    updateTopologyData();
+                    return true;
+                default:
+                    return true;
+            }
+        }
+
+        function generateVMConfiguration() {
+            const vmCount = parseInt(document.getElementById('vm-count').value);
+            const container = document.getElementById('vm-configurations');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= vmCount; i++) {
+                const vmCard = document.createElement('div');
+                vmCard.className = 'vm-card';
+                vmCard.innerHTML = `
+                    <h5><i class="fas fa-desktop me-2"></i>VM ${i}</h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-floating">
+                                <input type="text" class="form-control" id="vm-${i}-name" name="vm_${i}_name" value="VM${i}" required>
+                                <label for="vm-${i}-name">Nombre</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-floating">
+                                <select class="form-select" id="vm-${i}-cpu" name="vm_${i}_cpu" required>
+                                    <option value="1">1 Core</option>
+                                    <option value="2">2 Cores</option>
+                                    <option value="4">4 Cores</option>
+                                </select>
+                                <label for="vm-${i}-cpu">CPU</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-floating">
+                                <select class="form-select" id="vm-${i}-ram" name="vm_${i}_ram" required>
+                                    <option value="1GB">1GB</option>
+                                    <option value="2GB">2GB</option>
+                                    <option value="4GB">4GB</option>
+                                    <option value="8GB">8GB</option>
+                                </select>
+                                <label for="vm-${i}-ram">RAM</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-floating">
+                                <select class="form-select" id="vm-${i}-storage" name="vm_${i}_storage" required>
+                                    <option value="10GB">10GB</option>
+                                    <option value="20GB">20GB</option>
+                                    <option value="50GB">50GB</option>
+                                    <option value="100GB">100GB</option>
+                                </select>
+                                <label for="vm-${i}-storage">Almacenamiento</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-floating">
+                                <select class="form-select" id="vm-${i}-image" name="vm_${i}_image" required>
+                                    <option value="ubuntu:latest">Ubuntu 22.04</option>
+                                    <option value="centos:latest">CentOS 9</option>
+                                    <option value="debian:latest">Debian 12</option>
+                                    <option value="alpine:latest">Alpine Linux</option>
+                                    <option value="fedora:latest">Fedora 38</option>
+                                </select>
+                                <label for="vm-${i}-image">Sistema Operativo</label>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(vmCard);
+            }
+        }
+
+        function initializeNetworkVisualization() {
+            const container = document.getElementById('network-container');
+            const data = { nodes: nodes, edges: edges };
+            const options = {
+                nodes: {
+                    shape: 'circle',
+                    size: 30,
+                    font: { size: 14, color: '#333' },
+                    borderWidth: 3,
+                    color: {
+                        background: '#28a745',
+                        border: '#1e7e34',
+                        highlight: { background: '#20c997', border: '#17a2b8' }
+                    }
+                },
+                edges: {
+                    width: 3,
+                    color: '#6c757d',
+                    smooth: { type: 'continuous' }
+                },
+                physics: {
+                    enabled: true,
+                    stabilization: { iterations: 100 }
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true
+                }
+            };
+
+            network = new vis.Network(container, data, options);
+            
+            // Handle node clicks for connection mode
+            network.on('click', function(params) {
+                if (connectionMode && params.nodes.length > 0) {
+                    handleNodeClick(params.nodes[0]);
+                }
+            });
+
+            updateStats();
+        }
+
+        function selectTopologyType(type) {
+            topologyType = type;
+            document.querySelectorAll('[data-type]').forEach(option => {
+                option.classList.remove('active');
+            });
+            document.querySelector(`[data-type="${type}"]`).classList.add('active');
+            
+            // Show/hide appropriate controls
+            if (type === 'custom') {
+                document.getElementById('custom-controls').style.display = 'block';
+                document.getElementById('template-controls').style.display = 'none';
+            } else {
+                document.getElementById('custom-controls').style.display = 'none';
+                document.getElementById('template-controls').style.display = 'block';
+            }
+        }
+
+        function addNode() {
+            const vmCount = parseInt(document.getElementById('vm-count').value);
+            if (nodes.length >= vmCount) {
+                alert(`No se pueden agregar más nodos. Límite: ${vmCount} VMs`);
+                return;
+            }
+
+            const newNode = {
+                id: nodeId,
+                label: `VM${nodeId}`,
+                x: Math.random() * 400 - 200,
+                y: Math.random() * 300 - 150
+            };
+            nodes.add(newNode);
+            nodeId++;
+            updateStats();
+        }
+
+        function toggleConnectionMode() {
+            connectionMode = !connectionMode;
+            const btn = document.querySelector('button[onclick="toggleConnectionMode()"]');
+            if (connectionMode) {
+                btn.innerHTML = '<i class="fas fa-times me-1"></i>Cancelar Conexión';
+                btn.className = 'btn btn-danger btn-sm w-100 mb-2';
+            } else {
+                btn.innerHTML = '<i class="fas fa-link me-1"></i>Modo Conexión';
+                btn.className = 'btn btn-primary btn-sm w-100 mb-2';
+                selectedNode = null;
+            }
+        }
+
+        function handleNodeClick(nodeId) {
+            if (!selectedNode) {
+                selectedNode = nodeId;
+                // Highlight selected node
+                nodes.update({id: nodeId, color: {background: '#ffc107', border: '#e0a800'}});
+            } else {
+                if (selectedNode !== nodeId) {
+                    // Check if edge already exists
+                    const existingEdge = edges.get().find(edge => 
+                        (edge.from === selectedNode && edge.to === nodeId) ||
+                        (edge.from === nodeId && edge.to === selectedNode)
+                    );
+                    
+                    if (!existingEdge) {
+                        // Create new edge
+                        edges.add({
+                            from: selectedNode,
+                            to: nodeId
+                        });
+                    } else {
+                        alert('La conexión ya existe entre estos nodos');
+                    }
+                }
+                
+                // Reset node colors and selection
+                nodes.get().forEach(node => {
+                    nodes.update({
+                        id: node.id, 
+                        color: {background: '#28a745', border: '#1e7e34'}
+                    });
+                });
+                selectedNode = null;
+                updateStats();
+            }
+        }
+
+        function clearTopology() {
+            if (confirm('¿Estás seguro de que quieres limpiar toda la topología?')) {
+                nodes.clear();
+                edges.clear();
+                nodeId = 1;
+                selectedNode = null;
+                updateStats();
+            }
+        }
+
+        function applyTemplate(template) {
+            // Remove active class from all templates
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            // Add active class to selected template
+            document.querySelector(`[data-template="${template}"]`).classList.add('active');
+            
+            // Clear existing topology
+            nodes.clear();
+            edges.clear();
+            nodeId = 1;
+            
+            const vmCount = parseInt(document.getElementById('vm-count').value);
+            
+            // Generate topology based on template
+            switch(template) {
+                case 'star':
+                    generateStarTopology(vmCount);
+                    break;
+                case 'tree':
+                    generateTreeTopology(vmCount);
+                    break;
+                case 'ring':
+                    generateRingTopology(vmCount);
+                    break;
+                case 'mesh':
+                    generateMeshTopology(vmCount);
+                    break;
+                case 'linear':
+                    generateLinearTopology(vmCount);
+                    break;
+            }
+            
+            updateStats();
+        }
+
+        function generateStarTopology(vmCount) {
+            const centerNode = { id: 1, label: 'VM1', x: 0, y: 0 };
+            nodes.add(centerNode);
+            
+            const radius = 150;
+            for (let i = 2; i <= vmCount; i++) {
+                const angle = (2 * Math.PI * (i - 2)) / (vmCount - 1);
+                const x = radius * Math.cos(angle);
+                const y = radius * Math.sin(angle);
+                
+                nodes.add({ id: i, label: `VM${i}`, x: x, y: y });
+                edges.add({ from: 1, to: i });
+            }
+            nodeId = vmCount + 1;
+        }
+
+        function generateTreeTopology(vmCount) {
+            // Create a binary tree structure
+            const levels = Math.ceil(Math.log2(vmCount + 1));
+            let currentId = 1;
+            
+            // Root node
+            nodes.add({ id: 1, label: 'VM1', x: 0, y: -100 });
+            
+            for (let level = 1; level < levels && currentId < vmCount; level++) {
+                const nodesInLevel = Math.pow(2, level);
+                const yPos = level * 80 - 100;
+                const spacing = 300 / (nodesInLevel + 1);
+                
+                for (let i = 0; i < nodesInLevel && currentId < vmCount; i++) {
+                    currentId++;
+                    const xPos = (i + 1) * spacing - 150;
+                    
+                    nodes.add({ 
+                        id: currentId, 
+                        label: `VM${currentId}`, 
+                        x: xPos, 
+                        y: yPos 
+                    });
+                    
+                    // Connect to parent
+                    const parentId = Math.floor(currentId / 2);
+                    edges.add({ from: parentId, to: currentId });
+                }
+            }
+            nodeId = vmCount + 1;
+        }
+
+        function generateRingTopology(vmCount) {
+            const radius = 120;
+            
+            for (let i = 1; i <= vmCount; i++) {
+                const angle = (2 * Math.PI * (i - 1)) / vmCount;
+                const x = radius * Math.cos(angle);
+                const y = radius * Math.sin(angle);
+                
+                nodes.add({ id: i, label: `VM${i}`, x: x, y: y });
+                
+                // Connect to next node (and last to first)
+                const nextId = i === vmCount ? 1 : i + 1;
+                edges.add({ from: i, to: nextId });
+            }
+            nodeId = vmCount + 1;
+        }
+
+        function generateMeshTopology(vmCount) {
+            const radius = 100;
+            
+            // Create nodes in a circle
+            for (let i = 1; i <= vmCount; i++) {
+                const angle = (2 * Math.PI * (i - 1)) / vmCount;
+                const x = radius * Math.cos(angle);
+                const y = radius * Math.sin(angle);
+                
+                nodes.add({ id: i, label: `VM${i}`, x: x, y: y });
+            }
+            
+            // Connect every node to every other node
+            for (let i = 1; i <= vmCount; i++) {
+                for (let j = i + 1; j <= vmCount; j++) {
+                    edges.add({ from: i, to: j });
+                }
+            }
+            nodeId = vmCount + 1;
+        }
+
+        function generateLinearTopology(vmCount) {
+            const spacing = 200 / (vmCount - 1);
+            
+            for (let i = 1; i <= vmCount; i++) {
+                const x = (i - 1) * spacing - 100;
+                nodes.add({ id: i, label: `VM${i}`, x: x, y: 0 });
+                
+                // Connect to next node
+                if (i < vmCount) {
+                    edges.add({ from: i, to: i + 1 });
+                }
+            }
+            nodeId = vmCount + 1;
+        }
+
+        function updateStats() {
+            document.getElementById('node-count').textContent = `Nodos: ${nodes.length}`;
+            document.getElementById('edge-count').textContent = `Conexiones: ${edges.length}`;
+        }
+
+        function updateTopologyData() {
+            const topologyData = {
+                nodes: nodes.get(),
+                edges: edges.get()
+            };
+            document.getElementById('topology_data').value = JSON.stringify(topologyData);
+        }
+
+        function generateReview() {
+            // Basic information
+            document.getElementById('review-name').textContent = 
+                document.getElementById('slice-name').value;
+            document.getElementById('review-vm-count').textContent = 
+                document.getElementById('vm-count').value;
+            document.getElementById('review-description').textContent = 
+                document.getElementById('slice-description').value || 'Sin descripción';
+            
+            // Topology information
+            document.getElementById('review-nodes').textContent = nodes.length;
+            document.getElementById('review-connections').textContent = edges.length;
+            document.getElementById('review-topology-type').textContent = 
+                topologyType === 'custom' ? 'Personalizada' : 'Plantilla';
+            
+            // VM configurations
+            const vmReviewList = document.getElementById('vm-review-list');
+            vmReviewList.innerHTML = '';
+            
+            const vmCount = parseInt(document.getElementById('vm-count').value);
+            for (let i = 1; i <= vmCount; i++) {
+                const vmName = document.getElementById(`vm-${i}-name`).value;
+                const vmCpu = document.getElementById(`vm-${i}-cpu`).value;
+                const vmRam = document.getElementById(`vm-${i}-ram`).value;
+                const vmStorage = document.getElementById(`vm-${i}-storage`).value;
+                const vmImage = document.getElementById(`vm-${i}-image`).value;
+                
+                const vmReview = document.createElement('div');
+                vmReview.className = 'row mb-2 p-2 bg-light rounded';
+                vmReview.innerHTML = `
+                    <div class="col-md-2"><strong>${vmName}</strong></div>
+                    <div class="col-md-2">${vmCpu} CPU</div>
+                    <div class="col-md-2">${vmRam} RAM</div>
+                    <div class="col-md-2">${vmStorage}</div>
+                    <div class="col-md-4">${vmImage}</div>
+                `;
+                vmReviewList.appendChild(vmReview);
+            }
+        }
+    </script>
+</body>
+</html>
