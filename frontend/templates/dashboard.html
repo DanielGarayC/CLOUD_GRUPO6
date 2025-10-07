@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VNRT - Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="dashboard-page">
+        <!-- Barra Superior -->
+        <nav class="top-bar">
+            <div class="container-fluid">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="navbar-brand mb-0">VNRT</span>
+                    <div class="d-flex align-items-center">
+                        <span class="me-3">Bienvenido, {{ user.nombre }}</span>
+                        <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-sign-out-alt me-1"></i>Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Contenido Principal -->
+        <div class="main-content">
+            <div class="page-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="page-title">VNRT - Slices</h1>
+                        <p class="page-subtitle">Información general sobre los slices existentes</p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('create_slice') }}" class="btn btn-success">
+                            <i class="fas fa-plus me-2"></i>Crear Slice
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="content-card">
+                <!-- Tabla de Slices -->
+                <table class="table data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Instancias</th>
+                            <th>Creación</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for slice in slices %}
+                        <tr>
+                            <td><a href="#" class="text-decoration-none slice-link" data-slice-id="{{ slice.id }}" onclick="selectSlice({{ slice.id }})">Slice #{{ slice.id }}</a></td>
+                            <td>{{ slice.instancias|length }} VMs</td>
+                            <td>{{ slice.fecha_creacion.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>
+                                <span class="status-badge {{ 'status-running' if slice.estado == 'RUNNING' else 'status-stopped' }}">
+                                    {{ slice.estado }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('slice_topology', slice_id=slice.id) }}" class="btn btn-sm btn-outline-primary me-1">
+                                    <i class="fas fa-project-diagram me-1"></i>Ver Topología
+                                </a>
+                                <a href="{{ url_for('download_topology', slice_id=slice.id) }}" class="btn btn-sm btn-outline-success me-1" title="Descargar JSON de Topología">
+                                    <i class="fas fa-download me-1"></i>JSON
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteSlice({{ slice.id }}, '{{ slice.nombre or 'Slice #' + slice.id|string }}')" title="Eliminar Slice">
+                                    <i class="fas fa-trash me-1"></i>Eliminar
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not slices %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">No hay slices disponibles</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+
+                <!-- Panel de detalles del slice -->
+                <div id="sliceDetails" class="slice-details mt-4" style="display: none;">
+                    <h4>Detalles del Slice</h4>
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>ID:</strong> <span id="detailId"></span></p>
+                                    <p><strong>Estado:</strong> <span id="detailEstado"></span></p>
+                                    <p><strong>Fecha de Creación:</strong> <span id="detailCreated"></span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Instancias:</strong> <span id="detailInstances"></span></p>
+                                    <p><strong>Propietario:</strong> <span id="detailOwner"></span></p>
+                                    <div id="detailActions">
+                                        <a href="#" id="viewTopologyLink" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-project-diagram me-1"></i>Ver Topología
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3" id="instancesList">
+                                <!-- Instances will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
