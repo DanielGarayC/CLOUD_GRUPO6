@@ -3,23 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VNRT - Topología del Slice</title>
+    <title>TeleFlow - Topología del Slice</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
+        /* Estilos específicos para topología - evitar conflictos con dashboard.css */
         #topology-viewer {
             height: 500px;
             border: 1px solid #ddd;
             border-radius: 8px;
             margin: 20px 0;
+            position: relative;
+            background: white;
         }
+
+        /* Controles de navegación estilo dashboard pero específicos para topología */
+        .topology-navigation-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            z-index: 1000 !important;
+        }
+
+        .topology-navigation-controls .btn {
+            border-radius: 6px;
+            font-size: 0.85rem;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            background: white;
+            color: #495057;
+            transition: all 0.2s ease;
+            z-index: 1001 !important;
+            position: relative;
+        }
+
+        .topology-navigation-controls .btn:hover {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .topology-navigation-controls .btn:focus {
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+
+        /* Panel de zoom circular como en la imagen */
+        .topology-zoom-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000 !important;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .topology-zoom-panel-right {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000 !important;
+            display: flex;
+            gap: 5px;
+        }
+
+        /* Botones circulares de navegación (flechas) */
+        .nav-btn-circular {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #28a745;
+            border: 2px solid #1e7e34;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            z-index: 1001 !important;
+            position: relative;
+        }
+
+        .nav-btn-circular:hover {
+            background: #1e7e34;
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        /* Botones circulares de zoom */
+        .zoom-btn-circular {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: #28a745;
+            border: 2px solid #1e7e34;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 1001 !important;
+            position: relative;
+        }
+
+        .zoom-btn-circular:hover {
+            background: #1e7e34;
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        /* Disposición en cruz para navegación */
+        .nav-controls-cross {
+            position: absolute;
+            bottom: 80px;
+            left: 20px;
+            z-index: 1000 !important;
+            display: grid;
+            grid-template-columns: 40px 40px 40px;
+            grid-template-rows: 40px 40px 40px;
+            gap: 5px;
+        }
+
+        .nav-up { grid-column: 2; grid-row: 1; }
+        .nav-left { grid-column: 1; grid-row: 2; }
+        .nav-center { grid-column: 2; grid-row: 2; }
+        .nav-right { grid-column: 3; grid-row: 2; }
+        .nav-down { grid-column: 2; grid-row: 3; }
+
+        /* Panel de información de zoom */
+        .zoom-info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000 !important;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            color: #495057;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
         .instance-card {
             border: 1px solid #ddd;
             border-radius: 8px;
             padding: 15px;
             margin: 10px 0;
+            background: white;
+        }
+
+        /* Asegurar que los elementos no sean ocultados por z-index */
+        .topology-controls-container {
+            position: relative;
+            z-index: 1000 !important;
+        }
+
+        .topology-controls-container * {
+            z-index: 1001 !important;
+        }
+
+        /* Media queries para responsivo */
+        @media (max-width: 768px) {
+            .topology-navigation-controls {
+                justify-content: center;
+                margin-bottom: 15px;
+            }
+            
+            .nav-controls-cross {
+                bottom: 120px;
+                left: 10px;
+            }
+            
+            .topology-zoom-panel-right {
+                bottom: 10px;
+                right: 10px;
+            }
+            
+            .zoom-info-panel {
+                top: 10px;
+                right: 10px;
+                font-size: 0.8rem;
+                padding: 8px 12px;
+            }
         }
     </style>
 </head>
@@ -30,7 +205,7 @@
             <div class="container-fluid">
                 <div class="navbar-brand">
                     <i class="fas fa-cloud me-2"></i>
-                    <strong>VNRT</strong>
+                    <strong>TeleFlow</strong>
                     <span class="ms-2 text-muted">| Topología del Slice</span>
                 </div>
                 <div class="navbar-nav ms-auto">
@@ -90,8 +265,57 @@
 
             <!-- Topology Visualization -->
             <div class="content-card mb-4">
-                <h4><i class="fas fa-project-diagram me-2"></i>Topología de Red</h4>
-                <div id="topology-viewer"></div>
+                <div class="topology-controls-container">
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+                        <h4><i class="fas fa-project-diagram me-2"></i>Topología de Red</h4>
+                    
+                    </div>
+                </div>
+                
+                <div class="position-relative">
+                    <div id="topology-viewer"></div>
+                    
+                    <!-- Panel de información de zoom (top-right) -->
+                    <div class="zoom-info-panel">
+                        <div class="d-flex align-items-center gap-2">
+                            <small class="text-muted">Nodos: {{ slice.instancias|length }}</small>
+                            <span>|</span>
+                            <small class="text-muted">Conexiones: 0</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Controles de navegación en cruz (bottom-left) -->
+                    <div class="nav-controls-cross">
+                        <div class="nav-btn-circular nav-up" onclick="panUp()" title="Arriba">
+                            <i class="fas fa-chevron-up"></i>
+                        </div>
+                        <div class="nav-btn-circular nav-left" onclick="panLeft()" title="Izquierda">
+                            <i class="fas fa-chevron-left"></i>
+                        </div>
+                        <div class="nav-btn-circular nav-center" onclick="centerView()" title="Centrar">
+                            <i class="fas fa-crosshairs"></i>
+                        </div>
+                        <div class="nav-btn-circular nav-right" onclick="panRight()" title="Derecha">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                        <div class="nav-btn-circular nav-down" onclick="panDown()" title="Abajo">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Controles de zoom (bottom-right) -->
+                    <div class="topology-zoom-panel-right">
+                        <div class="zoom-btn-circular" onclick="fitToScreen()" title="Ajustar pantalla">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                        </div>
+                        <div class="zoom-btn-circular" onclick="zoomOut()" title="Zoom Out">
+                            <i class="fas fa-minus"></i>
+                        </div>
+                        <div class="zoom-btn-circular" onclick="zoomIn()" title="Zoom In">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Instance Details -->
@@ -125,6 +349,11 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Variables globales
+        let network;
+        let currentScale = 1;
+        const panStep = 100; // Pixels para moverse en cada dirección
+
         document.addEventListener('DOMContentLoaded', function() {
             const container = document.getElementById('topology-viewer');
             
@@ -164,11 +393,18 @@
                 },
                 interaction: {
                     hover: true,
-                    tooltipDelay: 200
+                    tooltipDelay: 200,
+                    dragView: true,
+                    zoomView: true
                 }
             };
             
-            const network = new vis.Network(container, data, options);
+            network = new vis.Network(container, data, options);
+            
+            // Event listeners para zoom
+            network.on('zoom', function(params) {
+                currentScale = params.scale;
+            });
             
             // Add click event for nodes
             network.on('click', function(params) {
@@ -178,7 +414,112 @@
                     alert(`Nodo: ${node.label}\nID: ${nodeId}`);
                 }
             });
+            
+            // Centrar vista al cargar
+            setTimeout(() => {
+                centerView();
+            }, 1000);
         });
+
+        // Funciones de navegación
+        function centerView() {
+            if (network) {
+                network.fit({
+                    animation: {
+                        duration: 800,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }
+        }
+
+        function fitToScreen() {
+            if (network) {
+                network.fit({
+                    animation: {
+                        duration: 800,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }
+        }
+
+        function zoomIn() {
+            if (network) {
+                currentScale = Math.min(currentScale * 1.2, 3);
+                const position = network.getViewPosition();
+                
+                network.moveTo({
+                    position: position,
+                    scale: currentScale,
+                    animation: {
+                        duration: 300,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }
+        }
+
+        function zoomOut() {
+            if (network) {
+                currentScale = Math.max(currentScale / 1.2, 0.2);
+                const position = network.getViewPosition();
+                
+                network.moveTo({
+                    position: position,
+                    scale: currentScale,
+                    animation: {
+                        duration: 300,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }
+        }
+
+        // Funciones de paneo (movimiento)
+        function panUp() {
+            if (network) {
+                const position = network.getViewPosition();
+                network.moveTo({
+                    position: { x: position.x, y: position.y - panStep },
+                    scale: currentScale,
+                    animation: { duration: 300 }
+                });
+            }
+        }
+
+        function panDown() {
+            if (network) {
+                const position = network.getViewPosition();
+                network.moveTo({
+                    position: { x: position.x, y: position.y + panStep },
+                    scale: currentScale,
+                    animation: { duration: 300 }
+                });
+            }
+        }
+
+        function panLeft() {
+            if (network) {
+                const position = network.getViewPosition();
+                network.moveTo({
+                    position: { x: position.x - panStep, y: position.y },
+                    scale: currentScale,
+                    animation: { duration: 300 }
+                });
+            }
+        }
+
+        function panRight() {
+            if (network) {
+                const position = network.getViewPosition();
+                network.moveTo({
+                    position: { x: position.x + panStep, y: position.y },
+                    scale: currentScale,
+                    animation: { duration: 300 }
+                });
+            }
+        }
     </script>
 </body>
 </html>

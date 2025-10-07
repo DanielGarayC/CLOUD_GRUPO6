@@ -3,274 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VNRT - Crear Slice</title>
+    <title>TeleFlow - Crear Slice</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/create_slice.css') }}" rel="stylesheet">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-        }
-
-        .navbar {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
-        }
-
-        .main-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .slice-designer {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            padding: 30px;
-            margin: 20px 0;
-        }
-
-        .step-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f8f9fa;
-        }
-
-        .step-number {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, #28a745, #20c997);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            margin-right: 15px;
-        }
-
-        .step-title {
-            margin: 0;
-            color: #2c3e50;
-            font-weight: 600;
-        }
-
-        .vm-card {
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-radius: 15px;
-            padding: 20px;
-            margin: 15px 0;
-            transition: all 0.3s ease;
-        }
-
-        .vm-card:hover {
-            border-color: #28a745;
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.2);
-        }
-
-        .topology-container {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 30px;
-            margin: 20px 0;
-        }
-
-        .topology-controls {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 25px;
-        }
-
-        .topology-option {
-            background: white;
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
-            padding: 20px;
-            margin: 10px 0;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-        }
-
-        .topology-option:hover {
-            border-color: #28a745;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.2);
-        }
-
-        .topology-option.active {
-            border-color: #28a745;
-            background: linear-gradient(45deg, rgba(40, 167, 69, 0.1), rgba(32, 201, 151, 0.1));
-        }
-
-        .topology-option i {
-            font-size: 2.5rem;
-            color: #28a745;
-            margin-bottom: 10px;
-        }
-
-        .topology-visualizer {
-            background: white;
-            border: 2px solid #e9ecef;
-            border-radius: 15px;
-            height: 500px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .custom-controls {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            z-index: 100;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .control-btn {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .control-btn:hover {
-            background: #28a745;
-            color: white;
-            border-color: #28a745;
-        }
-
-        .topology-stats {
-            position: absolute;
-            bottom: 15px;
-            left: 15px;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 8px;
-            padding: 10px 15px;
-            font-size: 0.9rem;
-            color: #6c757d;
-        }
-
-        .preset-topologies {
-            margin: 20px 0;
-        }
-
-        .preset-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-
-        .preset-btn {
-            background: white;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            padding: 15px 10px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .preset-btn:hover {
-            border-color: #17a2b8;
-            background: rgba(23, 162, 184, 0.1);
-        }
-
-        .preset-btn.active {
-            border-color: #17a2b8;
-            background: rgba(23, 162, 184, 0.2);
-        }
-
-        .form-floating {
-            margin-bottom: 20px;
-        }
-
-        .btn-gradient {
-            background: linear-gradient(45deg, #28a745, #20c997);
-            border: none;
-            color: white;
-            font-weight: 600;
-            padding: 12px 30px;
-            border-radius: 25px;
-            transition: all 0.3s ease;
-        }
-
-        .btn-gradient:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(40, 167, 69, 0.3);
-            color: white;
-        }
-
-        .progress-indicator {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            position: relative;
-        }
-
-        .progress-step {
-            flex: 1;
-            text-align: center;
-            position: relative;
-        }
-
-        .progress-step::before {
-            content: '';
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: #e9ecef;
-            display: block;
-            margin: 0 auto 10px;
-            transition: all 0.3s ease;
-        }
-
-        .progress-step.active::before {
-            background: #28a745;
-        }
-
-        .progress-step.completed::before {
-            background: #20c997;
-        }
-
-        .progress-line {
-            position: absolute;
-            top: 15px;
-            left: 50%;
-            right: -50%;
-            height: 2px;
-            background: #e9ecef;
-            z-index: -1;
-        }
-
-        .progress-step:last-child .progress-line {
-            display: none;
-        }
-
-        .alert {
-            border-radius: 12px;
-            border: none;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        #network-container {
-            height: 100%;
-            border-radius: 12px;
-        }
-    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -278,7 +15,7 @@
         <div class="container-fluid">
             <div class="navbar-brand">
                 <i class="fas fa-cloud me-2"></i>
-                <strong>VNRT</strong>
+                <strong>TeleFlow</strong>
                 <span class="ms-2 text-muted">| Diseñador de Slice</span>
             </div>
             <div class="navbar-nav ms-auto">
@@ -448,14 +185,47 @@
                             </div>
                         </div>
                     </div>
-                    
                     <div class="topology-visualizer">
                         <div id="network-container"></div>
+                        
+                        <!-- CONTROLES DE DIRECCIÓN (IZQUIERDA) -->
+                        <div class="direction-controls">
+                            <div class="direction-btn up" onclick="moveView('up')" title="Mover hacia arriba">
+                                <i class="fas fa-chevron-up"></i>
+                            </div>
+                            <div class="direction-btn left" onclick="moveView('left')" title="Mover hacia la izquierda">
+                                <i class="fas fa-chevron-left"></i>
+                            </div>
+                            <div class="direction-btn center" onclick="centerView()" title="Centrar vista">
+                                <i class="fas fa-crosshairs"></i>
+                            </div>
+                            <div class="direction-btn right" onclick="moveView('right')" title="Mover hacia la derecha">
+                                <i class="fas fa-chevron-right"></i>
+                            </div>
+                            <div class="direction-btn down" onclick="moveView('down')" title="Mover hacia abajo">
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                        </div>
+                        
+                        <!-- CONTROLES DE ZOOM (DERECHA) -->
+                        <div class="navigation-controls">
+                            <div class="nav-control-btn" onclick="fitToScreen()" title="Ajustar a pantalla">
+                                <i class="fas fa-expand-arrows-alt"></i>
+                            </div>
+                            <div class="nav-control-btn" onclick="zoomOut()" title="Zoom Out">
+                                <i class="fas fa-minus"></i>
+                            </div>
+                            <div class="nav-control-btn" onclick="zoomIn()" title="Zoom In">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                        </div>
+                        
                         <div class="topology-stats">
                             <span id="node-count">Nodos: 0</span> | 
                             <span id="edge-count">Conexiones: 0</span>
                         </div>
                     </div>
+                    
                 </div>
 
                 <input type="hidden" id="topology_data" name="topology_data">
@@ -527,12 +297,213 @@
         let connectionMode = false;
         let selectedNode = null;
         let topologyType = 'custom';
+        let currentScale = 1;
+        let viewPosition = { x: 0, y: 0 };
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             initializeNetworkVisualization();
             generateVMConfiguration();
         });
+
+        // Función para mover la vista en direcciones específicas
+        function moveView(direction) {
+            if (network) {
+                const currentPosition = network.getViewPosition();
+                const moveDistance = 100;
+                let newPosition = { ...currentPosition };
+
+                switch(direction) {
+                    case 'up':
+                        newPosition.y -= moveDistance;
+                        break;
+                    case 'down':
+                        newPosition.y += moveDistance;
+                        break;
+                    case 'left':
+                        newPosition.x -= moveDistance;
+                        break;
+                    case 'right':
+                        newPosition.x += moveDistance;
+                        break;
+                }
+
+                network.moveTo({
+                    position: newPosition,
+                    animation: {
+                        duration: 300,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }
+        }
+
+        // Función para centrar la vista en los nodos
+        function centerView() {
+            if (network && nodes.length > 0) {
+                network.fit({
+                    animation: {
+                        duration: 800,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                updateZoomDisplay();
+            } else {
+                // Si no hay nodos, centrar en el origen
+                network.moveTo({
+                    position: { x: 0, y: 0 },
+                    scale: 1,
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                currentScale = 1;
+                updateZoomDisplay();
+            }
+        }
+
+        // Función para ajustar toda la topología en pantalla
+        function fitToScreen() {
+            if (network) {
+                if (nodes.length > 0) {
+                    network.fit({
+                        animation: {
+                            duration: 800,
+                            easingFunction: 'easeInOutQuad'
+                        }
+                    });
+                } else {
+                    network.moveTo({
+                        position: { x: 0, y: 0 },
+                        scale: 1,
+                        animation: {
+                            duration: 500,
+                            easingFunction: 'easeInOutQuad'
+                        }
+                    });
+                }
+                updateZoomDisplay();
+            }
+        }
+
+        // Función para hacer zoom in
+        function zoomIn() {
+            if (network) {
+                currentScale = Math.min(currentScale * 1.2, 3);
+                const position = network.getViewPosition();
+                
+                network.moveTo({
+                    position: position,
+                    scale: currentScale,
+                    animation: {
+                        duration: 300,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                updateZoomDisplay();
+            }
+        }
+
+        // Función para hacer zoom out
+        function zoomOut() {
+            if (network) {
+                currentScale = Math.max(currentScale / 1.2, 0.2);
+                const position = network.getViewPosition();
+                
+                network.moveTo({
+                    position: position,
+                    scale: currentScale,
+                    animation: {
+                        duration: 300,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                updateZoomDisplay();
+            }
+        }
+
+
+
+
+        // Función para establecer zoom específico
+        function setZoom(scale) {
+            if (network) {
+                currentScale = parseFloat(scale);
+                const position = network.getViewPosition();
+                
+                network.moveTo({
+                    position: position,
+                    scale: currentScale,
+                    animation: {
+                        duration: 200,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                updateZoomDisplay();
+            }
+        }
+
+        // Función para actualizar el display del zoom
+        function updateZoomDisplay() {
+            const zoomPercentage = Math.round(currentScale * 100);
+            document.getElementById('zoom-level').textContent = `${zoomPercentage}%`;
+            document.getElementById('zoom-slider').value = currentScale;
+        }
+
+        function initializeNetworkVisualization() {
+            const container = document.getElementById('network-container');
+            const data = { nodes: nodes, edges: edges };
+            const options = {
+                nodes: {
+                    shape: 'circle',
+                    size: 30,
+                    font: { size: 14, color: '#333' },
+                    borderWidth: 3,
+                    color: {
+                        background: '#28a745',
+                        border: '#1e7e34',
+                        highlight: { background: '#20c997', border: '#17a2b8' }
+                    }
+                },
+                edges: {
+                    width: 3,
+                    color: '#6c757d',
+                    smooth: { type: 'continuous' }
+                },
+                physics: {
+                    enabled: true,
+                    stabilization: { iterations: 100 }
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true
+                }
+            };
+
+            network = new vis.Network(container, data, options);
+            
+            // Event listeners para actualizar el zoom
+            network.on('zoom', function(params) {
+                currentScale = params.scale;
+                updateZoomDisplay();
+            });
+            
+            network.on('dragEnd', function(params) {
+                viewPosition = network.getViewPosition();
+            });
+            
+            // Handle node clicks for connection mode
+            network.on('click', function(params) {
+                if (connectionMode && params.nodes.length > 0) {
+                    handleNodeClick(params.nodes[0]);
+                }
+            });
+
+            updateStats();
+            updateZoomDisplay();
+        }
 
         function nextStep() {
             // Validate current step
@@ -682,49 +653,6 @@
             }
         }
 
-        function initializeNetworkVisualization() {
-            const container = document.getElementById('network-container');
-            const data = { nodes: nodes, edges: edges };
-            const options = {
-                nodes: {
-                    shape: 'circle',
-                    size: 30,
-                    font: { size: 14, color: '#333' },
-                    borderWidth: 3,
-                    color: {
-                        background: '#28a745',
-                        border: '#1e7e34',
-                        highlight: { background: '#20c997', border: '#17a2b8' }
-                    }
-                },
-                edges: {
-                    width: 3,
-                    color: '#6c757d',
-                    smooth: { type: 'continuous' }
-                },
-                physics: {
-                    enabled: true,
-                    stabilization: { iterations: 100 }
-                },
-                interaction: {
-                    dragNodes: true,
-                    dragView: true,
-                    zoomView: true
-                }
-            };
-
-            network = new vis.Network(container, data, options);
-            
-            // Handle node clicks for connection mode
-            network.on('click', function(params) {
-                if (connectionMode && params.nodes.length > 0) {
-                    handleNodeClick(params.nodes[0]);
-                }
-            });
-
-            updateStats();
-        }
-
         function selectTopologyType(type) {
             topologyType = type;
             document.querySelectorAll('[data-type]').forEach(option => {
@@ -854,6 +782,9 @@
             }
             
             updateStats();
+            setTimeout(() => {
+                centerView();
+            }, 500);
         }
 
         function generateStarTopology(vmCount) {
@@ -998,11 +929,11 @@
                 const vmImage = document.getElementById(`vm-${i}-image`).value;
                 
                 const vmReview = document.createElement('div');
-                vmReview.className = 'row mb-2 p-2 bg-light rounded';
+                vmReview.className = 'row mb-2';
                 vmReview.innerHTML = `
                     <div class="col-md-2"><strong>${vmName}</strong></div>
-                    <div class="col-md-2">${vmCpu} CPU</div>
-                    <div class="col-md-2">${vmRam} RAM</div>
+                    <div class="col-md-2">${vmCpu} Core(s)</div>
+                    <div class="col-md-2">${vmRam}</div>
                     <div class="col-md-2">${vmStorage}</div>
                     <div class="col-md-4">${vmImage}</div>
                 `;

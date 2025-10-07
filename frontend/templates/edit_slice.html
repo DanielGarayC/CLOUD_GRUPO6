@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeleFlow - Crear Slice</title>
+    <title>TeleFlow - Editar Slice</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
@@ -52,6 +52,35 @@
             opacity: 0.6;
             cursor: not-allowed;
         }
+        .warning-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 50%;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .ml-2 {
+            margin-left: 0.5rem;
+        }
     </style>
 </head>
 <body class="dashboard-body">
@@ -61,8 +90,8 @@
             <div class="container-fluid">
                 <div class="navbar-brand">
                     <i class="fas fa-cloud me-2"></i>
-                    <strong>TeleFlow </strong>
-                    <span class="ms-2 text-muted">| Crear Slice</span>
+                    <strong>TeleFlow</strong>
+                    <span class="ms-2 text-muted">| Editar Slice</span>
                 </div>
                 <div class="navbar-nav ms-auto">
                     <div class="nav-item dropdown">
@@ -86,29 +115,23 @@
         <!-- Main Content -->
         <div class="main-content">
             <div class="page-header">
-                <h1 class="page-title">Crear Nuevo Slice</h1>
-                <p class="page-subtitle">Configure las instancias virtuales y su topología de red</p>
+                <h1 class="page-title">Editar Slice: {{ slice.nombre or 'Slice #' + slice.idslice|string }}</h1>
+                <p class="page-subtitle">Modifica la configuración de instancias virtuales y su topología de red</p>
             </div>
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
+            <div class="warning-box">
+                <h5>⚠️ Advertencia Importante</h5>
+                <p>Está editando un slice existente. Una vez que guarde los cambios, <strong>no habrá forma de recuperar la configuración anterior</strong>.</p>
+            </div>
 
-            <form method="POST" id="create-slice-form">
+            <form method="POST" id="edit-slice-form">
                 <!-- Step 0: Slice Name -->
                 <div class="content-card mb-4">
                     <h4><i class="fas fa-tag me-2"></i>Información del Slice</h4>
                     <div class="row">
                         <div class="col-md-6">
                             <label for="slice_name" class="form-label">Nombre del Slice</label>
-                            <input type="text" class="form-control" id="slice_name" name="slice_name" required placeholder="Ej: TEL141_2025-2_20206466">
+                            <input type="text" class="form-control" id="slice_name" name="slice_name" value="{{ slice.nombre or '' }}" required placeholder="Ej: TEL141_2025-2_20206466">
                         </div>
                     </div>
                 </div>
@@ -119,7 +142,7 @@
                     <div class="row">
                         <div class="col-md-6">
                             <label for="num_vms" class="form-label">Número de VMs</label>
-                            <input type="number" class="form-control" id="num_vms" name="num_vms" min="1" max="10" value="2" required onchange="handleVMCountChange()">
+                            <input type="number" class="form-control" id="num_vms" name="num_vms" min="1" max="10" value="{{ slice.instancias|length }}" required onchange="handleVMCountChange()">
                         </div>
                     </div>
                 </div>
@@ -152,17 +175,17 @@
                             <small>Diseña tu propia topología</small>
                         </div>
                     </div>
-                    <input type="hidden" id="topology_type" name="topology_type" value="star" required>
+                    <input type="hidden" id="topology_type" name="topology_type" value="custom" required>
                 </div>
 
                 <!-- Step 4: Custom Topology Designer -->
-                <div class="content-card mb-4" id="custom-topology-card" style="display: none;">
+                <div class="content-card mb-4" id="custom-topology-card">
                     <h4><i class="fas fa-pencil-ruler me-2"></i>Diseñador de Topología</h4>
                     <p class="text-muted">Usa los controles para crear nodos y conectarlos. La topología se guardará automáticamente.</p>
                     
                     <div class="node-counter">
                         <i class="fas fa-info-circle me-2"></i>
-                        <span id="node-count-display">Nodos: 0 / 2</span>
+                        <span id="node-count-display">Nodos: 0 / {{ slice.instancias|length }}</span>
                         <span class="text-muted ms-2">(Máximo basado en el número de VMs configuradas)</span>
                     </div>
                     
@@ -199,12 +222,25 @@
                         <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Cancelar
                         </a>
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-save me-1"></i>Crear Slice
+                        <button type="button" class="btn btn-warning" onclick="showConfirmModal()">
+                            <i class="fas fa-save me-1"></i>Guardar Cambios
                         </button>
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h3>⚠️ Confirmar Cambios</h3>
+            <p><strong>ADVERTENCIA:</strong> Una vez que realice los cambios, no habrá forma de recuperar el slice anterior.</p>
+            <p>Esta acción es <strong>IRREVERSIBLE</strong>.</p>
+            <p>¿Está seguro de que desea continuar?</p>
+            <br>
+            <button class="btn btn-danger" onclick="confirmSave()">Sí, guardar cambios definitivamente</button>
+            <button class="btn btn-secondary ml-2" onclick="closeModal()">Cancelar</button>
         </div>
     </div>
 
@@ -214,6 +250,15 @@
         let customNodes = null;
         let customEdges = null;
         let customNodeId = 1;
+        
+        // Convertir la topología actual de forma segura
+        let currentTopology = {{ current_topology | tojson | safe }};
+        if (!currentTopology || typeof currentTopology !== 'object') {
+            currentTopology = { nodes: [], edges: [] };
+        }
+
+        // Datos de las instancias actuales (serializados correctamente)
+        let existingInstances = {{ instances_data | tojson | safe }};
 
         function generateVMConfig() {
             const numVMs = document.getElementById('num_vms').value;
@@ -221,6 +266,7 @@
             container.innerHTML = '';
 
             for (let i = 1; i <= numVMs; i++) {
+                const existingInstance = existingInstances[i-1] || null;
                 const vmCard = document.createElement('div');
                 vmCard.className = 'vm-config-card';
                 vmCard.innerHTML = `
@@ -228,27 +274,27 @@
                     <div class="row">
                         <div class="col-md-3">
                             <label class="form-label">Nombre</label>
-                            <input type="text" class="form-control" name="vm_${i}_name" value="VM${i}" required>
+                            <input type="text" class="form-control" name="vm_${i}_name" value="${existingInstance ? existingInstance.nombre : 'VM' + i}" required>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">CPU</label>
-                            <input type="text" class="form-control" name="vm_${i}_cpu" value="1" required>
+                            <input type="text" class="form-control" name="vm_${i}_cpu" value="${existingInstance ? existingInstance.cpu : '1'}" required>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">RAM</label>
-                            <input type="text" class="form-control" name="vm_${i}_ram" value="1GB" required>
+                            <input type="text" class="form-control" name="vm_${i}_ram" value="${existingInstance ? existingInstance.ram : '1GB'}" required>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Almacenamiento</label>
-                            <input type="text" class="form-control" name="vm_${i}_storage" value="10GB" required>
+                            <input type="text" class="form-control" name="vm_${i}_storage" value="${existingInstance ? existingInstance.storage : '10GB'}" required>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Imagen</label>
                             <select class="form-select" name="vm_${i}_image" required>
-                                <option value="ubuntu:latest">Ubuntu Latest</option>
-                                <option value="centos:latest">CentOS Latest</option>
-                                <option value="debian:latest">Debian Latest</option>
-                                <option value="alpine:latest">Alpine Latest</option>
+                                <option value="ubuntu:latest" ${existingInstance && existingInstance.imagen === 'ubuntu:latest' ? 'selected' : ''}>Ubuntu Latest</option>
+                                <option value="centos:latest" ${existingInstance && existingInstance.imagen === 'centos:latest' ? 'selected' : ''}>CentOS Latest</option>
+                                <option value="debian:latest" ${existingInstance && existingInstance.imagen === 'debian:latest' ? 'selected' : ''}>Debian Latest</option>
+                                <option value="alpine:latest" ${existingInstance && existingInstance.imagen === 'alpine:latest' ? 'selected' : ''}>Alpine Latest</option>
                             </select>
                         </div>
                     </div>
@@ -261,36 +307,8 @@
             generateVMConfig();
             updateNodeCountDisplay();
             
-            // Si hay una topología personalizada activa, validar los nodos existentes
             if (customNodes && document.getElementById('topology_type').value === 'custom') {
                 validateExistingNodes();
-            }
-        }
-
-        function validateExistingNodes() {
-            const maxVMs = parseInt(document.getElementById('num_vms').value);
-            const currentNodes = customNodes.get();
-            
-            // Si hay más nodos que VMs permitidas, eliminar los excedentes
-            if (currentNodes.length > maxVMs) {
-                const nodesToRemove = currentNodes.slice(maxVMs);
-                const nodeIdsToRemove = nodesToRemove.map(node => node.id);
-                
-                // Eliminar nodos excedentes
-                customNodes.remove(nodeIdsToRemove);
-                
-                // Eliminar conexiones que involucren los nodos eliminados
-                const existingEdges = customEdges.get();
-                const edgesToRemove = existingEdges.filter(edge => 
-                    nodeIdsToRemove.includes(edge.from) || nodeIdsToRemove.includes(edge.to)
-                );
-                customEdges.remove(edgesToRemove.map(edge => edge.id));
-                
-                updateSelectOptions();
-                updateTopologyData();
-                
-                // Mostrar mensaje informativo
-                alert(`Se eliminaron ${nodesToRemove.length} nodo(s) porque excedían el límite de ${maxVMs} VMs configuradas.`);
             }
         }
 
@@ -318,10 +336,17 @@
         function initCustomTopology() {
             const container = document.getElementById('custom-topology-container');
             
-            // Initialize nodes and edges
-            customNodes = new vis.DataSet([]);
-            customEdges = new vis.DataSet([]);
-            customNodeId = 1;
+            // Initialize nodes and edges with current topology
+            customNodes = new vis.DataSet(currentTopology.nodes || []);
+            customEdges = new vis.DataSet(currentTopology.edges || []);
+            
+            // Set node counter based on existing nodes
+            if (customNodes.length > 0) {
+                const nodeIds = customNodes.getIds();
+                if (nodeIds.length > 0) {
+                    customNodeId = Math.max(...nodeIds) + 1;
+                }
+            }
             
             const data = { nodes: customNodes, edges: customEdges };
             const options = {
@@ -378,7 +403,6 @@
             const toNode = document.getElementById('toNode').value;
             
             if (fromNode && toNode && fromNode !== toNode) {
-                // Verificar si ya existe una conexión entre estos nodos
                 const existingEdges = customEdges.get();
                 const edgeExists = existingEdges.some(edge => 
                     (edge.from == fromNode && edge.to == toNode) || 
@@ -426,7 +450,6 @@
                 display.textContent = `Nodos: ${currentNodeCount} / ${maxVMs}`;
             }
             
-            // Habilitar/deshabilitar botón de agregar nodo
             if (addBtn) {
                 if (currentNodeCount >= maxVMs) {
                     addBtn.disabled = true;
@@ -449,10 +472,70 @@
             }
         }
 
-        // Initialize on page load
+        function validateExistingNodes() {
+            const maxVMs = parseInt(document.getElementById('num_vms').value);
+            const currentNodes = customNodes.get();
+            
+            if (currentNodes.length > maxVMs) {
+                const nodesToRemove = currentNodes.slice(maxVMs);
+                const nodeIdsToRemove = nodesToRemove.map(node => node.id);
+                
+                customNodes.remove(nodeIdsToRemove);
+                
+                const existingEdges = customEdges.get();
+                const edgesToRemove = existingEdges.filter(edge => 
+                    nodeIdsToRemove.includes(edge.from) || nodeIdsToRemove.includes(edge.to)
+                );
+                customEdges.remove(edgesToRemove.map(edge => edge.id));
+                
+                updateSelectOptions();
+                updateTopologyData();
+                
+                alert(`Se eliminaron ${nodesToRemove.length} nodo(s) porque excedían el límite de ${maxVMs} VMs configuradas.`);
+            }
+        }
+
+        function showConfirmModal() {
+            document.getElementById('confirmModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+        }
+
+        function confirmSave() {
+            // Capture current topology if custom
+            if (document.getElementById('topology_type').value === 'custom') {
+                updateTopologyData();
+            }
+            
+            // Submit form
+            const formData = new FormData(document.getElementById('edit-slice-form'));
+            
+            fetch('/update_slice/{{ slice.idslice }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    window.location.href = '/dashboard';
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Error al guardar: ' + error);
+            });
+            
+            closeModal();
+        }
+
+        // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
             generateVMConfig();
-            selectTopology('star');
+            selectTopology('custom');
         });
     </script>
 </body>

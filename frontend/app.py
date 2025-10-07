@@ -444,6 +444,126 @@ def download_topology(slice_id):
     
     return response
 
+# Agregar estas nuevas rutas al final del archivo app.py
+
+@app.route('/edit_slice/<int:slice_id>')
+def edit_slice(slice_id):
+    """Edit slice page - only for STOPPED slices"""
+    if 'user_id' not in session:
+        flash('Please log in to edit slices', 'error')
+        return redirect(url_for('login'))
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('User not found', 'error')
+        return redirect(url_for('login'))
+    
+    slice_obj = Slice.query.get_or_404(slice_id)
+    
+    # Check if user can access this slice
+    if not can_access_slice(user, slice_obj):
+        flash('Access denied - You can only edit your own slices', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Check if slice is in STOPPED state
+    if slice_obj.estado != 'STOPPED':
+        flash('Solo se pueden editar slices en estado STOPPED', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get current topology data
+    current_topology = slice_obj.get_topology_data()
+    if not current_topology:
+        current_topology = {'nodes': [], 'edges': []}
+    
+    # Convert instances to serializable format
+    instances_data = []
+    for instance in slice_obj.instancias:
+        instances_data.append({
+            'id': instance.idinstancia,
+            'nombre': instance.nombre,
+            'cpu': instance.cpu,
+            'ram': instance.ram,
+            'storage': instance.storage,
+            'imagen': instance.imagen,
+            'estado': instance.estado
+        })
+    
+    return render_template('edit_slice.html', 
+                         slice=slice_obj, 
+                         user=user,
+                         current_topology=current_topology,
+                         instances_data=instances_data)
+
+@app.route('/update_slice/<int:slice_id>', methods=['POST'])
+def update_slice(slice_id):
+    """Update slice configuration - with warning message"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 401
+    
+    slice_obj = Slice.query.get_or_404(slice_id)
+    
+    # Check access and state
+    if not can_access_slice(user, slice_obj):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    if slice_obj.estado != 'STOPPED':
+        return jsonify({'error': 'El slice debe estar en estado STOPPED para editarlo'}), 400
+    
+    try:
+        # Get form data
+        slice_name = request.form.get('slice_name', slice_obj.nombre)
+        topology_data = request.form.get('topology_data', '')
+        topology_type = request.form.get('topology_type', 'custom')
+        num_vms = int(request.form.get('num_vms', len(slice_obj.instancias)))
+        
+        # Update slice information
+        slice_obj.nombre = slice_name
+        
+        # Update topology if provided
+        if topology_data:
+            slice_obj.topologia = topology_data
+        
+        # Delete existing instances
+        for instance in slice_obj.instancias:
+            db.session.delete(instance)
+        
+        # Create new instances based on updated form data
+        for i in range(1, num_vms + 1):
+            vm_name = request.form.get(f'vm_{i}_name', f'VM{i}')
+            vm_cpu = request.form.get(f'vm_{i}_cpu', '1')
+            vm_ram = request.form.get(f'vm_{i}_ram', '1GB')
+            vm_storage = request.form.get(f'vm_{i}_storage', '10GB')
+            vm_image = request.form.get(f'vm_{i}_image', 'ubuntu:latest')
+            
+            instance = Instancia(
+                slice_idslice=slice_obj.idslice,
+                nombre=vm_name,
+                cpu=vm_cpu,
+                ram=vm_ram,
+                storage=vm_storage,
+                imagen=vm_image
+            )
+            db.session.add(instance)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '⚠️ ADVERTENCIA: Los cambios realizados son permanentes. No hay forma de recuperar la configuración anterior del slice.',
+            'slice_name': slice_obj.nombre
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Error updating slice: {str(e)}'
+        }), 500
+
 if __name__ == '__main__':
     initialize_database()
     app.run(debug=True, host='0.0.0.0', port=5000)

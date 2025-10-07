@@ -3,24 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VNRT - Sistema de Gestión</title>
+    <title>TeleFlow - Sistema de Gestión</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/login.css') }}" rel="stylesheet">
 </head>
 <body>
     <div class="login-page">
+        <!-- Elementos decorativos de fondo -->
+        <div class="background-shapes">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+        </div>
+        
         <div class="login-container">
+            <!-- Logo y branding -->
             <div class="login-header">
-                <i class="fas fa-cloud"></i>
-                <h2>VNRT</h2>
-                <p class="text-muted">Sistema de Gestión de Slices</p>
+                <div class="logo-container">
+                    <div class="logo-icon">
+                        <i class="fas fa-cloud"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>TeleFlow</h1>
+                        <span class="logo-subtitle">Cloud Management</span>
+                    </div>
+                </div>
+                <p class="welcome-text">Bienvenido al Sistema de Gestión de Slices</p>
             </div>
             
+            <!-- Alertas -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show custom-alert" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
                             {{ message }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
@@ -28,33 +46,87 @@
                 {% endif %}
             {% endwith %}
             
-            <form method="POST">
-                <div class="form-floating mb-3">
-                    <input type="text" class="form-control" id="username" name="username" placeholder="Usuario" required>
-                    <label for="username"><i class="fas fa-user me-2"></i>Usuario</label>
+            <!-- Formulario de login -->
+            <form method="POST" class="login-form">
+                <div class="input-group-custom">
+                    <div class="input-icon">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <input type="text" class="form-control-custom" id="username" name="username" placeholder="Ingresa tu usuario" required>
                 </div>
                 
-                <div class="form-floating mb-3">
-                    <input type="password" class="form-control" id="password" name="password" placeholder="Contraseña" required>
-                    <label for="password"><i class="fas fa-lock me-2"></i>Contraseña</label>
+                <div class="input-group-custom">
+                    <div class="input-icon">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <input type="password" class="form-control-custom" id="password" name="password" placeholder="Ingresa tu contraseña" required>
+                    <div class="password-toggle" onclick="togglePassword()">
+                        <i class="fas fa-eye" id="toggleIcon"></i>
+                    </div>
                 </div>
                 
-                <button type="submit" class="btn btn-success btn-login">
-                    <i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión
+                <div class="form-options">
+                    <div class="remember-me">
+                        <input type="checkbox" id="remember" class="custom-checkbox">
+                        <label for="remember">Recordarme</label>
+                    </div>
+                    <a href="#" class="forgot-password">¿Olvidaste tu contraseña?</a>
+                </div>
+                
+                <button type="submit" class="btn-login">
+                    <span class="btn-text">Iniciar Sesión</span>
+                    <i class="fas fa-arrow-right btn-icon"></i>
                 </button>
             </form>
             
+            <!-- Información adicional -->
             <div class="login-footer">
-                <p class="text-muted mt-3">
-                    <small>Usuario de prueba: <strong>admin</strong> / Contraseña: <strong>admin123</strong></small>
-                </p>
-                <p class="text-muted">
-                    <small>¿No tienes cuenta? <a href="{{ url_for('register') }}" class="text-success">Regístrate aquí</a></small>
-                </p>
+                <div class="register-link">
+                    <span>¿No tienes cuenta?</span>
+                    <a href="{{ url_for('register') }}" class="register-btn">
+                        <i class="fas fa-user-plus me-1"></i>
+                        Crear cuenta
+                    </a>
+                </div>
             </div>
+        </div>
+        
+        <!-- Información de versión/copyright -->
+        <div class="footer-info">
+            <p>&copy; 2025 TeleFlow. Todos los derechos reservados.</p>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toggle password visibility
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        }
+
+        // Animaciones de entrada
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.login-container');
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(30px)';
+            
+            setTimeout(() => {
+                container.style.transition = 'all 0.6s ease';
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }, 100);
+        });
+    </script>
 </body>
 </html>
