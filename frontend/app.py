@@ -66,6 +66,20 @@ def test():
     app.logger.error("ERROR: prueba de Flask desde web_app")
     return "ok"
 
+@app.route('/grafana')
+def grafana_dashboard():
+    """Vista embebida de Grafana visible desde navegador y contenedor."""
+    if 'user_id' not in session:
+        flash('Por favor inicia sesión para acceder al dashboard de monitoreo.', 'error')
+        return redirect(url_for('login'))
+
+    if os.environ.get("IN_DOCKER") == "true":
+        grafana_url = "http://localhost:3000/d/d99c29a1-a13e-4b98-87cb-1d1601a129d6/dashboard-logs-teleflow?orgId=1&from=now-6h&to=now&kiosk"
+    else:
+        grafana_url = "http://grafana:3000/d/d99c29a1-a13e-4b98-87cb-1d1601a129d6/dashboard-logs-teleflow?orgId=1&from=now-6h&to=now&kiosk"
+
+    app.logger.info(f"🌀 Grafana URL usada: {grafana_url}")
+    return render_template('grafana_embed.html', grafana_url=grafana_url)
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page - authenticate against existing users in database"""

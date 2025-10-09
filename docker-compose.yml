@@ -58,6 +58,10 @@ services:
       - "5000:5000"
     environment:
       - FLASK_ENV=development
+      - IN_DOCKER=true
+    depends_on:
+      - slice_db
+      - grafana
     volumes:
       - ./frontend:/app
     networks:
@@ -111,6 +115,14 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    environment:
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_SERVER_DOMAIN=localhost
+      - GF_SERVER_ROOT_URL=http://localhost:3000/
+      - GF_SECURITY_COOKIE_SAMESITE=none
+      - GF_SECURITY_COOKIE_SECURE=false
     volumes: 
       - ./grafana_data:/var/lib/grafana 
     networks:

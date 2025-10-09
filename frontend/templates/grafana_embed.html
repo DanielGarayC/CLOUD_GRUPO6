@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard de Monitoreo</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #0d1117;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        header {
+            background-color: #161b22;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        header a:hover {
+            text-decoration: underline;
+        }
+        iframe {
+            width: 100%;
+            height: calc(100vh - 60px);
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h3>📊 Dashboard de Logs & Teleflow</h3>
+        <a href="{{ url_for('dashboard') }}">← Volver al panel</a>
+    </header>
+    <iframe src="{{ grafana_url }}" allowfullscreen></iframe>
+</body>
+</html>
