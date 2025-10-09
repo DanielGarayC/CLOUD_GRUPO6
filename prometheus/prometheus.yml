@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 5s  # cada 5 segundos
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']
+
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: 
+        - '10.20.12.129:5802'   # worker1 (server 2)
+        - '10.20.12.129:5803'   # worker2 (server 3)
+        - '10.20.12.129:5804'   # worker3 (server 4)
