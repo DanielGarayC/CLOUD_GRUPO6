@@ -1,0 +1,44 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+
+    relabel_configs:
+      # Limpia el nombre del contenedor (quita la /)
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: container
+
+      # Si tiene label de docker-compose, úsalo como "service"
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: service
+
+      # Si no tiene ese label, usa el nombre del contenedor
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: service
+        replacement: '${1}'
+
+      # Agrega el job para que Loki acepte el stream (evita error 400)
+      - target_label: job
+        replacement: docker
+
+      # Etiquetas extra útiles
+      - source_labels: ['__meta_docker_container_image']
+        target_label: image
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: stream
+
+    pipeline_stages:
+      - docker: {}

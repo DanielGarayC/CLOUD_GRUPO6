@@ -13,6 +13,8 @@ services:
       DB_PASSWORD: root
       DB_NAME: auth_db
       SECRET_KEY: supersecreto
+    networks:
+      - cloudnet
 
   auth_db:
     image: mysql:8.0
@@ -26,6 +28,8 @@ services:
     volumes:
       #Acá debe estar el script SQL para crear las tablas owo
       - ./backend/auth/sql-script:/docker-entrypoint-initdb.d
+    networks:
+      - cloudnet
 
   #frontend:
     #build: ./frontend
@@ -41,6 +45,8 @@ services:
     depends_on:
       #- backend
       - auth
+    networks:
+      - cloudnet
 
   web:
     build:
@@ -71,11 +77,7 @@ services:
       - ./db/slice_db.sql:/docker-entrypoint-initdb.d/slice_db.sql
     networks:
       - cloudnet
-      
-networks:
-  cloudnet:
-volumes:
-  db_data:
+
 
   #serviceA_db:
   #  image: mysql:8.0
@@ -103,13 +105,45 @@ volumes:
   #    #Acá debe estar el script SQL para crear las tablas owo
   #    - ./userService/sql-script:/docker-entrypoint-initdb.d
 
-  #grafana:
-  #  image: grafana/grafana:10.2.0
-  #  container_name: grafana
-  #  ports:
-  #    - "3000:3000"
-  #  environment:
-  #    - GF_SECURITY_ADMIN_USER=admin
-  #    - GF_SECURITY_ADMIN_PASSWORD=admin
-    #depends_on:
-    #  - loki
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes: 
+      - ./grafana_data:/var/lib/grafana 
+    networks:
+      - cloudnet
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/local-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - cloudnet
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
+    user: root
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./loki/promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - cloudnet
+
+networks:
+  cloudnet:
+    driver: bridge
+    attachable: true
+
+volumes: 
+  grafana_storage: {}
+  db_data:

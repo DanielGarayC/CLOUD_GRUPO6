@@ -3,12 +3,18 @@ from models import db, User, Slice, Rol, Security, Instancia, Interfaz
 import os
 import json
 from datetime import datetime
+import logging
+import sys
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-change-in-production'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:root@slice_db:3306/mydb'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+app.logger.addHandler(logging.StreamHandler(sys.stdout))
+app.logger.setLevel(logging.INFO)
 # Initialize database
 db.init_app(app)
 
@@ -54,6 +60,11 @@ def index():
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
+
+@app.route('/test')
+def test():
+    app.logger.error("ERROR: prueba de Flask desde web_app")
+    return "ok"
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
