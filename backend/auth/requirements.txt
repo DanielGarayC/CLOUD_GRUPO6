@@ -2,5 +2,5 @@ fastapi
 uvicorn
 mysql-connector-python
 bcrypt
-PyJWT
+PyJWT==2.9.0
 python-multipart

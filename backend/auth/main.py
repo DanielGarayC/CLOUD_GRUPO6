@@ -46,5 +46,7 @@ def verify_token(request: Request):
         return decoded
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expirado")
+    except jwt.InvalidSignatureError:
+        raise HTTPException(status_code=401, detail="Firma inválida (clave incorrecta)")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token inválido")

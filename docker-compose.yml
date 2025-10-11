@@ -152,6 +152,7 @@ services:
     networks:
       - cloudnet
 
+<<<<<<< HEAD
 # Monitoreo Prometheus y Node Exporter
   
 
@@ -226,6 +227,8 @@ services:
       tail -f /dev/null
     networks: [cloudnet]
 
+=======
+>>>>>>> 4522ad04eb68a3e7b178d2269245ddeb292311bf
 networks:
   cloudnet:
     driver: bridge
