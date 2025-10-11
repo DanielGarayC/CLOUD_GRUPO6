@@ -5,6 +5,10 @@ import json
 from datetime import datetime
 import logging
 import sys
+import requests
+
+AUTH_SERVICE_URL = "http://auth:8080/login"
+VERIFY_URL = "http://auth:8080/verify"
 
 
 app = Flask(__name__)
@@ -80,26 +84,44 @@ def grafana_dashboard():
 
     app.logger.info(f"🌀 Grafana URL usada: {grafana_url}")
     return render_template('grafana_embed.html', grafana_url=grafana_url)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Login page - authenticate against existing users in database"""
+    """Login page - authenticate via Auth microservice"""
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
-        # Query user from existing database
-        user = User.query.filter_by(nombre=username).first()
-        
-        if user and user.check_password(password):
-            session['user_id'] = user.id
-            session['username'] = user.nombre
-            session['user_role'] = user.rol.nombre_rol if user.rol else 'unknown'
-            
-            flash(f'Login successful! Welcome {user.nombre}', 'success')
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Invalid username or password', 'error')
-    
+
+        try:
+            # Enviar credenciales al servicio auth
+            response = requests.post(
+                AUTH_SERVICE_URL,
+                data={"username": username, "password": password},
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                session['access_token'] = data['access_token']
+                session['username'] = username
+
+                # Verificar token para obtener rol e ID
+                verify = requests.get(VERIFY_URL, headers={"Authorization": f"Bearer {data['access_token']}"})
+                if verify.status_code == 200:
+                    decoded = verify.json()
+                    session['user_id'] = decoded.get('sub')
+                    session['user_role'] = decoded.get('role')
+                    flash(f"Bienvenido {username}!", "success")
+                    return redirect(url_for('dashboard'))
+                else:
+                    flash("Error verificando token", "error")
+
+            else:
+                flash("Credenciales inválidas", "error")
+
+        except Exception as e:
+            flash(f"Error de conexión con el servicio de autenticación: {e}", "error")
+
     return render_template('login.html')
     
 @app.route('/register', methods=['GET', 'POST'])
