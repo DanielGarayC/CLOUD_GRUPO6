@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeleFlow - Crear Slice</title>
+    <title>VNRT - Crear Slice</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/create_slice.css') }}" rel="stylesheet">
@@ -15,7 +15,7 @@
         <div class="container-fluid">
             <div class="navbar-brand">
                 <i class="fas fa-cloud me-2"></i>
-                <strong>TeleFlow</strong>
+                <strong>VNRT</strong>
                 <span class="ms-2 text-muted">| Diseñador de Slice</span>
             </div>
             <div class="navbar-nav ms-auto">
@@ -80,6 +80,20 @@
                     <textarea class="form-control" id="slice-description" name="slice_description" placeholder="Descripción" style="height: 100px"></textarea>
                     <label for="slice-description">Descripción (opcional)</label>
                 </div>
+
+                <!-- Global Image Selection -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <select class="form-select" id="global-image" name="global_image" required>
+                                <option value="ubuntu:latest">Ubuntu</option>
+                                <option value="cirrus:latest">Cirrus</option>
+                            </select>
+                            <label for="global-image">Imagen del Sistema Operativo</label>
+                        </div>
+                        <small class="text-muted">Esta imagen se aplicará a todas las VMs del slice</small>
+                    </div>
+                </div>
                 
                 <div class="text-end">
                     <button type="button" class="btn btn-gradient" onclick="nextStep()">
@@ -93,6 +107,17 @@
                 <div class="step-header">
                     <div class="step-number">2</div>
                     <h3 class="step-title">Configuración de Máquinas Virtuales</h3>
+                </div>
+
+                <!-- Global Image Display -->
+                <div class="vm-card mb-4" style="background-color: #e8f5e8; border-color: #28a745;">
+                    <h5><i class="fas fa-globe-americas me-2"></i>Configuración Global</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Imagen del Sistema Operativo (Aplicada a todas las VMs)</label>
+                            <input type="text" class="form-control" id="global-image-display" readonly>
+                        </div>
+                    </div>
                 </div>
                 
                 <div id="vm-configurations">
@@ -255,6 +280,7 @@
                             <h5><i class="fas fa-info-circle me-2"></i>Información del Slice</h5>
                             <p><strong>Nombre:</strong> <span id="review-name"></span></p>
                             <p><strong>VMs:</strong> <span id="review-vm-count"></span></p>
+                            <p><strong>Imagen Global:</strong> <span id="review-global-image"></span></p>
                             <p><strong>Descripción:</strong> <span id="review-description"></span></p>
                         </div>
                     </div>
@@ -304,7 +330,22 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeNetworkVisualization();
             generateVMConfiguration();
+            updateGlobalImageDisplay();
+            
+            // Listen for global image changes
+            document.getElementById('global-image').addEventListener('change', updateGlobalImageDisplay);
         });
+
+        function updateGlobalImageDisplay() {
+            const globalImageSelect = document.getElementById('global-image');
+            const globalImageDisplay = document.getElementById('global-image-display');
+            
+            if (globalImageDisplay) {
+                const selectedValue = globalImageSelect.value;
+                const selectedText = globalImageSelect.options[globalImageSelect.selectedIndex].text;
+                globalImageDisplay.value = selectedText;
+            }
+        }
 
         // Función para mover la vista en direcciones específicas
         function moveView(direction) {
@@ -423,9 +464,6 @@
             }
         }
 
-
-
-
         // Función para establecer zoom específico
         function setZoom(scale) {
             if (network) {
@@ -446,9 +484,18 @@
 
         // Función para actualizar el display del zoom
         function updateZoomDisplay() {
-            const zoomPercentage = Math.round(currentScale * 100);
-            document.getElementById('zoom-level').textContent = `${zoomPercentage}%`;
-            document.getElementById('zoom-slider').value = currentScale;
+            // Solo actualizar si los elementos existen
+            const zoomLevelElement = document.getElementById('zoom-level');
+            const zoomSliderElement = document.getElementById('zoom-slider');
+            
+            if (zoomLevelElement) {
+                const zoomPercentage = Math.round(currentScale * 100);
+                zoomLevelElement.textContent = `${zoomPercentage}%`;
+            }
+            
+            if (zoomSliderElement) {
+                zoomSliderElement.value = currentScale;
+            }
         }
 
         function initializeNetworkVisualization() {
@@ -523,6 +570,7 @@
             // Special actions for specific steps
             if (currentStep === 2) {
                 generateVMConfiguration();
+                updateGlobalImageDisplay();
             } else if (currentStep === 4) {
                 generateReview();
             }
@@ -551,6 +599,8 @@
                 case 1:
                     const sliceName = document.getElementById('slice-name').value;
                     const vmCount = document.getElementById('vm-count').value;
+                    const globalImage = document.getElementById('global-image').value;
+                    
                     if (!sliceName.trim()) {
                         alert('Por favor ingresa un nombre para el slice');
                         return false;
@@ -559,9 +609,13 @@
                         alert('El número mínimo de VMs es 2');
                         return false;
                     }
+                    if (!globalImage) {
+                        alert('Por favor selecciona una imagen del sistema operativo');
+                        return false;
+                    }
                     return true;
                 case 2:
-                    // Validate VM configurations
+                    // Validate VM configurations (excluding image since it's global)
                     const vmCards = document.querySelectorAll('.vm-card');
                     for (let card of vmCards) {
                         const inputs = card.querySelectorAll('input[required], select[required]');
@@ -597,7 +651,7 @@
                 vmCard.innerHTML = `
                     <h5><i class="fas fa-desktop me-2"></i>VM ${i}</h5>
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="form-floating">
                                 <input type="text" class="form-control" id="vm-${i}-name" name="vm_${i}_name" value="VM${i}" required>
                                 <label for="vm-${i}-name">Nombre</label>
@@ -613,7 +667,7 @@
                                 <label for="vm-${i}-cpu">CPU</label>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="form-floating">
                                 <select class="form-select" id="vm-${i}-ram" name="vm_${i}_ram" required>
                                     <option value="1GB">1GB</option>
@@ -624,7 +678,7 @@
                                 <label for="vm-${i}-ram">RAM</label>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="form-floating">
                                 <select class="form-select" id="vm-${i}-storage" name="vm_${i}_storage" required>
                                     <option value="10GB">10GB</option>
@@ -633,18 +687,6 @@
                                     <option value="100GB">100GB</option>
                                 </select>
                                 <label for="vm-${i}-storage">Almacenamiento</label>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-floating">
-                                <select class="form-select" id="vm-${i}-image" name="vm_${i}_image" required>
-                                    <option value="ubuntu:latest">Ubuntu 22.04</option>
-                                    <option value="centos:latest">CentOS 9</option>
-                                    <option value="debian:latest">Debian 12</option>
-                                    <option value="alpine:latest">Alpine Linux</option>
-                                    <option value="fedora:latest">Fedora 38</option>
-                                </select>
-                                <label for="vm-${i}-image">Sistema Operativo</label>
                             </div>
                         </div>
                     </div>
@@ -910,6 +952,11 @@
             document.getElementById('review-description').textContent = 
                 document.getElementById('slice-description').value || 'Sin descripción';
             
+            // Global image information
+            const globalImageSelect = document.getElementById('global-image');
+            const globalImageText = globalImageSelect.options[globalImageSelect.selectedIndex].text;
+            document.getElementById('review-global-image').textContent = globalImageText;
+            
             // Topology information
             document.getElementById('review-nodes').textContent = nodes.length;
             document.getElementById('review-connections').textContent = edges.length;
@@ -926,16 +973,15 @@
                 const vmCpu = document.getElementById(`vm-${i}-cpu`).value;
                 const vmRam = document.getElementById(`vm-${i}-ram`).value;
                 const vmStorage = document.getElementById(`vm-${i}-storage`).value;
-                const vmImage = document.getElementById(`vm-${i}-image`).value;
                 
                 const vmReview = document.createElement('div');
                 vmReview.className = 'row mb-2';
                 vmReview.innerHTML = `
-                    <div class="col-md-2"><strong>${vmName}</strong></div>
+                    <div class="col-md-3"><strong>${vmName}</strong></div>
                     <div class="col-md-2">${vmCpu} Core(s)</div>
                     <div class="col-md-2">${vmRam}</div>
                     <div class="col-md-2">${vmStorage}</div>
-                    <div class="col-md-4">${vmImage}</div>
+                    <div class="col-md-3">${globalImageText}</div>
                 `;
                 vmReviewList.appendChild(vmReview);
             }
