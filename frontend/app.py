@@ -111,6 +111,8 @@ def login():
                 headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
 
+            print("Respuesta del servicio:", response.status_code, response.text)
+
             if response.status_code == 200:
                 data = response.json()
                 session['access_token'] = data['access_token']

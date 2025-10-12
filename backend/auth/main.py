@@ -35,37 +35,32 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": token, "token_type": "bearer"}
 
 @app.get('/verify')
-def verify_and_authorize_token(request: Request): 
-    # 1. Extraer el token JWT del encabezado Authorization
+def verify_and_authorize_token(request: Request):
     auth_header = request.headers.get('Authorization')
     original_uri = request.headers.get('X-Original-URI')
 
     if not auth_header:
-        # 3. Lanzar excepciones HTTP para errores
         raise HTTPException(status_code=401, detail="Missing token")
 
     try:
         token = auth_header.split(" ")[1]
         decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         user_role = decoded_token.get('role')
-
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except (jwt.InvalidTokenError, IndexError):
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Lógica de autorización basada en el rol del usuario y la URI original
-    # Ejemplo: solo los administradores pueden acceder al sliceManager.
+    # Reglas de autorización
     if original_uri and original_uri.startswith('/api/sliceManager/') and user_role not in [1, 2]:
         raise HTTPException(status_code=403, detail="Forbidden: Insufficient permissions")
 
-    # Ejemplo: cualquier usuario autenticado puede ver el monitoring.
-    if original_uri and original_uri.startswith('/api/monitoring/') and user_role:
-        # 4. Devolver una respuesta 200 OK para éxito
-        return Response(status_code=200)
-    #restricción para el servicio de prueba
     if original_uri and original_uri.startswith('/api/test/') and user_role not in [1, 2]:
         raise HTTPException(status_code=403, detail="No autorizado: solo Admins")
-    
-    # Política por defecto: Si ninguna regla lo impidió, el usuario está autorizado.
-    return Response(status_code=200)
+
+    return {
+        "sub": decoded_token.get("sub"),
+        "role": decoded_token.get("role"),
+        "exp": decoded_token.get("exp"),
+        "authorized": True
+    }
