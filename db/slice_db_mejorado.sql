@@ -319,7 +319,7 @@ DROP TABLE IF EXISTS `worker`;
 CREATE TABLE `worker` (
   `idworker` int NOT NULL AUTO_INCREMENT,
   `nombre` varchar(45) DEFAULT NULL,
-  `puerto` varchar(45) DEFAULT NULL,
+  `ip` varchar(45) DEFAULT NULL,
   `cpu` varchar(45) DEFAULT NULL,
   `ram` varchar(45) DEFAULT NULL,
   `storage` varchar(45) DEFAULT NULL,
