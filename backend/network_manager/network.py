@@ -91,3 +91,38 @@ def liberar_vnc(vnc_id: int, db: Session):
         raise HTTPException(status_code=404, detail="VNC no encontrado")
 
     return {"mensaje": f"VNC {vnc_id} liberado correctamente"}
+
+# ============================
+#   CREAR NUEVA VLAN / VNC
+# ============================
+
+def crear_vlan(numero: str, estado: str, db: Session):
+    """Crea una nueva VLAN en la tabla vlan."""
+    # Verificar si ya existe una VLAN con ese número
+    existe = db.execute("SELECT * FROM vlan WHERE numero = :numero", {"numero": numero}).fetchone()
+    if existe:
+        raise HTTPException(status_code=400, detail=f"La VLAN {numero} ya existe")
+
+    db.execute("""
+        INSERT INTO vlan (numero, estado)
+        VALUES (:numero, :estado)
+    """, {"numero": numero, "estado": estado})
+    db.commit()
+
+    return {"mensaje": f"VLAN {numero} creada correctamente", "estado": estado}
+
+
+def crear_vnc(puerto: str, estado: str, db: Session):
+    """Crea un nuevo puerto VNC en la tabla vnc."""
+    # Verificar si ya existe ese puerto
+    existe = db.execute("SELECT * FROM vnc WHERE puerto = :puerto", {"puerto": puerto}).fetchone()
+    if existe:
+        raise HTTPException(status_code=400, detail=f"El puerto VNC {puerto} ya existe")
+
+    db.execute("""
+        INSERT INTO vnc (puerto, estado)
+        VALUES (:puerto, :estado)
+    """, {"puerto": puerto, "estado": estado})
+    db.commit()
+
+    return {"mensaje": f"VNC {puerto} creado correctamente", "estado": estado}

@@ -202,7 +202,7 @@ services:
       DB_HOST: slice_db
       DB_USER: root
       DB_PASSWORD: root
-      DB_NAME: slice_db
+      DB_NAME: mydb
     networks:
       - cloudnet 
 

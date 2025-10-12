@@ -43,3 +43,37 @@ def asignar_vnc(db: Session = Depends(get_db)):
 @app.put("/vncs/liberar/{vnc_id}")
 def liberar_vnc(vnc_id: int, db: Session = Depends(get_db)):
     return svc.liberar_vnc(vnc_id, db)
+@app.post("/vlans/crear")
+def crear_vlan(payload: dict, db: Session = Depends(get_db)):
+    """
+    Crea una nueva VLAN.
+    Body JSON:
+    {
+      "numero": "111",
+      "estado": "disponible"
+    }
+    """
+    numero = payload.get("numero")
+    estado = payload.get("estado", "disponible")
+    if not numero:
+        raise HTTPException(status_code=400, detail="Debe indicar el número de VLAN")
+
+    return svc.crear_vlan(numero, estado, db)
+
+
+@app.post("/vncs/crear")
+def crear_vnc(payload: dict, db: Session = Depends(get_db)):
+    """
+    Crea un nuevo puerto VNC.
+    Body JSON:
+    {
+      "puerto": "5921",
+      "estado": "disponible"
+    }
+    """
+    puerto = payload.get("puerto")
+    estado = payload.get("estado", "disponible")
+    if not puerto:
+        raise HTTPException(status_code=400, detail="Debe indicar el puerto VNC")
+
+    return svc.crear_vnc(puerto, estado, db)
