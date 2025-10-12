@@ -5,30 +5,30 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - auth_db
+      - slice_db
     environment:
-      DB_HOST: auth_db
-      DB_USER: user
+      DB_HOST: slice_db
+      DB_USER: root
       DB_PASSWORD: root
-      DB_NAME: auth_db
+      DB_NAME: mydb
       SECRET_KEY: supersecreto
     networks:
       - cloudnet
 
-  auth_db:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: auth_db
-      MYSQL_USER: user
-      MYSQL_PASSWORD: root
-    ports:
-      - "3307:3306"
-    volumes:
+  #auth_db:
+   # image: mysql:8.0
+    #environment:
+     # MYSQL_ROOT_PASSWORD: rootpassword
+      #MYSQL_DATABASE: auth_db
+      #MYSQL_USER: user
+      #MYSQL_PASSWORD: root
+    #ports:
+    #  - "3307:3306"
+    #volumes:
       #Acá debe estar el script SQL para crear las tablas owo
-      - ./backend/auth/sql-script:/docker-entrypoint-initdb.d
-    networks:
-      - cloudnet
+     # - ./backend/auth/sql-script:/docker-entrypoint-initdb.d
+    #networks:
+    #  - cloudnet
 
   #frontend:
     #build: ./frontend
