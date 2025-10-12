@@ -70,12 +70,23 @@ def test():
     app.logger.error("ERROR: prueba de Flask desde web_app")
     return "ok"
 
+
 @app.route('/grafana')
 def grafana_dashboard():
     """Vista embebida de Grafana visible desde navegador y contenedor."""
     if 'user_id' not in session:
         flash('Por favor inicia sesión para acceder al dashboard de monitoreo.', 'error')
         return redirect(url_for('login'))
+
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('Usuario no encontrado. Por favor, inicia sesión de nuevo.', 'error')
+        session.clear()
+        return redirect(url_for('login'))
+
+    if user.rol_idrol not in [1, 2]:
+        flash('No tienes los permisos necesarios para acceder a esta página.', 'error')
+        return redirect(url_for('dashboard'))
 
     if os.environ.get("IN_DOCKER") == "true":
         grafana_url = "http://localhost:3000/d/d99c29a1-a13e-4b98-87cb-1d1601a129d6/dashboard-logs-teleflow?orgId=1&from=now-6h&to=now&kiosk"
@@ -110,7 +121,9 @@ def login():
                 if verify.status_code == 200:
                     decoded = verify.json()
                     session['user_id'] = decoded.get('sub')
+                    session['access_token'] = data['access_token'] # Guardar token en sesión
                     session['user_role'] = decoded.get('role')
+                    app.logger.info(f"SESIÓN CREADA: {session}")
                     flash(f"Bienvenido {username}!", "success")
                     return redirect(url_for('dashboard'))
                 else:

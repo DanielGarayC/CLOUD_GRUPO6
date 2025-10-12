@@ -1,52 +1,54 @@
 from fastapi import FastAPI, Request
-import json
-import os
 from datetime import datetime
+import json
+import asyncio
 
 app = FastAPI()
 
-LOG_DIR = "logs_metrics"
-os.makedirs(LOG_DIR, exist_ok=True)
+# ===========================
+# ESTRUCTURA EN MEMORIA
+# ===========================
+# Diccionario con la última métrica recibida por cada worker
+latest_metrics = {}
 
-current_day = datetime.utcnow().strftime("%Y-%m-%d")
-log_file_path = os.path.join(LOG_DIR, f"metrics_{current_day}.txt")
-
+# ===========================
+# ENDPOINT: recibir métricas de cada worker
+# ===========================
 @app.post("/metrics")
 async def receive_metrics(request: Request):
-    global current_day, log_file_path
-    
     data = await request.json()
-    timestamp = datetime.utcnow().isoformat()
-    data["received_at"] = timestamp  # por si quieres diferenciar envío y recepción
+    hostname = data.get("hostname", "unknown")
+    data["received_at"] = datetime.utcnow().isoformat()
+    latest_metrics[hostname] = data   # almacena la última métrica de este worker
 
-    # Verificar cambio de día
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    if today != current_day:
-        current_day = today
-        log_file_path = os.path.join(LOG_DIR, f"metrics_{current_day}.txt")
-        # Reinicia el archivo (nueva jornada)
-        open(log_file_path, 'w').close()
+    print(f"📡 Métricas recibidas de {hostname}: CPU={data.get('cpu_percent')}%, RAM={data.get('ram_percent')}%")
+    return {"status": "ok", "worker": hostname}
 
-    # Guardar línea JSON
-    with open(log_file_path, "a") as f:
-        f.write(json.dumps(data) + "\n")
-
-    return {"status": "ok", "saved_in": log_file_path}
-
+# ===========================
+# ENDPOINT: devolver métricas actuales de todos los workers
+# ===========================
 @app.get("/metrics")
-def read_metrics(date: str = None):
+def get_latest_metrics():
     """
-    Permite consultar métricas de un día específico.
-    GET /metrics?date=2025-10-07
+    Devuelve la última métrica conocida de cada worker.
+    Ejemplo:
+    curl http://10.0.10.1:5000/metrics
     """
-    if date is None:
-        date = datetime.utcnow().strftime("%Y-%m-%d")
-    
-    file_path = os.path.join(LOG_DIR, f"metrics_{date}.txt")
-    if not os.path.exists(file_path):
-        return {"error": f"No hay datos para {date}"}
+    if not latest_metrics:
+        return {"status": "no_data", "message": "Aún no se han recibido métricas."}
 
-    with open(file_path, "r") as f:
-        lines = [json.loads(line) for line in f]
+    now = datetime.utcnow().isoformat()
+    return {
+        "timestamp": now,
+        "workers_count": len(latest_metrics),
+        "metrics": latest_metrics
+    }
 
-    return {"date": date, "count": len(lines), "metrics": lines}
+# ===========================
+# EJECUTAR HEADNODE
+# ===========================
+if __name__ == "__main__":
+    import uvicorn
+    print("🟢 Headnode escuchando en 0.0.0.0:5000...")
+    uvicorn.run(app, host="0.0.0.0", port=5000)
+
