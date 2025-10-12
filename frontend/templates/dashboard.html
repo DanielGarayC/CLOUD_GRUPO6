@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VNRT - Dashboard</title>
+    <title>TeleFlow - Dashboard</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
@@ -14,7 +14,7 @@
         <nav class="top-bar">
             <div class="container-fluid">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span class="navbar-brand mb-0">VNRT</span>
+                    <span class="navbar-brand mb-0">TeleFlow</span>
                     <div class="d-flex align-items-center">
                         <span class="me-3">Bienvenido, {{ user.nombre }}</span>
                         <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
@@ -30,7 +30,7 @@
             <div class="page-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h1 class="page-title">VNRT - Slices</h1>
+                        <h1 class="page-title">TeleFlow - Slices</h1>
                         <p class="page-subtitle">Información general sobre los slices existentes</p>
                     </div>
                     <div>
