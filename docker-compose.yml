@@ -207,7 +207,7 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
 
-      volumes:
+    volumes:
       - kafka_data:/tmp/kraft-combined-logs
     networks: [cloudnet]
     healthcheck:
@@ -234,6 +234,25 @@ services:
       echo "Topics listos."
       tail -f /dev/null
     networks: [cloudnet]
+
+  #Network&Security
+  network_manager:
+    build: ./backend/network_manager
+    container_name: network_manager
+    ports:
+      - "8100:8100"
+    depends_on:
+      - slice_db
+    environment:
+      DB_HOST: slice_db
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: slice_db
+    networks:
+      - cloudnet 
+
+      
+
 
 networks:
   cloudnet:
