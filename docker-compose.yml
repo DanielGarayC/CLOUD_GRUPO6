@@ -25,6 +25,7 @@ services:
     networks:
       - cloudnet
 
+
   #auth_db:
    # image: mysql:8.0
     #environment:
