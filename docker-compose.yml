@@ -80,6 +80,12 @@ services:
       - ./db/slice_db.sql:/docker-entrypoint-initdb.d/slice_db.sql
     networks:
       - cloudnet
+  test_service:
+    build: ./backend/test_service
+    container_name: test_service
+    command: uvicorn test_service:app --host 0.0.0.0 --port 8000
+    networks:
+      - cloudnet
 
 
   #serviceA_db:
