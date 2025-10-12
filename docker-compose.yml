@@ -188,12 +188,7 @@ services:
 
 
 
-  slice-manager:
-    build: ./backend/sliceManager
-    container_name: slice-manager
-    ports:
-    - "8000:8000"  
-    networks: [cloudnet]
+
 
   linux-driver:
     build: ./backend/linux-driver
