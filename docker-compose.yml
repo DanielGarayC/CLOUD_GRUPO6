@@ -72,7 +72,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: slice_db
+      MYSQL_DATABASE: mydb
     ports:
       - "3308:3306"
     volumes:
@@ -207,11 +207,6 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
 
-<<<<<<< HEAD
-    volumes:
-      - kafka_data:/tmp/kraft-combined-logs
-=======
->>>>>>> 93f1f2f56aad456cb9e35a2bb33180ff9ffa9334
     networks: [cloudnet]
     healthcheck:
       test: ["CMD","bash","-lc","/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]

@@ -17,12 +17,27 @@ def obtener_vlan_internet(db: Session):
     if not vlan:
         raise HTTPException(status_code=404, detail="No hay VLAN reservada para Internet")
 
-    return {
-        "vlan_id": vlan.idvlan,
-        "numero": vlan.numero,
-        "mensaje": f"VLAN {vlan.numero} corresponde a la red de Internet"
-    }
+    return vlan.numero
 
+# --- Asignar una VLAN disponible ---
+def asignar_vlan(db: Session):
+    vlan = db.execute("""
+        SELECT idvlan, numero FROM vlan
+        WHERE estado='disponible'
+        ORDER BY idvlan LIMIT 1
+    """).fetchone()
+
+    if not vlan:
+        raise HTTPException(status_code=400, detail="No hay VLANs disponibles")
+
+    db.execute("""
+        UPDATE vlan
+        SET estado='ocupada'
+        WHERE idvlan=:idvlan
+    """, {"idvlan": vlan.idvlan})
+    db.commit()
+
+    return vlan.numero
 
 # --- Liberar VLAN ---
 def liberar_vlan(vlan_id: int, db: Session):
