@@ -22,7 +22,7 @@ async def create_vm(request: Request):
     worker = data.get("worker")
     vlans = data.get("vlans", [])
     puerto_vnc = str(data.get("puerto_vnc"))
-    imagen = data.get("imagen", "/home/ubuntu/cirros-0.5.1-x86_64-disk.img")
+    imagen = data.get("imagen", "cirros-base.qcow2")
     ram = str(data.get("ram_mb", 512))
     cpus = str(data.get("cpus", 1))
     disco = str(data.get("disco_gb", 2))
