@@ -32,7 +32,7 @@ def get_latest_metrics():
     """
     Devuelve la última métrica conocida de cada worker.
     Ejemplo:
-    curl http://10.0.10.1:5000/metrics
+    curl http://10.0.10.1:5010/metrics
     """
     if not latest_metrics:
         return {"status": "no_data", "message": "Aún no se han recibido métricas."}
@@ -49,6 +49,6 @@ def get_latest_metrics():
 # ===========================
 if __name__ == "__main__":
     import uvicorn
-    print("🟢 Headnode escuchando en 0.0.0.0:5000...")
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    print("🟢 Headnode escuchando en 0.0.0.0:5010...")
+    uvicorn.run(app, host="0.0.0.0", port=5010)
 

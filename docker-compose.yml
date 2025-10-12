@@ -14,6 +14,16 @@ services:
       SECRET_KEY: supersecreto
     networks:
       - cloudnet
+  monitoring_service:
+    build: ./backend/monitoringService
+    container_name: monitoring_service
+    restart: unless-stopped
+    ports:
+      - "5010:5010"
+    volumes:
+      - ./backend/monitoringService/logs_metrics:/app/logs_metrics
+    networks:
+      - cloudnet
 
   #auth_db:
    # image: mysql:8.0
