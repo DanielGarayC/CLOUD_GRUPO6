@@ -24,24 +24,7 @@ services:
       - ./backend/monitoringService/logs_metrics:/app/logs_metrics
     networks:
       - cloudnet
-  slice-manager:
-    build: ./backend/sliceManager
-    container_name: slice-manager
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      DB_HOST: slice_db
-      DB_USER: root
-      DB_PASSWORD: root
-      DB_NAME: mydb
-      MONITORING_URL: http://monitoring_service:5010/metrics
-    depends_on:
-      - slice_db
-      - monitoring_service
-    networks:
-      - cloudnet
-
+  
 
   #auth_db:
    # image: mysql:8.0
@@ -188,7 +171,12 @@ services:
 
 
 
-
+  slice-manager:
+    build: ./backend/sliceManager
+    container_name: slice-manager
+    ports:
+    - "8000:8000"  
+    networks: [cloudnet]
 
   linux-driver:
     build: ./backend/linux-driver
