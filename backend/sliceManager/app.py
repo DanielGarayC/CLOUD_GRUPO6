@@ -1,26 +1,8 @@
-<<<<<<< HEAD
-#Pronto con Kafka :'v
-import os, json, time
-from fastapi import FastAPI
-from pydantic import BaseModel
-from kafka import KafkaProducer
 
-BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")
-
-# Productor Kafka
-# (pequeña espera por si el broker demora en estar listo)
-time.sleep(3)
-producer = KafkaProducer(
-    bootstrap_servers=BOOTSTRAP,
-    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-    key_serializer=lambda k: k.encode("utf-8")
-)
-=======
 from fastapi import FastAPI, Body
 from datetime import datetime
 import requests
 import json
->>>>>>> a8574b8a2fb32d44a03b45766c1469e4a55e66d2
 
 app = FastAPI()
 
