@@ -30,3 +30,16 @@ def obtener_vlan_internet(db: Session = Depends(get_db)):
 @app.put("/vlans/liberar/{vlan_id}")
 def liberar_vlan(vlan_id: int, db: Session = Depends(get_db)):
     return svc.liberar_vlan(vlan_id, db)
+
+# --- ENDPOINTS DE VNCs ---
+@app.get("/vncs")
+def listar_vncs(db: Session = Depends(get_db)):
+    return svc.listar_vncs(db)
+
+@app.post("/vncs/asignar")
+def asignar_vnc(db: Session = Depends(get_db)):
+    return svc.asignar_vnc(db)
+
+@app.put("/vncs/liberar/{vnc_id}")
+def liberar_vnc(vnc_id: int, db: Session = Depends(get_db)):
+    return svc.liberar_vnc(vnc_id, db)

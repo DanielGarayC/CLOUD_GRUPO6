@@ -52,3 +52,42 @@ def liberar_vlan(vlan_id: int, db: Session):
         raise HTTPException(status_code=404, detail="VLAN no encontrada")
 
     return {"mensaje": f"VLAN {vlan_id} liberada correctamente"}
+
+# --- Listar VNCs ---
+def listar_vncs(db: Session):
+    result = db.execute("SELECT * FROM vnc").fetchall()
+    return [dict(zip(r.keys(), r)) for r in result]
+
+# --- Asignar VNC libre ---
+def asignar_vnc(db: Session):
+    vnc = db.execute("""
+        SELECT idvnc, numero FROM vnc
+        WHERE estado='disponible'
+        ORDER BY idvnc LIMIT 1
+    """).fetchone()
+
+    if not vnc:
+        raise HTTPException(status_code=400, detail="No hay VNCs disponibles")
+
+    db.execute("""
+        UPDATE vnc
+        SET estado='ocupado'
+        WHERE idvnc=:idvnc
+    """, {"idvnc": vnc.idvnc})
+    db.commit()
+
+    return vnc.numero
+
+# --- Liberar VNC ---
+def liberar_vnc(vnc_id: int, db: Session):
+    result = db.execute("""
+        UPDATE vnc
+        SET estado='disponible'
+        WHERE idvnc=:idvnc
+    """, {"idvnc": vnc_id})
+    db.commit()
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="VNC no encontrado")
+
+    return {"mensaje": f"VNC {vnc_id} liberado correctamente"}
