@@ -199,6 +199,16 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      CLUSTER_ID: chqyFQ9qQzKabTZV1Apx0Q
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+
+      # (Opcional) evitar autocreación por typos
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      volumes:
+      - kafka_data:/tmp/kraft-combined-logs
     networks: [cloudnet]
     healthcheck:
       test: ["CMD","bash","-lc","/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
@@ -232,4 +242,5 @@ networks:
 
 volumes: 
   grafana_storage: {}
-  db_data:
+  db_data: {}
+  kafka_data: {}
