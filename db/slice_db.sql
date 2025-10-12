@@ -1,84 +1,5 @@
-CREATE DATABASE  IF NOT EXISTS `mydb` /*!40100 DEFAULT CHARACTER SET utf8mb3 */ /*!80016 DEFAULT ENCRYPTION='N' */;
+CREATE DATABASE  IF NOT EXISTS `mydb`;
 USE `mydb`;
--- MySQL dump 10.13  Distrib 8.0.36, for Win64 (x86_64)
---
--- Host: localhost    Database: mydb
--- ------------------------------------------------------
--- Server version	8.0.36
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
---
--- Table structure for table `instancia`
---
-
-DROP TABLE IF EXISTS `instancia`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `instancia` (
-  `idinstancia` int NOT NULL AUTO_INCREMENT,
-  `slice_idslice` int NOT NULL,
-  `nombre` varchar(100) DEFAULT NULL,
-  `estado` varchar(45) DEFAULT NULL,
-  `cpu` varchar(45) DEFAULT NULL,
-  `ram` varchar(45) DEFAULT NULL,
-  `storage` varchar(45) DEFAULT NULL,
-  `imagen` varchar(100) DEFAULT NULL,
-  PRIMARY KEY (`idinstancia`,`slice_idslice`),
-  KEY `fk_instancia_slice1_idx` (`slice_idslice`),
-  CONSTRAINT `fk_instancia_slice1` FOREIGN KEY (`slice_idslice`) REFERENCES `slice` (`idslice`)
-) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb3;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `instancia`
---
-
-LOCK TABLES `instancia` WRITE;
-/*!40000 ALTER TABLE `instancia` DISABLE KEYS */;
-INSERT INTO `instancia` VALUES (1,3,'VM1','STOPPED','1','1GB','10GB','ubuntu:latest'),(2,3,'VM2','STOPPED','1','1GB','10GB','ubuntu:latest'),(3,4,'VM1','STOPPED','1','1GB','10GB','ubuntu:latest'),(4,4,'VM2','STOPPED','1','1GB','10GB','ubuntu:latest'),(5,4,'VM3','STOPPED','1','1GB','10GB','ubuntu:latest'),(6,5,'VM1','STOPPED','1','1GB','10GB','ubuntu:latest'),(7,5,'VM2','STOPPED','1','1GB','10GB','ubuntu:latest'),(8,6,'VM1','STOPPED','1','1GB','10GB','centos:latest'),(9,6,'VM2','STOPPED','1','1GB','10GB','debian:latest'),(10,7,'VM1','STOPPED','1','1GB','10GB','debian:latest'),(11,7,'VM2','STOPPED','1','1GB','10GB','alpine:latest'),(12,7,'VM3','STOPPED','1','1GB','10GB','centos:latest'),(13,7,'VM4','STOPPED','1','1GB','10GB','ubuntu:latest'),(14,8,'VM1','STOPPED','1','1GB','10GB','debian:latest'),(15,8,'VM2','STOPPED','1','1GB','10GB','centos:latest'),(16,8,'VM3','STOPPED','1','1GB','10GB','ubuntu:latest'),(19,10,'VM1','STOPPED','1','1GB','10GB','ubuntu:latest'),(20,10,'VM2','STOPPED','1','1GB','10GB','ubuntu:latest'),(21,10,'VM3','STOPPED','1','1GB','10GB','ubuntu:latest'),(27,12,'VM1','STOPPED','1','1GB','10GB','ubuntu:latest'),(28,12,'VM2','STOPPED','1','1GB','10GB','ubuntu:latest'),(29,12,'VM3','STOPPED','1','1GB','10GB','ubuntu:latest'),(30,12,'VM4','STOPPED','1','1GB','10GB','ubuntu:latest'),(31,12,'VM5','STOPPED','1','1GB','10GB','ubuntu:latest');
-/*!40000 ALTER TABLE `instancia` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `interfaz`
---
-
-DROP TABLE IF EXISTS `interfaz`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `interfaz` (
-  `idinterfaz` int NOT NULL AUTO_INCREMENT,
-  `nombre_interfaz` varchar(45) DEFAULT NULL,
-  `instancia_idinstancia` int NOT NULL,
-  `instancia_slice_idslice` int NOT NULL,
-  PRIMARY KEY (`idinterfaz`,`instancia_idinstancia`,`instancia_slice_idslice`),
-  KEY `fk_interfaz_instancia1_idx` (`instancia_idinstancia`,`instancia_slice_idslice`),
-  CONSTRAINT `fk_interfaz_instancia1` FOREIGN KEY (`instancia_idinstancia`, `instancia_slice_idslice`) REFERENCES `instancia` (`idinstancia`, `slice_idslice`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `interfaz`
---
-
-LOCK TABLES `interfaz` WRITE;
-/*!40000 ALTER TABLE `interfaz` DISABLE KEYS */;
-/*!40000 ALTER TABLE `interfaz` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `rol`
---
 
 DROP TABLE IF EXISTS `rol`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -101,28 +22,107 @@ INSERT INTO `rol` VALUES (1,'superadmin'),(2,'administrador'),(3,'investigador')
 UNLOCK TABLES;
 
 --
--- Table structure for table `security`
+-- Table structure for table `usuario`
 --
 
-DROP TABLE IF EXISTS `security`;
+DROP TABLE IF EXISTS `usuario`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `security` (
-  `idsecurity` int NOT NULL AUTO_INCREMENT,
-  `tipo` varchar(45) DEFAULT NULL,
-  `descripcion` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`idsecurity`)
+CREATE TABLE `usuario` (
+  `idusuario` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(45) DEFAULT NULL,
+  `contrasenia` varchar(128) DEFAULT NULL,
+  `rol_idrol` int NOT NULL,
+  PRIMARY KEY (`idusuario`,`rol_idrol`),
+  KEY `fk_usuario_rol1_idx` (`rol_idrol`),
+  CONSTRAINT `fk_usuario_rol1` FOREIGN KEY (`rol_idrol`) REFERENCES `rol` (`idrol`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `usuario`
+--
+
+LOCK TABLES `usuario` WRITE;
+/*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
+INSERT INTO `usuario` VALUES (1,'admin','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 1), (2,'daniel','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 2), (3,'bala','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 3), (4,'ricardo','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 4);
+UNLOCK TABLES;
+
+--
+-- Table structure for table `imagen`
+--
+
+DROP TABLE IF EXISTS `imagen`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `imagen` (
+  `idimagen` int NOT NULL AUTO_INCREMENT,
+  `ruta` varchar(45) DEFAULT NULL,
+  `nombre` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idimagen`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `security`
+-- Dumping data for table `imagen`
 --
 
-LOCK TABLES `security` WRITE;
-/*!40000 ALTER TABLE `security` DISABLE KEYS */;
-INSERT INTO `security` VALUES (1,'basic','Basic security policy');
-/*!40000 ALTER TABLE `security` ENABLE KEYS */;
+LOCK TABLES `imagen` WRITE;
+/*!40000 ALTER TABLE `imagen` DISABLE KEYS */;
+INSERT INTO `imagen` VALUES (1,'/images/ubuntu:latest','ubuntu:latest');
+/*!40000 ALTER TABLE `imagen` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `vnc`
+--
+
+DROP TABLE IF EXISTS `vnc`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `vnc` (
+  `idvnc` int NOT NULL AUTO_INCREMENT,
+  `puerto` varchar(45) DEFAULT NULL,
+  `estado` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idvnc`)
+) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `vnc`
+--
+
+LOCK TABLES `vnc` WRITE;
+/*!40000 ALTER TABLE `vnc` DISABLE KEYS */;
+INSERT INTO `vnc` VALUES (1,'5901','disponible'),(2,'5902','disponible'),(3,'5903','disponible'),(4,'5904','disponible'),(5,'5905','disponible'),(6,'5906','disponible'),(7,'5907','disponible'),(8,'5908','disponible'),(9,'5909','disponible'),(10,'5910','disponible'),(11,'5911','disponible'),(12,'5912','disponible'),(13,'5913','disponible'),(14,'5914','disponible'),(15,'5915','disponible'),(16,'5916','disponible'),(17,'5917','disponible'),(18,'5918','disponible'),(19,'5919','disponible'),(20,'5920','disponible');
+/*!40000 ALTER TABLE `vnc` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `worker`
+--
+
+DROP TABLE IF EXISTS `worker`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `worker` (
+  `idworker` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(45) DEFAULT NULL,
+  `puerto` varchar(45) DEFAULT NULL,
+  `cpu` varchar(45) DEFAULT NULL,
+  `ram` varchar(45) DEFAULT NULL,
+  `storage` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idworker`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `worker`
+--
+
+LOCK TABLES `worker` WRITE;
+/*!40000 ALTER TABLE `worker` DISABLE KEYS */;
+/*!40000 ALTER TABLE `worker` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -139,11 +139,9 @@ CREATE TABLE `slice` (
   `topologia` text,
   `fecha_creacion` date DEFAULT NULL,
   `fecha_upload` date DEFAULT NULL,
-  `security_idsecurity` int NOT NULL,
-  PRIMARY KEY (`idslice`,`security_idsecurity`),
-  KEY `fk_slice_security1_idx` (`security_idsecurity`),
-  CONSTRAINT `fk_slice_security1` FOREIGN KEY (`security_idsecurity`) REFERENCES `security` (`idsecurity`)
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb3;
+  `zonadisponibilidad` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idslice`)
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -152,36 +150,50 @@ CREATE TABLE `slice` (
 
 LOCK TABLES `slice` WRITE;
 /*!40000 ALTER TABLE `slice` DISABLE KEYS */;
-INSERT INTO `slice` VALUES (3,'daniel','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":2,\"label\":\"VM2\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}}],\"edges\":[{\"from\":1,\"to\":2,\"id\":\"b618874e-43e9-4b42-925e-4b133f57b835\"}]}','2025-09-24',NULL,1),(4,'daniel2','STOPPED','{\"nodes\": [{\"id\": 1, \"label\": \"VM1\", \"color\": \"#28a745\"}, {\"id\": 2, \"label\": \"VM2\", \"color\": \"#28a745\"}, {\"id\": 3, \"label\": \"VM3\", \"color\": \"#28a745\"}], \"edges\": [{\"from\": 1, \"to\": 2}, {\"from\": 1, \"to\": 3}]}','2025-09-24',NULL,1),(5,'9oa','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":2,\"label\":\"VM2\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":3,\"label\":\"VM3\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":4,\"label\":\"VM4\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}}],\"edges\":[]}','2025-09-24',NULL,1),(6,'awa','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":2,\"label\":\"VM2\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}}],\"edges\":[{\"from\":1,\"to\":2,\"id\":\"58fcbc68-d749-4c7b-9cfd-62c9e1f28bff\"}]}','2025-09-24',NULL,1),(7,'sdn','STOPPED','{\"nodes\": [{\"id\": 1, \"label\": \"VM1\", \"color\": \"#28a745\"}, {\"id\": 2, \"label\": \"VM2\", \"color\": \"#28a745\"}, {\"id\": 3, \"label\": \"VM3\", \"color\": \"#28a745\"}, {\"id\": 4, \"label\": \"VM4\", \"color\": \"#28a745\"}], \"edges\": [{\"from\": 1, \"to\": 2}, {\"from\": 1, \"to\": 3}, {\"from\": 1, \"to\": 4}]}','2025-09-25',NULL,1),(8,'sdn','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":2,\"label\":\"VM2\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":3,\"label\":\"VM3\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}}],\"edges\":[{\"from\":1,\"to\":2,\"id\":\"f1a64c3b-083f-4d0f-91e3-6b85fca8575c\"},{\"from\":2,\"to\":3,\"id\":\"b3113611-6732-4ef3-96e2-d4b78838109e\"}]}','2025-09-25',NULL,1),(10,'awa','STOPPED','{\"nodes\":[],\"edges\":[]}','2025-09-29',NULL,1),(12,'dadadad','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":2,\"label\":\"VM2\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":3,\"label\":\"VM3\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":4,\"label\":\"VM4\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}},{\"id\":5,\"label\":\"VM5\",\"color\":{\"background\":\"#28a745\",\"border\":\"#1e7e34\"}}],\"edges\":[{\"from\":1,\"to\":2,\"id\":\"54755b46-7a9f-4102-8f6e-39ae56450086\"},{\"from\":3,\"to\":4,\"id\":\"e0e320c3-34d8-4480-81ff-c3bd411aa882\"},{\"from\":1,\"to\":5,\"id\":\"20b91a41-44a8-4da8-bbe6-4d72fc9ddc66\"},{\"from\":5,\"to\":4,\"id\":\"5d76ba38-79b8-4f00-aef1-d300302d4bd5\"},{\"from\":2,\"to\":3,\"id\":\"0c2e3a4d-1fa8-403e-8722-e1da156e95fd\"}]}','2025-09-29',NULL,1);
+INSERT INTO `slice` VALUES (19,'oli','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"x\":100,\"y\":0},{\"id\":2,\"label\":\"VM2\",\"x\":-49.99999999999998,\"y\":86.60254037844388},{\"id\":3,\"label\":\"VM3\",\"x\":-50.00000000000004,\"y\":-86.60254037844383}],\"edges\":[{\"from\":1,\"to\":2,\"id\":\"f50e0b85-95e6-44bd-b6ea-9b9c7be57668\"},{\"from\":1,\"to\":3,\"id\":\"0689e997-4c3b-4a12-8def-26f5a3a3fed1\"},{\"from\":2,\"to\":3,\"id\":\"a43918b0-7509-45e3-aa16-a08e25af5749\"}]}','2025-10-12',NULL,'default');
 /*!40000 ALTER TABLE `slice` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
--- Table structure for table `usuario`
+-- Table structure for table `instancia`
 --
 
-DROP TABLE IF EXISTS `usuario`;
+DROP TABLE IF EXISTS `instancia`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `usuario` (
-  `idusuario` int NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(45) DEFAULT NULL,
-  `contrasenia` varchar(128) DEFAULT NULL,
-  `rol_idrol` int NOT NULL,
-  PRIMARY KEY (`idusuario`,`rol_idrol`),
-  KEY `fk_usuario_rol1_idx` (`rol_idrol`),
-  CONSTRAINT `fk_usuario_rol1` FOREIGN KEY (`rol_idrol`) REFERENCES `rol` (`idrol`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb3;
+CREATE TABLE `instancia` (
+  `idinstancia` int NOT NULL AUTO_INCREMENT,
+  `slice_idslice` int NOT NULL,
+  `nombre` varchar(100) DEFAULT NULL,
+  `estado` varchar(45) DEFAULT NULL,
+  `cpu` varchar(45) DEFAULT NULL,
+  `ram` varchar(45) DEFAULT NULL,
+  `storage` varchar(45) DEFAULT NULL,
+  `salidainternet` tinyint DEFAULT NULL,
+  `imagen_idimagen` int NOT NULL,
+  `ip` varchar(45) DEFAULT NULL,
+  `vnc_idvnc` int DEFAULT NULL,
+  `worker_idworker` int DEFAULT NULL,
+  PRIMARY KEY (`idinstancia`,`slice_idslice`),
+  KEY `fk_instancia_slice1_idx` (`slice_idslice`),
+  KEY `fk_instancia_imagen1_idx` (`imagen_idimagen`),
+  KEY `fk_instancia_vnc1_idx` (`vnc_idvnc`),
+  KEY `fk_instancia_worker1_idx` (`worker_idworker`),
+  CONSTRAINT `fk_instancia_imagen1` FOREIGN KEY (`imagen_idimagen`) REFERENCES `imagen` (`idimagen`),
+  CONSTRAINT `fk_instancia_slice1` FOREIGN KEY (`slice_idslice`) REFERENCES `slice` (`idslice`),
+  CONSTRAINT `fk_instancia_vnc1` FOREIGN KEY (`vnc_idvnc`) REFERENCES `vnc` (`idvnc`),
+  CONSTRAINT `fk_instancia_worker1` FOREIGN KEY (`worker_idworker`) REFERENCES `worker` (`idworker`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `usuario`
+-- Dumping data for table `instancia`
 --
 
-LOCK TABLES `usuario` WRITE;
-/*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
-INSERT INTO `usuario` VALUES (1,'admin','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 1), (2,'daniel','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 2), (3,'bala','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 3), (4,'ricardo','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 4);
-/*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
+LOCK TABLES `instancia` WRITE;
+/*!40000 ALTER TABLE `instancia` DISABLE KEYS */;
+INSERT INTO `instancia` VALUES (1,19,'VM1','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL),(2,19,'VM2','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL),(3,19,'VM3','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL);
+/*!40000 ALTER TABLE `instancia` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -196,9 +208,9 @@ CREATE TABLE `usuario_has_slice` (
   `slice_idslice` int NOT NULL,
   PRIMARY KEY (`usuario_idusuario`,`slice_idslice`),
   KEY `fk_usuario_has_slice_slice1_idx` (`slice_idslice`),
-  KEY `fk_usuario_has_slice_usuario_idx` (`usuario_idusuario`),
+  KEY `fk_usuario_has_slice_usuario1_idx` (`usuario_idusuario`),
   CONSTRAINT `fk_usuario_has_slice_slice1` FOREIGN KEY (`slice_idslice`) REFERENCES `slice` (`idslice`),
-  CONSTRAINT `fk_usuario_has_slice_usuario` FOREIGN KEY (`usuario_idusuario`) REFERENCES `usuario` (`idusuario`)
+  CONSTRAINT `fk_usuario_has_slice_usuario1` FOREIGN KEY (`usuario_idusuario`) REFERENCES `usuario` (`idusuario`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -208,17 +220,57 @@ CREATE TABLE `usuario_has_slice` (
 
 LOCK TABLES `usuario_has_slice` WRITE;
 /*!40000 ALTER TABLE `usuario_has_slice` DISABLE KEYS */;
-INSERT INTO `usuario_has_slice` VALUES (1,3),(1,4),(1,5),(1,6),(4,7),(4,8),(4,10),(4,12);
+INSERT INTO `usuario_has_slice` VALUES (1,19);
 /*!40000 ALTER TABLE `usuario_has_slice` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+--
+-- Table structure for table `vlan`
+--
 
--- Dump completed on 2025-09-29 17:33:21
+DROP TABLE IF EXISTS `vlan`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `vlan` (
+  `idvlan` int NOT NULL AUTO_INCREMENT,
+  `numero` varchar(45) DEFAULT NULL,
+  `estado` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idvlan`)
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `vlan`
+--
+
+LOCK TABLES `vlan` WRITE;
+/*!40000 ALTER TABLE `vlan` DISABLE KEYS */;
+INSERT INTO `vlan` VALUES (1,'100','ocupada'),(2,'101','ocupada'),(3,'102','ocupada'),(4,'103','ocupada'),(5,'104','disponible'),(6,'105','disponible'),(7,'106','disponible'),(8,'107','disponible'),(9,'108','disponible'),(10,'109','disponible'),(11,'110','disponible');
+/*!40000 ALTER TABLE `vlan` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `enlace`
+--
+
+DROP TABLE IF EXISTS `enlace`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `enlace` (
+  `idenlace` int NOT NULL AUTO_INCREMENT,
+  `vm1` varchar(45) DEFAULT NULL,
+  `vm2` varchar(45) DEFAULT NULL,
+  `vlan` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idenlace`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `enlace`
+--
+
+LOCK TABLES `enlace` WRITE;
+
+UNLOCK TABLES;
+
+-- Dump completed on 2025-10-12  7:01:41

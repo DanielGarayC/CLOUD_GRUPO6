@@ -5,21 +5,6 @@ import json
 
 db = SQLAlchemy()
 
-class Security(db.Model):
-    __tablename__ = 'security'
-    
-    idsecurity = db.Column('idsecurity', db.Integer, primary_key=True)
-    tipo = db.Column(db.String(45))
-    descripcion = db.Column(db.String(45))
-    
-    # Alias for easier access
-    @property
-    def id(self):
-        return self.idsecurity
-    
-    def __repr__(self):
-        return f'<Security {self.tipo}>'
-
 class Rol(db.Model):
     __tablename__ = 'rol'
     
@@ -78,15 +63,14 @@ class Slice(db.Model):
     __tablename__ = 'slice'
     
     idslice = db.Column('idslice', db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100))  # Add slice name field
+    nombre = db.Column(db.String(100))
     estado = db.Column(db.String(45), default='STOPPED')
-    topologia = db.Column(db.Text)  # Keep as TEXT for JSON storage
+    topologia = db.Column(db.Text)
     fecha_creacion = db.Column(db.Date, default=datetime.utcnow)
     fecha_upload = db.Column(db.Date)
-    security_idsecurity = db.Column('security_idsecurity', db.Integer, db.ForeignKey('security.idsecurity'), nullable=False)
+    zonadisponibilidad = db.Column(db.String(45))
     
     # Relationships
-    security = db.relationship('Security', backref='slices', foreign_keys=[security_idsecurity])
     instancias = db.relationship('Instancia', backref='slice', lazy=True, cascade='all, delete-orphan', foreign_keys='Instancia.slice_idslice')
     
     # Many-to-many relationship with users
@@ -96,10 +80,6 @@ class Slice(db.Model):
     @property
     def id(self):
         return self.idslice
-    
-    @property
-    def security_id(self):
-        return self.security_idsecurity
     
     def get_topology_data(self):
         """Parse topology JSON data"""
@@ -120,20 +100,73 @@ class Slice(db.Model):
     def __repr__(self):
         return f'<Slice {self.nombre or self.idslice}>'
 
+class Imagen(db.Model):
+    __tablename__ = 'imagen'
+    
+    idimagen = db.Column('idimagen', db.Integer, primary_key=True)
+    ruta = db.Column(db.String(45))
+    nombre = db.Column(db.String(45))
+    
+    # Aliases for easier access
+    @property
+    def id(self):
+        return self.idimagen
+    
+    def __repr__(self):
+        return f'<Imagen {self.nombre}>'
+
+class Vnc(db.Model):
+    __tablename__ = 'vnc'
+    
+    idvnc = db.Column('idvnc', db.Integer, primary_key=True)
+    puerto = db.Column(db.String(45))
+    
+    # Aliases for easier access
+    @property
+    def id(self):
+        return self.idvnc
+    
+    def __repr__(self):
+        return f'<Vnc {self.puerto}>'
+
+class Worker(db.Model):
+    __tablename__ = 'worker'
+    
+    idworker = db.Column('idworker', db.Integer, primary_key=True)
+    nombre = db.Column(db.String(45))
+    puerto = db.Column(db.String(45))
+    cpu = db.Column(db.String(45))
+    ram = db.Column(db.String(45))
+    storage = db.Column(db.String(45))
+    
+    # Aliases for easier access
+    @property
+    def id(self):
+        return self.idworker
+    
+    def __repr__(self):
+        return f'<Worker {self.nombre}>'
+
 class Instancia(db.Model):
     __tablename__ = 'instancia'
     
     idinstancia = db.Column('idinstancia', db.Integer, primary_key=True)
     slice_idslice = db.Column('slice_idslice', db.Integer, db.ForeignKey('slice.idslice'), nullable=False)
-    nombre = db.Column(db.String(100), nullable=False)  # Add nombre field
+    nombre = db.Column(db.String(100), nullable=False)
     estado = db.Column(db.String(45), default='STOPPED')
     cpu = db.Column(db.String(45))
     ram = db.Column(db.String(45))
     storage = db.Column(db.String(45))
-    imagen = db.Column(db.String(100))  # Add imagen field
+    salidainternet = db.Column(db.Boolean, default=False)
+    imagen_idimagen = db.Column('imagen_idimagen', db.Integer, db.ForeignKey('imagen.idimagen'), nullable=False)
+    ip = db.Column(db.String(45))
+    vnc_idvnc = db.Column('vnc_idvnc', db.Integer, db.ForeignKey('vnc.idvnc'), nullable=True)
+    worker_idworker = db.Column('worker_idworker', db.Integer, db.ForeignKey('worker.idworker'), nullable=True)
     
     # Relationships
-    interfaces = db.relationship('Interfaz', backref='instancia', lazy=True, cascade='all, delete-orphan', foreign_keys='Interfaz.instancia_idinstancia')
+    imagen = db.relationship('Imagen', backref='instancias', foreign_keys=[imagen_idimagen])
+    vnc = db.relationship('Vnc', backref='instancias', foreign_keys=[vnc_idvnc])
+    worker = db.relationship('Worker', backref='instancias', foreign_keys=[worker_idworker])
     
     # Aliases for easier access
     @property
@@ -144,28 +177,51 @@ class Instancia(db.Model):
     def slice_id(self):
         return self.slice_idslice
     
+    @property
+    def imagen_id(self):
+        return self.imagen_idimagen
+    
+    @property
+    def vnc_id(self):
+        return self.vnc_idvnc
+    
+    @property
+    def worker_id(self):
+        return self.worker_idworker
+    
     def __repr__(self):
         return f'<Instancia {self.nombre}>'
 
-class Interfaz(db.Model):
-    __tablename__ = 'interfaz'
+class Enlace(db.Model):
+    __tablename__ = 'enlace'
     
-    idinterfaz = db.Column('idinterfaz', db.Integer, primary_key=True)
-    nombre_interfaz = db.Column(db.String(45))
-    instancia_idinstancia = db.Column('instancia_idinstancia', db.Integer, db.ForeignKey('instancia.idinstancia'), nullable=False)
-    instancia_slice_idslice = db.Column('instancia_slice_idslice', db.Integer, db.ForeignKey('slice.idslice'), nullable=False)
+    idenlace = db.Column('idenlace', db.Integer, primary_key=True)
+    vm1 = db.Column(db.String(45))
+    vm2 = db.Column(db.String(45))
+    vlan = db.Column(db.String(45))
     
     # Aliases for easier access
     @property
     def id(self):
-        return self.idinterfaz
-    
-    @property
-    def instancia_id(self):
-        return self.instancia_idinstancia
+        return self.idenlace
     
     def __repr__(self):
-        return f'<Interfaz {self.nombre_interfaz}>'
+        return f'<Enlace {self.vm1}-{self.vm2}>'
+
+class Vlan(db.Model):
+    __tablename__ = 'vlan'
+    
+    idvlan = db.Column('idvlan', db.Integer, primary_key=True)
+    numero = db.Column(db.String(45))
+    estado = db.Column(db.String(45))
+    
+    # Aliases for easier access
+    @property
+    def id(self):
+        return self.idvlan
+    
+    def __repr__(self):
+        return f'<Vlan {self.numero}>'
 
 # Association table for many-to-many relationship between users and slices
 usuario_has_slice = db.Table('usuario_has_slice',

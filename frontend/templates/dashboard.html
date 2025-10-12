@@ -1,10 +1,9 @@
- <!-- Lista de slices -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeleFlow - Dashboard</title>
+    <title>VNRT - Dashboard</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
@@ -15,7 +14,7 @@
         <nav class="top-bar">
             <div class="container-fluid">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span class="navbar-brand mb-0">TeleFlow</span>
+                    <span class="navbar-brand mb-0">VNRT</span>
                     <div class="d-flex align-items-center">
                         <span class="me-3">Bienvenido, {{ user.nombre }}</span>
                         <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
@@ -31,7 +30,7 @@
             <div class="page-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h1 class="page-title">TeleFlow - Slices</h1>
+                        <h1 class="page-title">VNRT - Slices</h1>
                         <p class="page-subtitle">Información general sobre los slices existentes</p>
                     </div>
                     <div>
@@ -58,7 +57,8 @@
                 <table class="table data-table">
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th>#</th>
+                            <th>Nombre</th>
                             <th>Instancias</th>
                             <th>Creación</th>
                             <th>Estado</th>
@@ -69,6 +69,7 @@
                         {% for slice in slices %}
                         <tr>
                             <td><a href="#" class="text-decoration-none slice-link" data-slice-id="{{ slice.id }}" onclick="selectSlice({{ slice.id }})">Slice #{{ slice.id }}</a></td>
+                            <td>{{ slice.nombre }}</td>
                             <td>{{ slice.instancias|length }} VMs</td>
                             <td>{{ slice.fecha_creacion.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                             <td>
@@ -80,18 +81,15 @@
                                 <a href="{{ url_for('slice_topology', slice_id=slice.id) }}" class="btn btn-sm btn-outline-primary me-1">
                                     <i class="fas fa-project-diagram me-1"></i>Ver Topología
                                 </a>
-                                <a href="{{ url_for('download_topology', slice_id=slice.id) }}" class="btn btn-sm btn-outline-success me-1" title="Descargar JSON de Topología">
-                                    <i class="fas fa-download me-1"></i>JSON
-                                </a>
-
                                 {% if slice.estado == "STOPPED" %}
                                     <a href="/edit_slice/{{ slice.id }}" class="btn btn-sm btn-outline-warning me-1">Editar</a>
                                 {% endif %}
-
                                 <button class="btn btn-sm btn-outline-danger" onclick="deleteSlice({{ slice.id }}, '{{ slice.nombre or 'Slice #' + slice.id|string }}')" title="Eliminar Slice">
                                     <i class="fas fa-trash me-1"></i>Eliminar
                                 </button>
                             </td>
+                            
+                            
                         </tr>
                         {% endfor %}
                         {% if not slices %}

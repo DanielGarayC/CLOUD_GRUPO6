@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
-from models import db, User, Slice, Rol, Security, Instancia, Interfaz
+from models import db, User, Slice, Rol, Instancia, Imagen, Vnc, Worker, Enlace, Vlan
 import os
 import json
 from datetime import datetime
@@ -206,10 +206,8 @@ def dashboard():
                          user_role=user_role,
                          is_admin=is_admin)
 
-
 @app.route('/create_slice', methods=['GET', 'POST'])
 def create_slice():
-    """Create new slice page - only for authenticated users"""
     if 'user_id' not in session:
         flash('Please log in to create slices', 'error')
         return redirect(url_for('login'))
@@ -225,25 +223,34 @@ def create_slice():
         num_vms = int(request.form['num_vms'])
         topology_type = request.form['topology_type']
         topology_data = request.form.get('topology_data', '')
-        global_image = request.form.get('global_image', 'ubuntu:latest')  # 🟢 NUEVA LÍNEA
+        global_image_name = request.form.get('global_image', 'ubuntu:latest')
+        zona_disponibilidad = request.form.get('zona_disponibilidad', 'default')
         
-        # Get or create basic security policy
-        security = Security.query.first()
-        if not security:
-            security = Security(tipo='basic', descripcion='Basic security policy')
-            db.session.add(security)
+        # 🟢 OBTENER O CREAR LA IMAGEN CON ID MANUAL
+        imagen = Imagen.query.filter_by(nombre=global_image_name).first()
+        if not imagen:
+            # 🟢 Obtener el próximo ID disponible
+            max_id = db.session.query(db.func.max(Imagen.idimagen)).scalar()
+            next_id = (max_id or 0) + 1
+            
+            # Crear imagen con ID manual
+            imagen = Imagen(
+                idimagen=next_id,  # 🟢 ID manual
+                nombre=global_image_name,
+                ruta=f'/images/{global_image_name}'
+            )
+            db.session.add(imagen)
             db.session.commit()
         
-        # Create slice
+        # Crear slice sin security
         new_slice = Slice(
             nombre=slice_name,
             estado='STOPPED',
-            security_idsecurity=security.idsecurity
+            zonadisponibilidad=zona_disponibilidad
         )
         
         # Set topology based on type
         if topology_type == 'custom' and topology_data:
-            # Custom topology from Vis.js
             new_slice.topologia = topology_data
         else:
             # Generate predefined topology
@@ -258,11 +265,9 @@ def create_slice():
                 })
             
             if topology_type == 'star':
-                # Star topology - connect all VMs to VM1
                 for i in range(2, num_vms + 1):
                     edges.append({'from': 1, 'to': i})
             elif topology_type == 'tree':
-                # Tree topology - hierarchical connections
                 for i in range(2, num_vms + 1):
                     parent = (i - 1) // 2
                     if parent == 0:
@@ -278,13 +283,14 @@ def create_slice():
         # Add current user to slice
         new_slice.usuarios.append(user)
         
-        # Create instances based on form data
+        # Crear instancias
         for i in range(1, num_vms + 1):
             vm_name = request.form.get(f'vm_{i}_name', f'VM{i}')
             vm_cpu = request.form.get(f'vm_{i}_cpu', '1')
             vm_ram = request.form.get(f'vm_{i}_ram', '1GB')
             vm_storage = request.form.get(f'vm_{i}_storage', '10GB')
-            # vm_image = request.form.get(f'vm_{i}_image', 'ubuntu:latest')  # 🔴 ELIMINAR ESTA LÍNEA
+            vm_internet = request.form.get(f'vm_{i}_internet', 'false') == 'true'
+            vm_ip = request.form.get(f'vm_{i}_ip', '')
             
             instance = Instancia(
                 slice_idslice=new_slice.idslice,
@@ -292,7 +298,11 @@ def create_slice():
                 cpu=vm_cpu,
                 ram=vm_ram,
                 storage=vm_storage,
-                imagen=global_image  # 🟢 CAMBIAR A IMAGEN GLOBAL
+                salidainternet=vm_internet,
+                imagen_idimagen=imagen.idimagen,  # Usar el ID de la imagen
+                ip=vm_ip if vm_ip else None,
+                vnc_idvnc=None,
+                worker_idworker=None
             )
             db.session.add(instance)
         
@@ -300,14 +310,18 @@ def create_slice():
         flash('Slice created successfully!', 'success')
         return redirect(url_for('dashboard'))
     
-    return render_template('create_slice2.html')
-
+    # Pasar datos al template
+    imagenes_disponibles = Imagen.query.all()
+    zonas_disponibles = ['us-east-1', 'us-west-1', 'eu-west-1', 'default']
+    
+    return render_template('create_slice2.html', 
+                         imagenes=imagenes_disponibles,
+                         zonas=zonas_disponibles)
 
 
 
 @app.route('/slice/<int:slice_id>')
 def slice_detail(slice_id):
-    """Get slice details as JSON - with role-based access control"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
@@ -350,7 +364,6 @@ def slice_detail(slice_id):
 
 @app.route('/slice/<int:slice_id>/topology')
 def slice_topology(slice_id):
-    """View slice topology with Vis.js - with role-based access control"""
     if 'user_id' not in session:
         flash('Please log in to view slice topology', 'error')
         return redirect(url_for('login'))
@@ -369,9 +382,8 @@ def slice_topology(slice_id):
     
     return render_template('slice_topology.html', slice=slice_obj, user=user)
 
-@app.route('/users')
+"""@app.route('/users')
 def list_users():
-    """List all users - only for admin users"""
     if 'user_id' not in session:
         flash('Please log in to access this page', 'error')
         return redirect(url_for('login'))
@@ -386,7 +398,6 @@ def list_users():
 
 @app.route('/slice/<int:slice_id>/start', methods=['POST'])
 def start_slice(slice_id):
-    """Start a slice - with role-based access control"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
@@ -417,7 +428,6 @@ def start_slice(slice_id):
 
 @app.route('/slice/<int:slice_id>/stop', methods=['POST'])
 def stop_slice(slice_id):
-    """Stop a slice - with role-based access control"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
@@ -445,10 +455,9 @@ def stop_slice(slice_id):
         'message': f'Slice {slice_obj.nombre} stopped successfully',
         'new_state': slice_obj.estado
     })
-
+"""
 @app.route('/delete_slice/<int:slice_id>', methods=['POST'])
 def delete_slice(slice_id):
-    """Delete a slice - with role-based access control"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
@@ -479,10 +488,9 @@ def delete_slice(slice_id):
             'success': False,
             'error': f'Error deleting slice: {str(e)}'
         }), 500
-
+"""
 @app.route('/download_topology/<int:slice_id>')
 def download_topology(slice_id):
-    """Download slice topology as JSON - with role-based access control"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
@@ -507,13 +515,12 @@ def download_topology(slice_id):
     response.headers['Content-Disposition'] = f'attachment; filename="{slice_name}_topology.json"'
     response.headers['Content-Type'] = 'application/json'
     
-    return response
+    return response"""
 
 # Agregar estas nuevas rutas al final del archivo app.py
 
 @app.route('/edit_slice/<int:slice_id>')
 def edit_slice(slice_id):
-    """Edit slice page - only for STOPPED slices"""
     if 'user_id' not in session:
         flash('Please log in to edit slices', 'error')
         return redirect(url_for('login'))
@@ -549,19 +556,26 @@ def edit_slice(slice_id):
             'cpu': instance.cpu,
             'ram': instance.ram,
             'storage': instance.storage,
-            'imagen': instance.imagen,
-            'estado': instance.estado
+            'imagen': instance.imagen.nombre if instance.imagen else 'N/A',  # 🟢 CORREGIDO
+            'estado': instance.estado,
+            'ip': instance.ip or 'No asignada',  # 🟢 AGREGADO
+            'salidainternet': instance.salidainternet  # 🟢 AGREGADO
         })
+    
+    # Get available images and zones for new VMs
+    imagenes_disponibles = Imagen.query.all()
+    zonas_disponibles = ['us-east-1', 'us-west-1', 'eu-west-1', 'default']
     
     return render_template('edit_slice.html', 
                          slice=slice_obj, 
                          user=user,
                          current_topology=current_topology,
-                         instances_data=instances_data)
+                         instances_data=instances_data,
+                         imagenes=imagenes_disponibles,  # 🟢 AGREGADO
+                         zonas=zonas_disponibles)  # 🟢 AGREGADO
 
 @app.route('/update_slice/<int:slice_id>', methods=['POST'])
 def update_slice(slice_id):
-    """Update slice configuration - with warning message"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
@@ -582,44 +596,79 @@ def update_slice(slice_id):
         # Get form data
         slice_name = request.form.get('slice_name', slice_obj.nombre)
         topology_data = request.form.get('topology_data', '')
-        topology_type = request.form.get('topology_type', 'custom')
-        num_vms = int(request.form.get('num_vms', len(slice_obj.instancias)))
+        num_new_vms = int(request.form.get('num_new_vms', 0))
+        zona_disponibilidad = request.form.get('zona_disponibilidad', slice_obj.zonadisponibilidad)
         
-        # Update slice information
+        # 🟢 VALIDACIÓN: Solo permitir cambios seguros
+        original_vm_count = len(slice_obj.instancias)
+        
+        # Update slice information (solo campos permitidos)
         slice_obj.nombre = slice_name
+        slice_obj.zonadisponibilidad = zona_disponibilidad
         
         # Update topology if provided
         if topology_data:
             slice_obj.topologia = topology_data
         
-        # Delete existing instances
-        for instance in slice_obj.instancias:
-            db.session.delete(instance)
+        # 🟢 CREAR SOLO NUEVAS INSTANCIAS (no tocar las existentes)
+        new_instances_created = 0
         
-        # Create new instances based on updated form data
-        for i in range(1, num_vms + 1):
-            vm_name = request.form.get(f'vm_{i}_name', f'VM{i}')
-            vm_cpu = request.form.get(f'vm_{i}_cpu', '1')
-            vm_ram = request.form.get(f'vm_{i}_ram', '1GB')
-            vm_storage = request.form.get(f'vm_{i}_storage', '10GB')
-            vm_image = request.form.get(f'vm_{i}_image', 'ubuntu:latest')
+        for i in range(1, num_new_vms + 1):
+            vm_name = request.form.get(f'new_vm_{i}_name', f'VM{original_vm_count + i}')
+            vm_cpu = request.form.get(f'new_vm_{i}_cpu', '1')
+            vm_ram = request.form.get(f'new_vm_{i}_ram', '1GB')
+            vm_storage = request.form.get(f'new_vm_{i}_storage', '10GB')
+            vm_image_name = request.form.get(f'new_vm_{i}_image', 'ubuntu:latest')
+            vm_internet = request.form.get(f'new_vm_{i}_internet', 'false') == 'true'
+            vm_ip = request.form.get(f'new_vm_{i}_ip', '')
             
-            instance = Instancia(
+            # 🟢 OBTENER O CREAR LA IMAGEN
+            imagen = Imagen.query.filter_by(nombre=vm_image_name).first()
+            if not imagen:
+                # Crear imagen si no existe
+                max_id = db.session.query(db.func.max(Imagen.idimagen)).scalar()
+                next_id = (max_id or 0) + 1
+                imagen = Imagen(
+                    idimagen=next_id,
+                    nombre=vm_image_name,
+                    ruta=f'/images/{vm_image_name}'
+                )
+                db.session.add(imagen)
+                db.session.commit()
+            
+            # 🟢 CREAR NUEVA INSTANCIA CON ESTRUCTURA CORRECTA
+            new_instance = Instancia(
                 slice_idslice=slice_obj.idslice,
                 nombre=vm_name,
                 cpu=vm_cpu,
                 ram=vm_ram,
                 storage=vm_storage,
-                imagen=vm_image
+                salidainternet=vm_internet,
+                imagen_idimagen=imagen.idimagen,  # 🟢 RELACIÓN CORRECTA
+                ip=vm_ip if vm_ip else None,
+                vnc_idvnc=None,  # Opcional por ahora
+                worker_idworker=None  # Opcional por ahora
             )
-            db.session.add(instance)
+            db.session.add(new_instance)
+            new_instances_created += 1
         
         db.session.commit()
         
+        # 🟢 MENSAJE DETALLADO DE ÉXITO
+        message = f'Slice "{slice_obj.nombre}" actualizado exitosamente. '
+        if new_instances_created > 0:
+            message += f'Se agregaron {new_instances_created} nueva(s) VM(s). '
+        if topology_data:
+            message += 'Topología actualizada. '
+        message += f'Las {original_vm_count} VM(s) existentes se mantuvieron intactas.'
+        
         return jsonify({
             'success': True,
-            'message': ' ADVERTENCIA: Los cambios realizados son permanentes. No hay forma de recuperar la configuración anterior del slice.',
-            'slice_name': slice_obj.nombre
+            'message': message,
+            'slice_name': slice_obj.nombre,
+            'new_vms_added': new_instances_created,
+            'total_vms': len(slice_obj.instancias),
+            'original_vms': original_vm_count
         })
         
     except Exception as e:
