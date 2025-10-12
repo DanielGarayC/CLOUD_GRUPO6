@@ -1,5 +1,8 @@
 fastapi
 uvicorn
+requests
+sqlalchemy
+pymysql
 mysql-connector-python
 bcrypt
 PyJWT==2.9.0
