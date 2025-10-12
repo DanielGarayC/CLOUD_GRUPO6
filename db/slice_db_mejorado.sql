@@ -1,43 +1,52 @@
--- MySQL dump 10.13  Distrib 8.0.36, for Win64 (x86_64)
---
--- Host: localhost    Database: mydb
--- ------------------------------------------------------
--- Server version	8.0.36
+CREATE DATABASE  IF NOT EXISTS `slice_db`;
+USE `slice_db`;
 
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
---
--- Table structure for table `enlace`
---
-
-DROP TABLE IF EXISTS `enlace`;
+DROP TABLE IF EXISTS `rol`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `enlace` (
-  `idenlace` int NOT NULL,
-  `vm1` varchar(45) DEFAULT NULL,
-  `vm2` varchar(45) DEFAULT NULL,
-  `vlan` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`idenlace`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+CREATE TABLE `rol` (
+  `idrol` int NOT NULL AUTO_INCREMENT,
+  `nombre_rol` varchar(45) NOT NULL,
+  PRIMARY KEY (`idrol`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `enlace`
+-- Dumping data for table `rol`
 --
 
-LOCK TABLES `enlace` WRITE;
-/*!40000 ALTER TABLE `enlace` DISABLE KEYS */;
-/*!40000 ALTER TABLE `enlace` ENABLE KEYS */;
+LOCK TABLES `rol` WRITE;
+/*!40000 ALTER TABLE `rol` DISABLE KEYS */;
+INSERT INTO `rol` VALUES (1,'superadmin'),(2,'administrador'),(3,'investigador'),(4,'usuariofinal');
+/*!40000 ALTER TABLE `rol` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `usuario`
+--
+
+DROP TABLE IF EXISTS `usuario`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `usuario` (
+  `idusuario` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(45) DEFAULT NULL,
+  `contrasenia` varchar(128) DEFAULT NULL,
+  `rol_idrol` int NOT NULL,
+  PRIMARY KEY (`idusuario`,`rol_idrol`),
+  KEY `fk_usuario_rol1_idx` (`rol_idrol`),
+  CONSTRAINT `fk_usuario_rol1` FOREIGN KEY (`rol_idrol`) REFERENCES `rol` (`idrol`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `usuario`
+--
+
+LOCK TABLES `usuario` WRITE;
+/*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
+INSERT INTO `usuario` VALUES (1,'admin','admin123',1),(2,'ricardo','ricardo123',2),(3,'roberto','roberto123',3),(4,'adrian','adrian123',4);
+/*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -48,11 +57,11 @@ DROP TABLE IF EXISTS `imagen`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `imagen` (
-  `idimagen` int NOT NULL,
+  `idimagen` int NOT NULL AUTO_INCREMENT,
   `ruta` varchar(45) DEFAULT NULL,
   `nombre` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`idimagen`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -63,6 +72,87 @@ LOCK TABLES `imagen` WRITE;
 /*!40000 ALTER TABLE `imagen` DISABLE KEYS */;
 INSERT INTO `imagen` VALUES (1,'/images/ubuntu:latest','ubuntu:latest');
 /*!40000 ALTER TABLE `imagen` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `vnc`
+--
+
+DROP TABLE IF EXISTS `vnc`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `vnc` (
+  `idvnc` int NOT NULL AUTO_INCREMENT,
+  `puerto` varchar(45) DEFAULT NULL,
+  `estado` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idvnc`)
+) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `vnc`
+--
+
+LOCK TABLES `vnc` WRITE;
+/*!40000 ALTER TABLE `vnc` DISABLE KEYS */;
+INSERT INTO `vnc` VALUES (1,'5901','disponible'),(2,'5902','disponible'),(3,'5903','disponible'),(4,'5904','disponible'),(5,'5905','disponible'),(6,'5906','disponible'),(7,'5907','disponible'),(8,'5908','disponible'),(9,'5909','disponible'),(10,'5910','disponible'),(11,'5911','disponible'),(12,'5912','disponible'),(13,'5913','disponible'),(14,'5914','disponible'),(15,'5915','disponible'),(16,'5916','disponible'),(17,'5917','disponible'),(18,'5918','disponible'),(19,'5919','disponible'),(20,'5920','disponible');
+/*!40000 ALTER TABLE `vnc` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `worker`
+--
+
+DROP TABLE IF EXISTS `worker`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `worker` (
+  `idworker` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(45) DEFAULT NULL,
+  `puerto` varchar(45) DEFAULT NULL,
+  `cpu` varchar(45) DEFAULT NULL,
+  `ram` varchar(45) DEFAULT NULL,
+  `storage` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idworker`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `worker`
+--
+
+LOCK TABLES `worker` WRITE;
+/*!40000 ALTER TABLE `worker` DISABLE KEYS */;
+/*!40000 ALTER TABLE `worker` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `slice`
+--
+
+DROP TABLE IF EXISTS `slice`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `slice` (
+  `idslice` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(100) DEFAULT NULL,
+  `estado` varchar(45) DEFAULT NULL,
+  `topologia` text,
+  `fecha_creacion` date DEFAULT NULL,
+  `fecha_upload` date DEFAULT NULL,
+  `zonadisponibilidad` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idslice`)
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `slice`
+--
+
+LOCK TABLES `slice` WRITE;
+/*!40000 ALTER TABLE `slice` DISABLE KEYS */;
+INSERT INTO `slice` VALUES (19,'oli','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"x\":100,\"y\":0},{\"id\":2,\"label\":\"VM2\",\"x\":-49.99999999999998,\"y\":86.60254037844388},{\"id\":3,\"label\":\"VM3\",\"x\":-50.00000000000004,\"y\":-86.60254037844383}],\"edges\":[{\"from\":1,\"to\":2,\"id\":\"f50e0b85-95e6-44bd-b6ea-9b9c7be57668\"},{\"from\":1,\"to\":3,\"id\":\"0689e997-4c3b-4a12-8def-26f5a3a3fed1\"},{\"from\":2,\"to\":3,\"id\":\"a43918b0-7509-45e3-aa16-a08e25af5749\"}]}','2025-10-12',NULL,'default');
+/*!40000 ALTER TABLE `slice` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -108,140 +198,6 @@ INSERT INTO `instancia` VALUES (1,19,'VM1','STOPPED','1','1GB','10GB',0,1,NULL,N
 UNLOCK TABLES;
 
 --
--- Table structure for table `interfaz`
---
-
-DROP TABLE IF EXISTS `interfaz`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `interfaz` (
-  `idinterfaz` int NOT NULL AUTO_INCREMENT,
-  `nombre_interfaz` varchar(45) DEFAULT NULL,
-  `instancia_idinstancia` int NOT NULL,
-  `instancia_slice_idslice` int NOT NULL,
-  PRIMARY KEY (`idinterfaz`),
-  KEY `instancia_idinstancia` (`instancia_idinstancia`),
-  KEY `instancia_slice_idslice` (`instancia_slice_idslice`),
-  CONSTRAINT `interfaz_ibfk_1` FOREIGN KEY (`instancia_idinstancia`) REFERENCES `instancia` (`idinstancia`),
-  CONSTRAINT `interfaz_ibfk_2` FOREIGN KEY (`instancia_slice_idslice`) REFERENCES `slice` (`idslice`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `interfaz`
---
-
-LOCK TABLES `interfaz` WRITE;
-/*!40000 ALTER TABLE `interfaz` DISABLE KEYS */;
-/*!40000 ALTER TABLE `interfaz` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `rol`
---
-
-DROP TABLE IF EXISTS `rol`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `rol` (
-  `idrol` int NOT NULL AUTO_INCREMENT,
-  `nombre_rol` varchar(45) NOT NULL,
-  PRIMARY KEY (`idrol`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb3;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `rol`
---
-
-LOCK TABLES `rol` WRITE;
-/*!40000 ALTER TABLE `rol` DISABLE KEYS */;
-INSERT INTO `rol` VALUES (1,'superadmin'),(2,'administrador'),(3,'investigador'),(4,'usuariofinal');
-/*!40000 ALTER TABLE `rol` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `security`
---
-
-DROP TABLE IF EXISTS `security`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `security` (
-  `idsecurity` int NOT NULL AUTO_INCREMENT,
-  `tipo` varchar(45) DEFAULT NULL,
-  `descripcion` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`idsecurity`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `security`
---
-
-LOCK TABLES `security` WRITE;
-/*!40000 ALTER TABLE `security` DISABLE KEYS */;
-/*!40000 ALTER TABLE `security` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `slice`
---
-
-DROP TABLE IF EXISTS `slice`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `slice` (
-  `idslice` int NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(100) DEFAULT NULL,
-  `estado` varchar(45) DEFAULT NULL,
-  `topologia` text,
-  `fecha_creacion` date DEFAULT NULL,
-  `fecha_upload` date DEFAULT NULL,
-  `zonadisponibilidad` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`idslice`)
-) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb3;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `slice`
---
-
-LOCK TABLES `slice` WRITE;
-/*!40000 ALTER TABLE `slice` DISABLE KEYS */;
-INSERT INTO `slice` VALUES (19,'oli','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"x\":100,\"y\":0},{\"id\":2,\"label\":\"VM2\",\"x\":-49.99999999999998,\"y\":86.60254037844388},{\"id\":3,\"label\":\"VM3\",\"x\":-50.00000000000004,\"y\":-86.60254037844383}],\"edges\":[{\"from\":1,\"to\":2,\"id\":\"f50e0b85-95e6-44bd-b6ea-9b9c7be57668\"},{\"from\":1,\"to\":3,\"id\":\"0689e997-4c3b-4a12-8def-26f5a3a3fed1\"},{\"from\":2,\"to\":3,\"id\":\"a43918b0-7509-45e3-aa16-a08e25af5749\"}]}','2025-10-12',NULL,'default');
-/*!40000 ALTER TABLE `slice` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `usuario`
---
-
-DROP TABLE IF EXISTS `usuario`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `usuario` (
-  `idusuario` int NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(45) DEFAULT NULL,
-  `contrasenia` varchar(128) DEFAULT NULL,
-  `rol_idrol` int NOT NULL,
-  PRIMARY KEY (`idusuario`,`rol_idrol`),
-  KEY `fk_usuario_rol1_idx` (`rol_idrol`),
-  CONSTRAINT `fk_usuario_rol1` FOREIGN KEY (`rol_idrol`) REFERENCES `rol` (`idrol`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb3;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `usuario`
---
-
-LOCK TABLES `usuario` WRITE;
-/*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
-INSERT INTO `usuario` VALUES (1,'admin','admin123',1),(2,'ricardo','ricardo123',2),(3,'roberto','roberto123',3),(4,'adrian','adrian123',4);
-/*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `usuario_has_slice`
 --
 
@@ -277,11 +233,11 @@ DROP TABLE IF EXISTS `vlan`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `vlan` (
-  `idvlan` int NOT NULL,
+  `idvlan` int NOT NULL AUTO_INCREMENT,
   `numero` varchar(45) DEFAULT NULL,
   `estado` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`idvlan`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -295,64 +251,27 @@ INSERT INTO `vlan` VALUES (1,'100','ocupada'),(2,'101','ocupada'),(3,'102','ocup
 UNLOCK TABLES;
 
 --
--- Table structure for table `vnc`
+-- Table structure for table `enlace`
 --
 
-DROP TABLE IF EXISTS `vnc`;
+DROP TABLE IF EXISTS `enlace`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `vnc` (
-  `idvnc` int NOT NULL AUTO_INCREMENT,
-  `puerto` varchar(45) DEFAULT NULL,
-  `estado` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`idvnc`)
-) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb3;
+CREATE TABLE `enlace` (
+  `idenlace` int NOT NULL AUTO_INCREMENT,
+  `vm1` varchar(45) DEFAULT NULL,
+  `vm2` varchar(45) DEFAULT NULL,
+  `vlan` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`idenlace`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `vnc`
+-- Dumping data for table `enlace`
 --
 
-LOCK TABLES `vnc` WRITE;
-/*!40000 ALTER TABLE `vnc` DISABLE KEYS */;
-INSERT INTO `vnc` VALUES (1,'5901','disponible'),(2,'5902','disponible'),(3,'5903','disponible'),(4,'5904','disponible'),(5,'5905','disponible'),(6,'5906','disponible'),(7,'5907','disponible'),(8,'5908','disponible'),(9,'5909','disponible'),(10,'5910','disponible'),(11,'5911','disponible'),(12,'5912','disponible'),(13,'5913','disponible'),(14,'5914','disponible'),(15,'5915','disponible'),(16,'5916','disponible'),(17,'5917','disponible'),(18,'5918','disponible'),(19,'5919','disponible'),(20,'5920','disponible');
-/*!40000 ALTER TABLE `vnc` ENABLE KEYS */;
+LOCK TABLES `enlace` WRITE;
+
 UNLOCK TABLES;
 
---
--- Table structure for table `worker`
---
-
-DROP TABLE IF EXISTS `worker`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `worker` (
-  `idworker` int NOT NULL,
-  `nombre` varchar(45) DEFAULT NULL,
-  `puerto` varchar(45) DEFAULT NULL,
-  `cpu` varchar(45) DEFAULT NULL,
-  `ram` varchar(45) DEFAULT NULL,
-  `storage` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`idworker`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `worker`
---
-
-LOCK TABLES `worker` WRITE;
-/*!40000 ALTER TABLE `worker` DISABLE KEYS */;
-/*!40000 ALTER TABLE `worker` ENABLE KEYS */;
-UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2025-10-12  1:38:26
+-- Dump completed on 2025-10-12  7:01:41
