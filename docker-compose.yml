@@ -207,6 +207,10 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0eb55bf4b8147dd19a6676684195b08d72fe3de3
     networks: [cloudnet]
     healthcheck:
       test: ["CMD","bash","-lc","/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]

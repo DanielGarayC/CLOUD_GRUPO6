@@ -364,13 +364,19 @@
                             <label class="form-label">Almacenamiento</label>
                             <input type="text" class="form-control" name="new_vm_${i}_storage" value="10GB" required>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label">Imagen</label>
                             <select class="form-select" name="new_vm_${i}_image" required>
-                                <option value="ubuntu:latest">Ubuntu Latest</option>
-                                <option value="centos:latest">CentOS Latest</option>
-                                <option value="debian:latest">Debian Latest</option>
-                                <option value="alpine:latest">Alpine Latest</option>
+                                {% for imagen in imagenes %}
+                                <option value="{{ imagen.nombre }}">{{ imagen.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label">Internet</label>
+                            <select class="form-select" name="new_vm_${i}_internet">
+                                <option value="false">No</option>
+                                <option value="true">Sí</option>
                             </select>
                         </div>
                     </div>
@@ -378,6 +384,8 @@
                 container.appendChild(vmCard);
             }
         }
+
+
 
         function handleNewVMCountChange() {
             newVMCount = parseInt(document.getElementById('num_new_vms').value) || 0;

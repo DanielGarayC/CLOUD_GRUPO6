@@ -43,9 +43,44 @@ CREATE TABLE `enlace` (
 -- Dumping data for table `enlace`
 --
 
+<<<<<<< HEAD
 LOCK TABLES `enlace` WRITE;
 /*!40000 ALTER TABLE `enlace` DISABLE KEYS */;
 /*!40000 ALTER TABLE `enlace` ENABLE KEYS */;
+=======
+LOCK TABLES `rol` WRITE;
+/*!40000 ALTER TABLE `rol` DISABLE KEYS */;
+INSERT INTO `rol` VALUES (1,'superadmin'),(2,'administrador'),(3,'investigador'),(4,'usuariofinal');
+/*!40000 ALTER TABLE `rol` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `usuario`
+--
+
+DROP TABLE IF EXISTS `usuario`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `usuario` (
+  `idusuario` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(45) DEFAULT NULL,
+  `contrasenia` varchar(128) DEFAULT NULL,
+  `rol_idrol` int NOT NULL,
+  PRIMARY KEY (`idusuario`,`rol_idrol`),
+  KEY `fk_usuario_rol1_idx` (`rol_idrol`),
+  CONSTRAINT `fk_usuario_rol1` FOREIGN KEY (`rol_idrol`) REFERENCES `rol` (`idrol`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `usuario`
+--
+
+LOCK TABLES `usuario` WRITE;
+/*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
+INSERT INTO `usuario` VALUES (1,'admin','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne',1),(2,'ricardo','ricardo123',2),(3,'roberto','roberto123',3),(4,'adrian','adrian123',4);
+/*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
+>>>>>>> 0eb55bf4b8147dd19a6676684195b08d72fe3de3
 UNLOCK TABLES;
 
 --
