@@ -8,10 +8,10 @@ SECRET_KEY = os.getenv("SECRET_KEY", "supersecreto")
 
 def get_db():
     return mysql.connector.connect(
-        host=os.getenv("DB_HOST", "auth_db"),
-        user=os.getenv("DB_USER", "user"),
+        host=os.getenv("DB_HOST", "slice_db"),  
+        user=os.getenv("DB_USER", "root"),      
         password=os.getenv("DB_PASSWORD", "root"),
-        database=os.getenv("DB_NAME", "auth_db")
+        database=os.getenv("DB_NAME", "slice_db")  
     )
 
 @app.post("/login")
@@ -22,7 +22,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = cursor.fetchone()
     conn.close()
 
-    if not user or not bcrypt.checkpw(form_data.password.encode(), user["contrasenha"].encode()):
+    if not user or not bcrypt.checkpw(form_data.password.encode(), user["contrasenia"].encode()):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
     payload = {

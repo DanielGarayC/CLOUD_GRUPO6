@@ -180,7 +180,7 @@ CREATE TABLE `usuario` (
 
 LOCK TABLES `usuario` WRITE;
 /*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
-INSERT INTO `usuario` VALUES (1,'admin','daniel123',1),(2,'ricardo','ricardo123',2),(3,'roberto','roberto123',3),(4,'adrian','adrian123',4),(5,'jostin','jostin123',4);
+INSERT INTO `usuario` VALUES (1,'admin','$2a$13$hDsl2kC2dMYEuV02CoeiyuZd1SWPx4N0gM4QghCuJb7TDs0uaSgne', 1);
 /*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
 UNLOCK TABLES;
 
