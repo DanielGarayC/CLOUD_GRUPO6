@@ -18,7 +18,7 @@ def obtener_vlan_internet(db: Session):
     if not vlan:
         raise HTTPException(status_code=404, detail="No hay VLAN reservada para Internet")
 
-    return vlan.numero
+    return {"idvlan": vlan.idvlan, "numero": vlan.numero}
 
 # --- Asignar VLAN disponible ---
 def asignar_vlan(db: Session):
@@ -38,7 +38,7 @@ def asignar_vlan(db: Session):
     """), {"idvlan": vlan.idvlan})
     db.commit()
 
-    return vlan.numero
+    return {"idvlan": vlan.idvlan, "numero": vlan.numero}
 
 # --- Liberar VLAN ---
 def liberar_vlan(numero: str, db: Session):
@@ -78,7 +78,7 @@ def asignar_vnc(db: Session):
     """), {"idvnc": vnc.idvnc})
     db.commit()
 
-    return vnc.puerto
+    return {"idvnc": vnc.idvnc, "puerto": vnc.puerto}
 
 # --- Liberar VNC ---
 def liberar_vnc(puerto: str, db: Session):
