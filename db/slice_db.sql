@@ -69,7 +69,7 @@ CREATE TABLE `imagen` (
 
 LOCK TABLES `imagen` WRITE;
 /*!40000 ALTER TABLE `imagen` DISABLE KEYS */;
-INSERT INTO `imagen` VALUES (1,'/images/ubuntu:latest','ubuntu:latest');
+INSERT INTO `imagen` VALUES (1,'default','ubuntu:latest'),(2,'default','cirros:latest');
 /*!40000 ALTER TABLE `imagen` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -108,7 +108,7 @@ DROP TABLE IF EXISTS `worker`;
 CREATE TABLE `worker` (
   `idworker` int NOT NULL AUTO_INCREMENT,
   `nombre` varchar(45) DEFAULT NULL,
-  `puerto` varchar(45) DEFAULT NULL,
+  `ip` varchar(45) DEFAULT NULL,
   `cpu` varchar(45) DEFAULT NULL,
   `ram` varchar(45) DEFAULT NULL,
   `storage` varchar(45) DEFAULT NULL,
@@ -261,8 +261,14 @@ CREATE TABLE `enlace` (
   `vm1` varchar(45) DEFAULT NULL,
   `vm2` varchar(45) DEFAULT NULL,
   `vlan` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`idenlace`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
+  `vlan_idvlan` int NOT NULL,
+  `slice_idslice` int NOT NULL,
+  PRIMARY KEY (`idenlace`),
+  KEY `fk_enlace_vlan1_idx` (`vlan_idvlan`),
+  KEY `fk_enlace_slice1_idx` (`slice_idslice`),
+  CONSTRAINT `fk_enlace_slice1` FOREIGN KEY (`slice_idslice`) REFERENCES `slice` (`idslice`),
+  CONSTRAINT `fk_enlace_vlan1` FOREIGN KEY (`vlan_idvlan`) REFERENCES `vlan` (`idvlan`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

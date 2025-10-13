@@ -3,105 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeleFlow - Editar Slice</title>
+    <title>VNRT - Editar Slice</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/create_slice.css') }}" rel="stylesheet">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
-        #custom-topology-container {
-            height: 400px;
-            border: 1px solid #ddd;
-            margin: 20px 0;
-            border-radius: 8px;
-        }
-        .vm-config-card {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-        }
-        .vm-config-card.existing {
+        .vm-card.existing {
             background-color: #f8f9fa;
-            border-color: #6c757d;
-        }
-        .vm-config-card.new {
-            background-color: #e8f5e8;
-            border-color: #28a745;
-        }
-        .topology-selection {
-            display: flex;
-            gap: 15px;
-            margin: 20px 0;
-        }
-        .topology-option {
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .topology-option:hover {
-            border-color: #28a745;
-        }
-        .topology-option.selected {
-            border-color: #28a745;
-            background-color: #f8f9fa;
-        }
-        .node-counter {
-            background-color: #e9ecef;
-            border-radius: 5px;
-            padding: 8px 12px;
-            margin-bottom: 15px;
-            font-size: 0.9em;
-        }
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .warning-box {
-            background-color: #d1ecf1;
-            border: 1px solid #bee5eb;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 20px 0;
-        }
-        .info-box {
-            background-color: #e2f3ff;
-            border: 1px solid #b3d7ff;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 20px 0;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 50%;
+            border: 2px solid #6c757d;
             border-radius: 10px;
-            text-align: center;
+            padding: 20px;
+            margin-bottom: 15px;
         }
-        .ml-2 {
-            margin-left: 0.5rem;
+        .vm-card.new {
+            background-color: #e8f5e8;
+            border: 2px solid #28a745;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
         }
         .vm-indicator {
             display: inline-block;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.8em;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.75em;
             font-weight: bold;
+            margin-left: 10px;
         }
         .vm-indicator.existing {
             background-color: #6c757d;
@@ -111,160 +39,246 @@
             background-color: #28a745;
             color: white;
         }
+        .info-alert {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .topology-controls {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            margin-bottom: 20px;
+        }
+        #topology-container {
+            height: 400px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            background: white;
+        }
+        .readonly-field {
+            background-color: #f8f9fa !important;
+            border-color: #ced4da !important;
+            color: #6c757d !important;
+        }
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        .step-title {
+            color: #2c3e50;
+            margin: 0;
+            font-weight: 600;
+        }
+        .btn-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 12px 25px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+        .btn-gradient:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+        .main-container {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .slice-designer {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
-<body class="dashboard-body">
-    <div class="container-fluid p-0">
-        <!-- Navigation -->
-        <nav class="navbar navbar-expand-lg">
-            <div class="container-fluid">
-                <div class="navbar-brand">
-                    <i class="fas fa-cloud me-2"></i>
-                    <strong>TeleFlow</strong>
-                    <span class="ms-2 text-muted">| Editar Slice</span>
-                </div>
-                <div class="navbar-nav ms-auto">
-                    <div class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle user-menu" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user-circle me-1"></i>{{ session.username }}
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid">
+            <div class="navbar-brand">
+                <i class="fas fa-cloud me-2"></i>
+                <strong>VNRT</strong>
+                <span class="ms-2 text-muted">| Editar Slice</span>
+            </div>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-1"></i>{{ session.username or 'Usuario' }}
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end">
+                        <a class="dropdown-item" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                         </a>
-                        <div class="dropdown-menu dropdown-menu-end">
-                            <a class="dropdown-item" href="{{ url_for('dashboard') }}">
-                                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
-                            </a>
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="{{ url_for('logout') }}">
-                                <i class="fas fa-sign-out-alt me-1"></i>Logout
-                            </a>
-                        </div>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt me-1"></i>Logout
+                        </a>
                     </div>
                 </div>
             </div>
-        </nav>
+        </div>
+    </nav>
 
-        <!-- Main Content -->
-        <div class="main-content">
-            <div class="page-header">
-                <h1 class="page-title">Editar Slice: {{ slice.nombre or 'Slice #' + slice.idslice|string }}</h1>
-                <p class="page-subtitle">Agrega nuevas VMs y modifica las conexiones de red existentes</p>
-            </div>
+    <div class="main-container">
+        <form method="POST" id="edit-slice-form">
+            <!-- Información del Slice -->
+            <div class="slice-designer">
+                <div class="step-header">
+                    <div class="step-number">1</div>
+                    <h3 class="step-title">Información del Slice</h3>
+                </div>
 
-            <div class="info-box">
-                <h5><i class="fas fa-info-circle me-2"></i>Modo de Edición Seguro</h5>
-                <p><strong>Solo puedes agregar nuevas VMs y modificar conexiones.</strong> Las VMs existentes se mantendrán intactas. Los cambios se guardarán en la base de datos.</p>
-            </div>
+                <div class="info-alert">
+                    <h5><i class="fas fa-info-circle me-2"></i>Modo de Edición Seguro</h5>
+                    <p class="mb-0"><strong>Solo puedes agregar nuevas VMs y modificar conexiones.</strong> Las VMs existentes se mantendrán intactas.</p>
+                </div>
 
-            <form method="POST" id="edit-slice-form">
-                <!-- Step 0: Slice Name -->
-                <div class="content-card mb-4">
-                    <h4><i class="fas fa-tag me-2"></i>Información del Slice</h4>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label for="slice_name" class="form-label">Nombre del Slice</label>
-                            <input type="text" class="form-control" id="slice_name" name="slice_name" value="{{ slice.nombre or '' }}" required placeholder="Ej: TEL141_2025-2_20206466">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <input type="text" class="form-control" id="slice_name" name="slice_name" value="{{ slice.nombre or '' }}" required>
+                            <label for="slice_name">Nombre del Slice</label>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Step 1: Number of VMs -->
-                <div class="content-card mb-4">
-                    <h4><i class="fas fa-server me-2"></i>Configuración de Instancias</h4>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label for="num_new_vms" class="form-label">Número de nuevas VMs a agregar</label>
+                    <div class="col-md-6">
+                        <div class="form-floating">
                             <input type="number" class="form-control" id="num_new_vms" name="num_new_vms" min="0" max="10" value="0" onchange="handleNewVMCountChange()">
-                            <small class="text-muted">Actualmente tienes {{ slice.instancias|length }} VMs existentes</small>
+                            <label for="num_new_vms">Nuevas VMs a agregar</label>
                         </div>
+                        <small class="text-muted mt-1">Actualmente tienes {{ slice.instancias|length }} VMs existentes</small>
                     </div>
                 </div>
+            </div>
 
-                <!-- Step 2: Existing VMs (Read-only) -->
-                <div class="content-card mb-4">
-                    <h4><i class="fas fa-eye me-2"></i>VMs Existentes (Solo lectura)</h4>
-                    <div id="existing-vm-configs">
-                        <!-- Existing VM configurations will be generated here -->
-                    </div>
+            <!-- VMs Existentes -->
+            <div class="slice-designer">
+                <div class="step-header">
+                    <div class="step-number">2</div>
+                    <h3 class="step-title">VMs Existentes (Solo lectura)</h3>
                 </div>
 
-                <!-- Step 3: New VM Configuration -->
-                <div class="content-card mb-4" id="new-vm-config-section" style="display: none;">
-                    <h4><i class="fas fa-plus me-2"></i>Configuración de Nuevas VMs</h4>
-                    <div id="new-vm-configs">
-                        <!-- New VM configurations will be generated here -->
-                    </div>
+                <div id="existing-vm-configs">
+                    <!-- Se generarán automáticamente -->
+                </div>
+            </div>
+
+            <!-- Nuevas VMs -->
+            <div class="slice-designer" id="new-vm-section" style="display: none;">
+                <div class="step-header">
+                    <div class="step-number">3</div>
+                    <h3 class="step-title">Configuración de Nuevas VMs</h3>
                 </div>
 
-                <!-- Step 4: Topology Selection -->
-                <div class="content-card mb-4">
-                    <h4><i class="fas fa-project-diagram me-2"></i>Modificar Topología</h4>
-                    <div class="topology-selection">
-                        <div class="topology-option selected" data-topology="custom" onclick="selectTopology('custom')">
-                            <i class="fas fa-paint-brush fa-2x mb-2"></i>
-                            <h6>Editar Conexiones</h6>
-                            <small>Modifica las conexiones existentes y agrega nuevas</small>
-                        </div>
-                    </div>
-                    <input type="hidden" id="topology_type" name="topology_type" value="custom" required>
+                <div id="new-vm-configs">
+                    <!-- Se generarán dinámicamente -->
+                </div>
+            </div>
+
+            <!-- Editor de Topología -->
+            <div class="slice-designer">
+                <div class="step-header">
+                    <div class="step-number">4</div>
+                    <h3 class="step-title">Editor de Topología de Red</h3>
                 </div>
 
-                <!-- Step 5: Custom Topology Designer -->
-                <div class="content-card mb-4" id="custom-topology-card">
-                    <h4><i class="fas fa-pencil-ruler me-2"></i>Editor de Topología</h4>
-                    <p class="text-muted">Agrega conexiones entre VMs existentes y nuevas. Los cambios se guardarán automáticamente.</p>
-                    
-                    <div class="node-counter">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <span id="node-count-display">VMs totales: {{ slice.instancias|length }}</span>
-                        <span class="text-muted ms-2" id="total-vm-info">({{ slice.instancias|length }} existentes + 0 nuevas)</span>
-                    </div>
+                <div class="topology-controls">
+                    <h5><i class="fas fa-tools me-2"></i>Controles de Conexión</h5>
+                    <p class="text-muted">Agrega nuevas conexiones entre VMs existentes y nuevas</p>
                     
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <select id="fromNode" class="form-select form-select-sm">
-                                <option value="">Nodo origen</option>
+                            <label class="form-label">Nodo Origen</label>
+                            <select id="fromNode" class="form-select">
+                                <option value="">Seleccionar nodo origen</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <select id="toNode" class="form-select form-select-sm">
-                                <option value="">Nodo destino</option>
+                            <label class="form-label">Nodo Destino</label>
+                            <select id="toNode" class="form-select">
+                                <option value="">Seleccionar nodo destino</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <button type="button" class="btn btn-primary btn-sm" onclick="addCustomEdge()">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-gradient w-100" onclick="addCustomEdge()">
                                 <i class="fas fa-link me-1"></i>Agregar Conexión
                             </button>
                         </div>
                     </div>
-                    
-                    <div id="custom-topology-container"></div>
-                    <input type="hidden" id="topology_data" name="topology_data">
-                </div>
 
-                <!-- Submit Button -->
-                <div class="content-card">
-                    <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left me-1"></i>Cancelar
-                        </a>
-                        <button type="button" class="btn btn-success" onclick="showConfirmModal()">
-                            <i class="fas fa-save me-1"></i>Guardar Cambios
-                        </button>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <span id="node-count-display">VMs totales: {{ slice.instancias|length }}</span>
+                        <span class="text-muted ms-2" id="total-vm-info">({{ slice.instancias|length }} existentes + 0 nuevas)</span>
                     </div>
                 </div>
-            </form>
-        </div>
+
+                <div id="topology-container"></div>
+                <input type="hidden" id="topology_data" name="topology_data">
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="slice-designer">
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>Cancelar
+                    </a>
+                    <button type="button" class="btn btn-gradient btn-lg" onclick="showConfirmModal()">
+                        <i class="fas fa-save me-2"></i>Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 
     <!-- Modal de Confirmación -->
-    <div id="confirmModal" class="modal">
-        <div class="modal-content">
-            <h3><i class="fas fa-save me-2"></i>Confirmar Cambios</h3>
-            <p>Se guardarán las nuevas VMs y modificaciones de topología.</p>
-            <p>Las VMs existentes no serán afectadas.</p>
-            <p>¿Está seguro de que desea continuar?</p>
-            <br>
-            <button class="btn btn-success" onclick="confirmSave()">Sí, guardar cambios</button>
-            <button class="btn btn-secondary ml-2" onclick="closeModal()">Cancelar</button>
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-gradient text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-save me-2"></i>Confirmar Cambios
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <i class="fas fa-question-circle fa-3x text-warning mb-3"></i>
+                    <h5>¿Confirmar los cambios?</h5>
+                    <p>Se guardarán las nuevas VMs y modificaciones de topología.</p>
+                    <p class="text-muted">Las VMs existentes no serán afectadas.</p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-gradient" onclick="confirmSave()">
+                        <i class="fas fa-check me-1"></i>Sí, guardar cambios
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Cancelar
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -282,7 +296,7 @@
             currentTopology = { nodes: [], edges: [] };
         }
 
-        // Datos de las instancias actuales (serializados correctamente)
+        // Datos de las instancias actuales
         let existingInstances = {{ instances_data | tojson | safe }};
 
         function generateExistingVMConfig() {
@@ -291,33 +305,43 @@
 
             existingInstances.forEach((instance, index) => {
                 const vmCard = document.createElement('div');
-                vmCard.className = 'vm-config-card existing';
+                vmCard.className = 'vm-card existing';
                 vmCard.innerHTML = `
-                    <h6>
+                    <h5>
                         <i class="fas fa-desktop me-2"></i>
                         ${instance.nombre}
                         <span class="vm-indicator existing">EXISTENTE</span>
-                    </h6>
+                    </h5>
                     <div class="row">
                         <div class="col-md-2">
-                            <label class="form-label">CPU</label>
-                            <input type="text" class="form-control" value="${instance.cpu}" readonly>
+                            <div class="form-floating">
+                                <input type="text" class="form-control readonly-field" value="${instance.cpu}" readonly>
+                                <label>CPU</label>
+                            </div>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">RAM</label>
-                            <input type="text" class="form-control" value="${instance.ram}" readonly>
+                            <div class="form-floating">
+                                <input type="text" class="form-control readonly-field" value="${instance.ram}" readonly>
+                                <label>RAM</label>
+                            </div>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Almacenamiento</label>
-                            <input type="text" class="form-control" value="${instance.storage}" readonly>
+                            <div class="form-floating">
+                                <input type="text" class="form-control readonly-field" value="${instance.storage}" readonly>
+                                <label>Storage</label>
+                            </div>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Imagen</label>
-                            <input type="text" class="form-control" value="${instance.imagen}" readonly>
+                            <div class="form-floating">
+                                <input type="text" class="form-control readonly-field" value="${instance.imagen}" readonly>
+                                <label>Imagen</label>
+                            </div>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Estado</label>
-                            <input type="text" class="form-control" value="${instance.estado}" readonly>
+                            <div class="form-floating">
+                                <input type="text" class="form-control readonly-field" value="${instance.salidainternet ? 'Sí' : 'No'}" readonly>
+                                <label>Internet</label>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -327,7 +351,7 @@
 
         function generateNewVMConfig() {
             const container = document.getElementById('new-vm-configs');
-            const section = document.getElementById('new-vm-config-section');
+            const section = document.getElementById('new-vm-section');
             container.innerHTML = '';
 
             if (newVMCount === 0) {
@@ -340,33 +364,51 @@
             for (let i = 1; i <= newVMCount; i++) {
                 const vmIndex = existingVMCount + i;
                 const vmCard = document.createElement('div');
-                vmCard.className = 'vm-config-card new';
+                vmCard.className = 'vm-card new';
                 vmCard.innerHTML = `
-                    <h6>
+                    <h5>
                         <i class="fas fa-desktop me-2"></i>
                         Nueva VM ${i}
                         <span class="vm-indicator new">NUEVA</span>
-                    </h6>
+                    </h5>
                     <div class="row">
                         <div class="col-md-3">
-                            <label class="form-label">Nombre</label>
-                            <input type="text" class="form-control" name="new_vm_${i}_name" value="VM${vmIndex}" required>
+                            <div class="form-floating">
+                                <input type="text" class="form-control" name="new_vm_${i}_name" value="VM${vmIndex}" required>
+                                <label>Nombre</label>
+                            </div>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">CPU</label>
-                            <input type="text" class="form-control" name="new_vm_${i}_cpu" value="1" required>
+                            <select class="form-select" name="new_vm_${i}_cpu" required>
+                                <option value="1">1 Core</option>
+                                <option value="2">2 Cores</option>
+                                <option value="4">4 Cores</option>
+                            </select>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">RAM</label>
-                            <input type="text" class="form-control" name="new_vm_${i}_ram" value="1GB" required>
+                            <select class="form-select" name="new_vm_${i}_ram" required>
+                                <option value="1GB">1GB</option>
+                                <option value="2GB">2GB</option>
+                                <option value="4GB">4GB</option>
+                                <option value="8GB">8GB</option>
+                            </select>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Almacenamiento</label>
-                            <input type="text" class="form-control" name="new_vm_${i}_storage" value="10GB" required>
+                            <label class="form-label">Storage</label>
+                            <select class="form-select" name="new_vm_${i}_storage" required>
+                                <option value="10GB">10GB</option>
+                                <option value="20GB">20GB</option>
+                                <option value="50GB">50GB</option>
+                                <option value="100GB">100GB</option>
+                            </select>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Imagen</label>
                             <select class="form-select" name="new_vm_${i}_image" required>
+                                <option value="ubuntu:latest">Ubuntu Latest</option>
+                                <option value="cirrus:latest">CirrOS Latest</option>
                                 {% for imagen in imagenes %}
                                 <option value="{{ imagen.nombre }}">{{ imagen.nombre }}</option>
                                 {% endfor %}
@@ -374,18 +416,15 @@
                         </div>
                         <div class="col-md-1">
                             <label class="form-label">Internet</label>
-                            <select class="form-select" name="new_vm_${i}_internet">
-                                <option value="false">No</option>
-                                <option value="true">Sí</option>
-                            </select>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="new_vm_${i}_internet">
+                            </div>
                         </div>
                     </div>
                 `;
                 container.appendChild(vmCard);
             }
         }
-
-
 
         function handleNewVMCountChange() {
             newVMCount = parseInt(document.getElementById('num_new_vms').value) || 0;
@@ -397,15 +436,8 @@
             }
         }
 
-        function selectTopology(type) {
-            // Solo topología personalizada está disponible en modo edición
-            document.getElementById('topology_type').value = 'custom';
-            initCustomTopology();
-            updateNodeCountDisplay();
-        }
-
         function initCustomTopology() {
-            const container = document.getElementById('custom-topology-container');
+            const container = document.getElementById('topology-container');
             
             // Initialize nodes and edges with current topology
             customNodes = new vis.DataSet(currentTopology.nodes || []);
@@ -418,18 +450,28 @@
             const options = {
                 nodes: {
                     shape: 'circle',
-                    size: 25,
-                    font: { size: 14, color: '#333333' },
-                    borderWidth: 2
+                    size: 30,
+                    font: { size: 14, color: '#333' },
+                    borderWidth: 3,
+                    color: {
+                        background: '#28a745',
+                        border: '#1e7e34',
+                        highlight: { background: '#20c997', border: '#17a2b8' }
+                    }
                 },
                 edges: {
-                    width: 2,
-                    color: '#848484',
+                    width: 3,
+                    color: '#6c757d',
                     smooth: { type: 'continuous' }
                 },
                 physics: {
                     enabled: true,
-                    stabilization: { enabled: true, iterations: 100 }
+                    stabilization: { iterations: 100 }
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true
                 }
             };
             
@@ -446,7 +488,6 @@
             if (!customNodes) return;
 
             const totalExpectedNodes = existingVMCount + newVMCount;
-            const currentMaxId = customNodes.length > 0 ? Math.max(...customNodes.getIds()) : 0;
             
             // Add nodes for new VMs
             for (let i = existingVMCount + 1; i <= totalExpectedNodes; i++) {
@@ -455,7 +496,7 @@
                     const newNode = {
                         id: i,
                         label: `VM${i}`,
-                        color: { background: '#28a745', border: '#1e7e34' }
+                        color: { background: '#17a2b8', border: '#138496' }
                     };
                     customNodes.add(newNode);
                 }
@@ -487,6 +528,10 @@
                 };
                 customEdges.add(newEdge);
                 updateTopologyData();
+                
+                // Reset selections
+                document.getElementById('fromNode').value = '';
+                document.getElementById('toNode').value = '';
             } else {
                 alert('Por favor selecciona dos nodos diferentes para conectar.');
             }
@@ -496,8 +541,8 @@
             const fromSelect = document.getElementById('fromNode');
             const toSelect = document.getElementById('toNode');
             
-            fromSelect.innerHTML = '<option value="">Nodo origen</option>';
-            toSelect.innerHTML = '<option value="">Nodo destino</option>';
+            fromSelect.innerHTML = '<option value="">Seleccionar nodo origen</option>';
+            toSelect.innerHTML = '<option value="">Seleccionar nodo destino</option>';
             
             if (customNodes) {
                 customNodes.forEach(node => {
@@ -530,16 +575,12 @@
                     edges: customEdges.get()
                 };
                 document.getElementById('topology_data').value = JSON.stringify(topologyData);
-                updateNodeCountDisplay();
             }
         }
 
         function showConfirmModal() {
-            document.getElementById('confirmModal').style.display = 'block';
-        }
-
-        function closeModal() {
-            document.getElementById('confirmModal').style.display = 'none';
+            const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+            modal.show();
         }
 
         function confirmSave() {
@@ -566,14 +607,16 @@
                 alert('Error al guardar: ' + error);
             });
             
-            closeModal();
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+            modal.hide();
         }
 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
             generateExistingVMConfig();
             generateNewVMConfig();
-            selectTopology('custom');
+            initCustomTopology();
         });
     </script>
 </body>
