@@ -303,16 +303,16 @@
     function deleteSlice(sliceId, sliceName, sliceStatus) {
         // Verificar que el estado permite eliminación
         if (!['DRAW', 'STOPPED'].includes(sliceStatus)) {
-            showAlert('error', `❌ No se puede eliminar slice en estado "${sliceStatus}". Solo se permiten estados DRAW o STOPPED.`);
+            showAlert('error', ` No se puede eliminar slice en estado "${sliceStatus}". Solo se permiten estados DRAW o STOPPED.`);
             return;
         }
         
         // Mensajes específicos por estado
         let confirmMessage;
         if (sliceStatus === 'DRAW') {
-            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\n📝 Estado: DRAW\n⚠️ El slice será eliminado de la base de datos únicamente.\n\nEsta acción no se puede deshacer.`;
+            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\n Estado: DRAW\n El slice será eliminado de la base de datos únicamente.\n\nEsta acción no se puede deshacer.`;
         } else if (sliceStatus === 'STOPPED') {
-            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\n🏗️ Estado: STOPPED\n⚠️ ADVERTENCIA: Esto eliminará TODA la infraestructura desplegada:\n\n• Máquinas virtuales\n• Recursos de red (VLANs, puertos VNC)\n• Configuraciones de red\n• Procesos del sistema\n\nEsta acción no se puede deshacer.`;
+            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\n Estado: STOPPED\n ADVERTENCIA: Esto eliminará TODA la infraestructura desplegada:\n\n• Máquinas virtuales\n• Recursos de red (VLANs, puertos VNC)\n• Configuraciones de red\n• Procesos del sistema\n\nEsta acción no se puede deshacer.`;
         }
         
         if (!confirm(confirmMessage)) {
@@ -357,16 +357,16 @@
             if (data.success) {
                 // ✅ ÉXITO
                 const deleteType = data.type || 'unknown';
-                let successMessage = `✅ Slice "${sliceName}" eliminado exitosamente (${duration}s)`;
+                let successMessage = ` Slice "${sliceName}" eliminado exitosamente (${duration}s)`;
                 
                 if (deleteType === 'simple_delete') {
-                    successMessage += '\n📝 Eliminado de la base de datos';
+                    successMessage += '\n Eliminado de la base de datos';
                     if (data.details) {
                         successMessage += `\n• Instancias: ${data.details.instancias_eliminadas}`;
                         successMessage += `\n• Enlaces: ${data.details.enlaces_eliminados}`;
                     }
                 } else if (deleteType === 'infrastructure_delete') {
-                    successMessage += '\n🏗️ Infraestructura completamente limpiada';
+                    successMessage += '\n Infraestructura completamente limpiada';
                     if (data.details) {
                         successMessage += `\n• VMs eliminadas: ${data.details.vms_eliminadas || 0}`;
                         successMessage += `\n• VLANs liberadas: ${data.details.vlans_liberadas || 0}`;
@@ -386,7 +386,7 @@
         })
         .catch(error => {
             console.error('Delete error:', error);
-            showAlert('error', `❌ Error de comunicación eliminando slice "${sliceName}"`);
+            showAlert('error', ` Error de comunicación eliminando slice "${sliceName}"`);
             
             // Restaurar botón
             deleteBtn.disabled = false;
@@ -400,16 +400,16 @@
         let errorMessage = data.error || 'Error desconocido eliminando slice';
         
         if (errorType === 'partial_delete') {
-            errorMessage = `⚠️ Eliminación parcial del slice "${sliceName}"\n\n${data.message || 'Algunos recursos pueden no haberse liberado.'}\n\nVerifica manualmente el estado de la infraestructura.`;
+            errorMessage = ` Eliminación parcial del slice "${sliceName}"\n\n${data.message || 'Algunos recursos pueden no haberse liberado.'}\n\nVerifica manualmente el estado de la infraestructura.`;
             showAlert('warning', errorMessage);
         } else if (errorType === 'timeout_error') {
-            errorMessage = `⏱️ Timeout eliminando slice "${sliceName}"\n\nLa operación puede estar aún en progreso.\nVerifica el estado del slice en unos minutos.`;
+            errorMessage = ` Timeout eliminando slice "${sliceName}"\n\nLa operación puede estar aún en progreso.\nVerifica el estado del slice en unos minutos.`;
             showAlert('warning', errorMessage);
         } else if (errorType === 'communication_error') {
-            errorMessage = `🔌 Error de comunicación con Slice Manager\n\n${data.message || errorMessage}\n\nIntenta nuevamente en unos momentos.`;
+            errorMessage = ` Error de comunicación con Slice Manager\n\n${data.message || errorMessage}\n\nIntenta nuevamente en unos momentos.`;
             showAlert('error', errorMessage);
         } else {
-            showAlert('error', `❌ ${errorMessage}`);
+            showAlert('error', ` ${errorMessage}`);
         }
         
         // Restaurar botón
