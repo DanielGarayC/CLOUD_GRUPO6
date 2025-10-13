@@ -637,21 +637,132 @@ def delete_slice(slice_id):
         return jsonify({'error': 'Access denied'}), 403
     
     slice_name = slice_obj.nombre or f'Slice #{slice_id}'
+    current_estado = slice_obj.estado
     
-    try:
-        # Delete the slice (cascade will handle related instances and interfaces)
-        db.session.delete(slice_obj)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'Slice {slice_name} deleted successfully'
-        })
-    except Exception as e:
-        db.session.rollback()
+    # 🚫 VALIDAR QUE SOLO SE PUEDA ELIMINAR EN ESTADOS PERMITIDOS
+    if current_estado not in ['DRAW', 'STOPPED']:
         return jsonify({
             'success': False,
-            'error': f'Error deleting slice: {str(e)}'
+            'error': f'No se puede eliminar slice en estado "{current_estado}"',
+            'message': 'Solo se pueden eliminar slices en estado DRAW o STOPPED'
+        }), 400
+    
+    print(f"🗑️ Iniciando eliminación del slice {slice_id} en estado '{current_estado}'")
+    
+    try:
+        # 🎯 LÓGICA SEGÚN ESTADO
+        if current_estado == 'DRAW':
+            # ✅ ELIMINACIÓN SIMPLE: Solo BD
+            print(f"📝 Slice en estado DRAW - Eliminación simple de BD")
+            
+            # Contar elementos antes de eliminar
+            enlaces_count = Enlace.query.filter_by(slice_idslice=slice_id).count()
+            instancias_count = len(slice_obj.instancias)
+            
+            # Eliminar enlaces (sin VLANs asignadas en estado DRAW)
+            enlaces_del = Enlace.query.filter_by(slice_idslice=slice_id)
+            for enlace in enlaces_del:
+                db.session.delete(enlace)
+            
+            # Eliminar instancias 
+            for instancia in slice_obj.instancias:
+                db.session.delete(instancia)
+            
+            # Eliminar relaciones usuario-slice
+            # Usar SQLAlchemy ORM en lugar de raw SQL
+            for usuario in slice_obj.usuarios:
+                slice_obj.usuarios.remove(usuario)
+            
+            # Eliminar slice
+            db.session.delete(slice_obj)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'type': 'simple_delete',
+                'message': f'Slice "{slice_name}" eliminado de la base de datos',
+                'details': {
+                    'slice_estado': current_estado,
+                    'instancias_eliminadas': instancias_count,
+                    'enlaces_eliminados': enlaces_count,
+                    'infraestructura_limpiada': False
+                }
+            })
+            
+        elif current_estado == 'STOPPED':
+            # 🚀 ELIMINACIÓN COMPLETA: Llamar al Slice Manager
+            print(f"🏗️ Slice en estado STOPPED - Eliminación completa vía Slice Manager")
+            
+            SLICE_MANAGER_URL = os.getenv("SLICE_MANAGER_URL", "http://localhost:8000")
+            payload = {"id_slice": slice_id}
+            
+            try:
+                response = requests.post(
+                    f"{SLICE_MANAGER_URL}/placement/delete",
+                    json=payload,
+                    timeout=120
+                )
+                
+                if response.status_code == 200:
+                    deletion_result = response.json()
+                    
+                    if deletion_result.get('success', False):
+                        return jsonify({
+                            'success': True,
+                            'type': 'infrastructure_delete',
+                            'message': f'Slice "{slice_name}" eliminado completamente de la infraestructura',
+                            'details': {
+                                'slice_estado': current_estado,
+                                'vms_eliminadas': deletion_result.get('vms', {}).get('eliminadas', 0),
+                                'vlans_liberadas': deletion_result.get('recursos_red', {}).get('vlans_liberadas', 0),
+                                'vncs_liberados': deletion_result.get('recursos_red', {}).get('vncs_liberados', 0),
+                                'infraestructura_limpiada': True,
+                                'slice_manager_response': deletion_result.get('resumen', {})
+                            }
+                        })
+                    else:
+                        return jsonify({
+                            'success': False,
+                            'type': 'partial_delete',
+                            'error': f'Eliminación parcial del slice "{slice_name}"',
+                            'details': deletion_result,
+                            'message': 'Algunos recursos pueden no haberse liberado correctamente'
+                        }), 206
+                else:
+                    return jsonify({
+                        'success': False,
+                        'type': 'communication_error',
+                        'error': f'Error del Slice Manager: HTTP {response.status_code}',
+                        'details': {
+                            'slice_estado': current_estado,
+                            'response_text': response.text[:300]
+                        }
+                    }), 500
+                    
+            except requests.exceptions.Timeout:
+                return jsonify({
+                    'success': False,
+                    'type': 'timeout_error',
+                    'error': 'Timeout eliminando slice',
+                    'message': f'La eliminación del slice "{slice_name}" excedió el tiempo límite'
+                }), 408
+                
+            except requests.exceptions.RequestException as e:
+                return jsonify({
+                    'success': False,
+                    'type': 'network_error',
+                    'error': 'Error de red comunicándose con Slice Manager',
+                    'details': str(e)
+                }), 500
+                
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error eliminando slice {slice_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'type': 'database_error',
+            'error': f'Error durante eliminación: {str(e)}',
+            'message': f'Error eliminando slice "{slice_name}"'
         }), 500
 
 """@app.route('/download_topology/<int:slice_id>')
