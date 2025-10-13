@@ -217,15 +217,17 @@ def solicitar_vnc():
 #Despliegue :D
 def desplegar_vm_en_worker(vm_data: dict):
     """Envía la petición al Linux Driver para crear una VM"""
-    LINUX_DRIVER_URL = os.getenv("LINUX_DRIVER_URL", "http://linux-driver:9100/create_vm")
+    LINUX_DRIVER_URL = os.getenv("LINUX_DRIVER_URL", "http://linux-driver:9100")  # ✅ sin /create_vm
     try:
-        resp = requests.post(LINUX_DRIVER_URL, json=vm_data, timeout=200)
+        # 🔗 ahora agregamos /create_vm aquí
+        resp = requests.post(f"{LINUX_DRIVER_URL}/create_vm", json=vm_data, timeout=200)
         if resp.status_code == 200:
             return resp.json()  # El JSON que devuelve el Linux Driver
         else:
             return {"status": False, "message": f"Error {resp.status_code}: {resp.text}"}
     except Exception as e:
         return {"status": False, "message": f"❌ Error de conexión con Linux Driver: {e}"}
+
 
 # ======================================
 # ENDPOINT: verificar viabilidad
