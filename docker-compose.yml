@@ -182,8 +182,8 @@ services:
       DB_USER: root
       DB_PASSWORD: root
       DB_NAME: mydb
-      MONITORING_URL: http://monitoring_service:5010/metrics
-      LINUX_DRIVER_URL: http://linux-driver:9100
+      MONITORING_URL: "http://monitoring_service:5010/metrics"
+      LINUX_DRIVER_URL: "http://linux-driver:9100/create_vm"
     depends_on:
       - slice_db
       - monitoring_service
