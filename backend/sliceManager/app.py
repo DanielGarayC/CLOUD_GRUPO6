@@ -324,39 +324,34 @@ def deploy_slice(data: dict = Body(...)):
             pid = resp.get("pid")
 
             if ok:
-                print("oka")
-                # VM desplegada correctamente → actualizar instancia y VLANs
-                #with engine.begin() as conn:
-                    # Actualizar datos de la instancia
-                    #conn.execute(text("""
-                        #UPDATE instancia
-                        #SET 
-                            #estado = 'RUNNING',
-                            #cpu = :cpu,
-                            #ram = :ram,
-                            #storage = :storage,
-                            #vnc_idvnc = (SELECT idvnc FROM vnc WHERE puerto = :p LIMIT 1),
-                            #worker_idworker = (SELECT idworker FROM worker WHERE ip = :ip LIMIT 1)
-                        #WHERE nombre = :vm 
-                          #AND slice_idslice = :sid
-                    #"""), {
-                        #"cpu": str(vm["cpus"]),
-                        #"ram": f"{vm['ram_gb']} GB",
-                        #"storage": f"{vm['disco_gb']} GB",
-                        #"p": vm["puerto_vnc"],
-                        #"ip": vm["worker"],
-                        #"vm": vm["nombre_vm"],
-                        #"sid": id_slice
-                    #})
+                print(f"✅ VM {vm['nombre_vm']} desplegada correctamente en {vm['worker']}")
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        UPDATE instancia
+                        SET estado = 'RUNNING',
+                            cpu = :cpu,
+                            ram = :ram,
+                            storage = :storage,
+                            vnc_idvnc = (SELECT idvnc FROM vnc WHERE puerto = :p LIMIT 1),
+                            worker_idworker = (SELECT idworker FROM worker WHERE ip = :ip LIMIT 1)
+                        WHERE nombre = :vm AND slice_idslice = :sid
+                    """), {
+                        "cpu": str(vm["cpus"]),
+                        "ram": f"{vm['ram_gb']} GB",
+                        "storage": f"{vm['disco_gb']} GB",
+                        "p": vm["puerto_vnc"],
+                        "ip": vm["worker"],
+                        "vm": vm["nombre_vm"],
+                        "sid": id_slice
+                    })
 
-                    # Marcar VLANs usadas por esta VM como "ocupadas"
-                    #for vlan_id in vm["vlans"]:
-                        #conn.execute(text("""
-                           #UPDATE vlan
-                           #SET estado = 'ocupada'
-                           #WHERE idvlan = :vlan_id
-                        #"""), {"vlan_id": vlan_id})
-
+                    # Marcar VLANs usadas por esta VM como ocupadas
+                    for vlan_id in vm["vlans"]:
+                        conn.execute(text("""
+                            UPDATE vlan
+                            SET estado = 'ocupada'
+                            WHERE idvlan = :vlan_id
+                        """), {"vlan_id": vlan_id})
             else:
                 # ❌ Fallo → rollback de VM y marcar como FAILED
                 print("fashó")
@@ -388,8 +383,8 @@ def deploy_slice(data: dict = Body(...)):
 
     # Estado final del slice
     estado_final = "RUNNING" if fallos == 0 else "ERROR"
-    #with engine.begin() as conn:
-        #conn.execute(text("""
+    with engine.begin() as conn:
+        conn.execute(text("""
             #UPDATE slice 
             #SET estado = :e 
             #WHERE idslice = :sid
