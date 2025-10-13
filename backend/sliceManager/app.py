@@ -67,13 +67,14 @@ def obtener_enlaces_por_slice(id_slice: int):
             e.vm1, 
             e.vm2, 
             e.vlan_idvlan, 
+            e.vlan,
             v.numero
         FROM 
             enlace e
-        JOIN 
+        LEFT JOIN 
             vlan v ON e.vlan_idvlan = v.idvlan
         WHERE 
-            e.slice_idslice = :id_slice;
+            e.slice_idslice = :id_slice
     """)
     with engine.connect() as conn:
         result = conn.execute(query, {"id_slice": id_slice})
@@ -84,24 +85,38 @@ def asignar_vlans_a_enlaces(id_slice: int):
     Revisa los enlaces del slice y asigna VLANs nuevas si no tienen ninguna.
     Devuelve la lista de enlaces actualizada.
     """
+    # 🟢 USAR LA FUNCIÓN CORREGIDA
     enlaces = obtener_enlaces_por_slice(id_slice)
+    print(f"📊 Enlaces encontrados: {len(enlaces)}")
+    
     for e in enlaces:
+        print(f"🔗 Enlace {e['idenlace']}: VM{e['vm1']} ↔ VM{e['vm2']} | VLAN: {e['vlan_idvlan']}")
+        
         if e["vlan_idvlan"] is None:
             vlan_info = solicitar_vlan()
             if vlan_info and vlan_info.get("idvlan"):
                 idvlan = vlan_info["idvlan"]
-                # Guardar en BD
+                numero_vlan = vlan_info.get("numero", str(idvlan))
+                
+                # 🟢 ACTUALIZAR TANTO vlan_idvlan COMO vlan
                 with engine.begin() as conn:
                     conn.execute(text("""
                         UPDATE enlace
-                        SET vlan_idvlan = :idvlan
+                        SET vlan_idvlan = :idvlan, vlan = :numero_vlan
                         WHERE idenlace = :idenlace
-                    """), {"idvlan": idvlan, "idenlace": e["idenlace"]})
+                    """), {
+                        "idvlan": idvlan, 
+                        "numero_vlan": numero_vlan,
+                        "idenlace": e["idenlace"]
+                    })
+                
                 # Actualizar en memoria
                 e["vlan_idvlan"] = idvlan
-                print(f"🔗 Enlace {e['idenlace']} → VLAN asignada {idvlan}")
+                e["numero"] = numero_vlan
+                print(f"✅ Enlace {e['idenlace']} → VLAN {numero_vlan} (ID:{idvlan}) asignada")
             else:
                 print(f"⚠️ No se pudo asignar VLAN al enlace {e['idenlace']}")
+    
     return enlaces
 
 # ======================================
@@ -129,50 +144,70 @@ def generar_plan_deploy(id_slice: int,metrics_json: dict, instancias: list):
 
     workers.sort(key=lambda w: w["nombre"])
 
+ 
+    # 🟢 OBTENER ENLACES Y ASIGNAR VLANS
+    print(f"🔍 Obteniendo enlaces para slice {id_slice}...")
+    enlaces = asignar_vlans_a_enlaces(id_slice)
+    
+    # 🟢 CREAR MAPA DE VLANS POR VM
+    vlans_por_vm = {}
+    for enlace in enlaces:
+        vm1 = str(enlace["vm1"])  # Convertir a string para comparación
+        vm2 = str(enlace["vm2"])
+        vlan_numero = enlace.get("numero")
+        
+        if vlan_numero:  # Solo si tiene VLAN asignada
+            if vm1 not in vlans_por_vm:
+                vlans_por_vm[vm1] = []
+            if vm2 not in vlans_por_vm:
+                vlans_por_vm[vm2] = []
+            
+            vlans_por_vm[vm1].append(vlan_numero)
+            vlans_por_vm[vm2].append(vlan_numero)
+    
+    print(f"📋 Mapa de VLANs por VM: {vlans_por_vm}")
+    
     # Asignación Round-Robin
     plan = []
     idx = 0
-    enlaces = asignar_vlans_a_enlaces(id_slice)
-
+    
     for vm in instancias:
         w = workers[idx]
         ram_value = float(str(vm["ram"]).replace("GB", "").strip())
         storage_value = float(str(vm["storage"]).replace("GB", "").strip())
-
-        # Parte NETWORK MANAGER
-
-        vlans_vm = [e["numero"] for e in enlaces if vm["idinstancia"] in (e["vm1"], e["vm2"])]
-
+        
+        # 🟢 OBTENER VLANS DE ESTA VM
+        vm_id = str(vm["idinstancia"])
+        vlans_vm = list(set(vlans_por_vm.get(vm_id, [])))  # Eliminar duplicados
+        
         # Si la VM tiene salida a internet, agregar VLAN de internet
         if vm.get("salidainternet"):
             vlan_int = solicitar_vlan_internet()
-            if vlan_int:
-                vlans_vm.append(vlan_int.get("idvlan"))
-
+            if vlan_int and vlan_int.get("numero"):
+                vlans_vm.append(vlan_int["numero"])
+        
         # Solicitar VNC
         vnc_info = solicitar_vnc()
-        id_vnc = vnc_info.get("idvnc") if vnc_info else None
         puerto_vnc = vnc_info.get("puerto") if vnc_info else None
-
+        
         plan.append({
             "nombre_vm": vm["nombre"],
             "worker": w["ip"],
-            "vlans": vlans_vm,
+            "vlans": vlans_vm,  # 🟢 Ahora debería tener VLANs
             "puerto_vnc": puerto_vnc,
             "imagen": vm["imagen"],
             "ram_gb": ram_value,
             "cpus": int(vm["cpu"]),
             "disco_gb": storage_value,
-            
         })
-
+        
         # Descontar recursos simulados
         w["cpu_free"] -= int(vm["cpu"])
         w["ram_free"] -= ram_value
         idx = (idx + 1) % len(workers)
-
+    
     puede = all(w["cpu_free"] >= 0 and w["ram_free"] >= 0 for w in workers)
-
+    
     return {
         "timestamp": datetime.utcnow().isoformat(),
         "can_deploy": puede,
