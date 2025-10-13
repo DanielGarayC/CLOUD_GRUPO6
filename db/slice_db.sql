@@ -69,7 +69,7 @@ CREATE TABLE `imagen` (
 
 LOCK TABLES `imagen` WRITE;
 /*!40000 ALTER TABLE `imagen` DISABLE KEYS */;
-INSERT INTO `imagen` VALUES (1,'default','ubuntu:latest'),(2,'default','cirros:latest');
+INSERT INTO `imagen` VALUES (1,'/var/lib/qemu-images/image-base/ubuntu.qcow2','ubuntu:latest'),(2,'/var/lib/qemu-images/image-base/cirros-base.qcow2','cirros:latest');
 /*!40000 ALTER TABLE `imagen` ENABLE KEYS */;
 UNLOCK TABLES;
 
