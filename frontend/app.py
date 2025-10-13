@@ -1036,29 +1036,30 @@ def deploy_slice(slice_id):
     
     slice_obj = Slice.query.get_or_404(slice_id)
     
-    # Check if user can access this slice
     if not can_access_slice(user, slice_obj):
         return jsonify({'error': 'Access denied'}), 403
     
-    # 🟢 VERIFICAR QUE EL SLICE ESTÉ EN ESTADO DRAW
     if slice_obj.estado != 'DRAW':
         return jsonify({
             'error': f'El slice debe estar en estado DRAW para desplegarse. Estado actual: {slice_obj.estado}'
         }), 400
     
     try:
-        SLICE_MANAGER_URL = os.getenv("SLICE_MANAGER_URL", "http://localhost:8000")
+        # 🟢 URL CORREGIDA CON EL NOMBRE CORRECTO DEL CONTENEDOR
+        SLICE_MANAGER_URL = "http://slice-manager:8000"
         payload = {"id_slice": slice_id}
         
-        print(f"🚀 Iniciando proceso de despliegue para slice {slice_id}...")
+        print(f"🚀 Iniciando despliegue para slice {slice_id} usando {SLICE_MANAGER_URL}...")
         
-        # 1️⃣ PRIMERO: VERIFICAR QUE SE PUEDE DESPLEGAR
-        print("🔍 Paso 1: Verificando viabilidad del despliegue...")
+        # 1️⃣ VERIFICAR VIABILIDAD
+        print("🔍 Verificando viabilidad del despliegue...")
         verify_response = requests.post(
             f"{SLICE_MANAGER_URL}/placement/verify",
             json=payload,
             timeout=30
         )
+        
+        print(f"📊 Verify response: {verify_response.status_code}")
         
         if verify_response.status_code != 200:
             return jsonify({
@@ -1068,33 +1069,32 @@ def deploy_slice(slice_id):
             })
         
         verify_result = verify_response.json()
+        print(f"📋 Verify result: {verify_result.get('can_deploy', False)}")
         
-        # Verificar que se puede desplegar
         if not verify_result.get('can_deploy', False):
             return jsonify({
                 'success': False,
                 'error': 'El slice no puede ser desplegado en este momento',
-                'details': verify_result.get('error', 'Recursos insuficientes'),
-                'verify_result': verify_result
+                'details': verify_result.get('error', 'Recursos insuficientes')
             })
         
-        print("✅ Verificación exitosa - Slice puede ser desplegado")
-        
-        # 2️⃣ SEGUNDO: CAMBIAR ESTADO A DRAW → DEPLOYING
+        # 2️⃣ CAMBIAR ESTADO A DEPLOYING
         slice_obj.estado = 'DEPLOYING'
         db.session.commit()
-        print(f"📝 Estado del slice cambiado a DEPLOYING")
+        print(f"📝 Estado cambiado a DEPLOYING")
         
-        # 3️⃣ TERCERO: DESPLEGAR EFECTIVAMENTE
-        print("🚀 Paso 2: Iniciando despliegue real...")
+        # 3️⃣ DESPLEGAR
+        print("🚀 Iniciando despliegue real...")
         deploy_response = requests.post(
             f"{SLICE_MANAGER_URL}/placement/deploy",
             json=payload,
-            timeout=120  # 🟢 Más tiempo para el despliegue real
+            timeout=120
         )
         
+        print(f"🎯 Deploy response: {deploy_response.status_code}")
+        
         if deploy_response.status_code != 200:
-            # Revertir estado si falla
+            # Revertir estado
             slice_obj.estado = 'DRAW'
             db.session.commit()
             
@@ -1105,89 +1105,61 @@ def deploy_slice(slice_id):
             })
         
         deploy_result = deploy_response.json()
+        print(f"✅ Deploy result success: {deploy_result.get('success', False)}")
         
-        # 4️⃣ VERIFICAR RESULTADO DEL DESPLIEGUE
-        if deploy_result.get('success', False):
-            # Éxito total
-            final_state = deploy_result.get('estado_final', 'RUNNING')
-            slice_obj.estado = final_state
-            db.session.commit()
-            
+        # 4️⃣ PROCESAR RESULTADO
+        success = deploy_result.get('success', False)
+        final_state = deploy_result.get('estado_final', 'RUNNING' if success else 'FAILED')
+        
+        slice_obj.estado = final_state
+        db.session.commit()
+        
+        if success:
             return jsonify({
                 'success': True,
                 'message': f'Slice "{slice_obj.nombre}" desplegado exitosamente',
                 'new_status': final_state,
-                'deployment_summary': {
-                    'total_vms': deploy_result.get('resumen', {}).get('total_vms', 0),
-                    'vms_exitosas': deploy_result.get('resumen', {}).get('exitosas', 0),
-                    'vms_fallidas': deploy_result.get('resumen', {}).get('fallidas', 0),
-                    'porcentaje_exito': deploy_result.get('resumen', {}).get('porcentaje_exito', 0)
-                },
-                'workers_utilizados': deploy_result.get('workers_utilizados', []),
-                'vlans_asignadas': deploy_result.get('vlans_asignadas', []),
-                'verification_plan': verify_result.get('placement_plan', [])
-            })
-            
-        else:
-            # Despliegue falló o parcial
-            final_state = deploy_result.get('estado_final', 'FAILED')
-            slice_obj.estado = final_state
-            db.session.commit()
-            
-            return jsonify({
-                'success': final_state in ['RUNNING', 'PARTIAL'],  # PARTIAL se considera éxito parcial
-                'error': deploy_result.get('error', 'Error en despliegue'),
-                'message': deploy_result.get('message', f'Despliegue del slice con errores'),
-                'new_status': final_state,
                 'deployment_summary': deploy_result.get('resumen', {}),
-                'details': deploy_result.get('detalle_completo', [])
+                'slice_manager_url': SLICE_MANAGER_URL
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': deploy_result.get('error', 'Error en despliegue'),
+                'new_status': final_state,
+                'details': deploy_result.get('message', 'Despliegue falló')
             })
             
-    except requests.exceptions.Timeout as e:
-        # Timeout - El despliegue puede estar en progreso
-        print(f"⏱️ Timeout en comunicación con Slice Manager: {e}")
-        
-        # No revertir estado - puede estar desplegándose
-        return jsonify({
-            'success': False,
-            'error': 'Timeout en despliegue - La operación puede estar en progreso',
-            'details': 'Verifica el estado del slice en unos minutos',
-            'message': f'El despliegue del slice "{slice_obj.nombre}" excedió el tiempo de espera'
-        }), 408
-        
     except requests.exceptions.ConnectionError as e:
-        # Error de conexión - Slice Manager no disponible
-        print(f"🔌 Error de conexión con Slice Manager: {e}")
+        print(f"🔌 Error de conexión: {e}")
         
         # Revertir estado
-        slice_obj.estado = 'DRAW'
-        db.session.commit()
+        try:
+            slice_obj.estado = 'DRAW'
+            db.session.commit()
+        except:
+            pass
         
         return jsonify({
             'success': False,
-            'error': 'Slice Manager no disponible',
-            'details': 'El servicio de despliegue no está disponible en este momento',
-            'message': 'Intenta nuevamente en unos momentos'
+            'error': 'No se puede conectar con Slice Manager',
+            'details': f'Servicio no disponible: {str(e)}',
+            'slice_manager_url': SLICE_MANAGER_URL
         }), 503
         
-    except requests.exceptions.RequestException as e:
-        # Otros errores de requests
-        print(f"📡 Error de comunicación: {e}")
-        
-        slice_obj.estado = 'DRAW'
-        db.session.commit()
+    except requests.exceptions.Timeout as e:
+        print(f"⏱️ Timeout: {e}")
         
         return jsonify({
             'success': False,
-            'error': 'Error de comunicación con Slice Manager',
-            'details': str(e)
-        }), 500
-    
-    except Exception as e:
-        # Error interno
-        print(f"💥 Error interno: {e}")
+            'error': 'Timeout en despliegue',
+            'details': 'El despliegue puede estar en progreso, verifica en unos minutos'
+        }), 408
         
-        # Intentar revertir estado
+    except Exception as e:
+        print(f"💥 Error inesperado: {e}")
+        
+        # Revertir estado
         try:
             slice_obj.estado = 'DRAW'
             db.session.commit()
@@ -1199,7 +1171,6 @@ def deploy_slice(slice_id):
             'error': 'Error interno del servidor',
             'details': str(e)
         }), 500
-
 
 @app.route('/debug_slice_manager')
 def debug_slice_manager():
