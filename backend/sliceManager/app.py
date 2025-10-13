@@ -216,17 +216,35 @@ def solicitar_vnc():
 
 #Despliegue :D
 def desplegar_vm_en_worker(vm_data: dict):
-    """Envía la petición al Linux Driver para crear una VM"""
-    LINUX_DRIVER_URL = os.getenv("LINUX_DRIVER_URL", "http://linux-driver:9100")  # ✅ sin /create_vm
+    """Envía la petición al Linux Driver y devuelve JSON normalizado."""
+    LINUX_DRIVER_URL = os.getenv("LINUX_DRIVER_URL", "http://linux-driver:9100")
+    url = f"{LINUX_DRIVER_URL}/create_vm"
+
     try:
-        # 🔗 ahora agregamos /create_vm aquí
-        resp = requests.post(f"{LINUX_DRIVER_URL}/create_vm", json=vm_data, timeout=200)
-        if resp.status_code == 200:
-            return resp.json()  # El JSON que devuelve el Linux Driver
-        else:
-            return {"status": False, "message": f"Error {resp.status_code}: {resp.text}"}
+        print(f"[HTTP] → POST {url}")
+        print(f"[HTTP] Payload: {json.dumps(vm_data)[:500]}")
+
+        resp = requests.post(url, json=vm_data, timeout=200)
+        raw = resp.text
+        print(f"[HTTP] ← {resp.status_code}: {raw[:500]}")
+
+        if resp.status_code != 200:
+            return {"status": False, "message": f"HTTP {resp.status_code}", "raw": raw}
+
+        try:
+            data = resp.json()
+        except json.JSONDecodeError:
+            return {"status": False, "message": "Respuesta no es JSON", "raw": raw}
+
+        ok = bool(data.get("success", data.get("status", False)))
+        msg = data.get("mensaje") or data.get("message") or data.get("stdout") or "Sin mensaje"
+        pid = data.get("pid")
+        return {"status": ok, "message": msg, "pid": pid, "raw": data}
+
     except Exception as e:
         return {"status": False, "message": f"❌ Error de conexión con Linux Driver: {e}"}
+
+
 
 
 # ======================================
@@ -270,12 +288,15 @@ def deploy_slice(data: dict = Body(...)):
     print(f"🚀 Iniciando despliegue real del slice {id_slice}...")
 
     # 🟡 Estado inicial del slice
+    # 🟡 Estado inicial del slice
     with engine.begin() as conn:
         conn.execute(text("""
             UPDATE slice 
             SET estado = 'DEPLOYING'
             WHERE idslice = :sid
         """), {"sid": id_slice})
+
+
 
     # 1️⃣ Obtener instancias y métricas
     instancias = obtener_instancias_por_slice(id_slice)
@@ -385,10 +406,10 @@ def deploy_slice(data: dict = Body(...)):
     estado_final = "RUNNING" if fallos == 0 else "ERROR"
     with engine.begin() as conn:
         conn.execute(text("""
-            #UPDATE slice 
-            #SET estado = :e 
-            #WHERE idslice = :sid
-        #"""), {"e": estado_final, "sid": id_slice})
+            UPDATE slice 
+            SET estado = :e 
+            WHERE idslice = :sid
+        """), {"e": estado_final, "sid": id_slice})
 
     # 5️⃣ Respuesta final
     return {
