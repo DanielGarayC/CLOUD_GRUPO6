@@ -228,18 +228,16 @@ UNLOCK TABLES;
 -- Table structure for table `vlan`
 --
 
-DROP TABLE IF EXISTS `vlan`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
+
 CREATE TABLE `vlan` (
   `idvlan` int NOT NULL AUTO_INCREMENT,
   `numero` varchar(45) DEFAULT NULL,
   `estado` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`idvlan`)
-) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
---
+-- 
 -- Dumping data for table `vlan`
 --
 
@@ -247,50 +245,48 @@ LOCK TABLES `vlan` WRITE;
 /*!40000 ALTER TABLE `vlan` DISABLE KEYS */;
 
 INSERT INTO `vlan` VALUES
-(1,'100','ocupada'),
-(2,'101','ocupada'),
-(3,'102','ocupada'),
-(4,'103','ocupada'),
-(5,'104','disponible'),
-(6,'105','disponible'),
-(7,'106','disponible'),
-(8,'107','disponible'),
-(9,'108','disponible'),
-(10,'109','disponible'),
-(11,'110','disponible'),
-(12,'111','disponible'),
-(13,'112','disponible'),
-(14,'113','disponible'),
-(15,'114','disponible'),
-(16,'115','disponible'),
-(17,'116','disponible'),
-(18,'117','disponible'),
-(19,'118','disponible'),
-(20,'119','disponible'),
-(21,'120','disponible'),
-(22,'121','disponible'),
-(23,'122','disponible'),
-(24,'123','disponible'),
-(25,'124','disponible'),
-(26,'125','disponible'),
-(27,'126','disponible'),
-(28,'127','disponible'),
-(29,'128','disponible'),
-(30,'129','disponible'),
-(31,'130','disponible'),
-(32,'131','disponible'),
-(33,'132','disponible'),
-(34,'133','disponible'),
-(35,'134','disponible'),
-(36,'135','disponible'),
-(37,'136','disponible'),
-(38,'137','disponible'),
-(39,'138','disponible'),
-(40,'139','disponible');
+(1, '100', 'ocupada'),
+(2, '101', 'ocupada'),
+(3, '102', 'ocupada'),
+(4, '103', 'ocupada'),
+(5, '104', 'disponible'),
+(6, '105', 'disponible'),
+(7, '106', 'disponible'),
+(8, '107', 'disponible'),
+(9, '108', 'disponible'),
+(10, '109', 'disponible'),
+(11, '110', 'disponible'),
+(12, '111', 'disponible'),
+(13, '112', 'disponible'),
+(14, '113', 'disponible'),
+(15, '114', 'disponible'),
+(16, '115', 'disponible'),
+(17, '116', 'disponible'),
+(18, '117', 'disponible'),
+(19, '118', 'disponible'),
+(20, '119', 'disponible'),
+(21, '120', 'disponible'),
+(22, '121', 'disponible'),
+(23, '122', 'disponible'),
+(24, '123', 'disponible'),
+(25, '124', 'disponible'),
+(26, '125', 'disponible'),
+(27, '126', 'disponible'),
+(28, '127', 'disponible'),
+(29, '128', 'disponible'),
+(30, '129', 'disponible'),
+(31, '130', 'disponible'),
+(32, '131', 'disponible'),
+(33, '132', 'disponible'),
+(34, '133', 'disponible'),
+(35, '134', 'disponible'),
+(36, '135', 'disponible'),
+(37, '136', 'disponible'),
+(38, '137', 'disponible'),
+(39, '138', 'disponible'),
+(40, '139', 'disponible');
 
-/*!/40000 ALTER TABLE `vlan` ENABLE KEYS */;
-UNLOCK TABLES;
-
+LOCK TABLES `vlan` READ;
 
 --
 -- Table structure for table `enlace`
