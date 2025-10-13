@@ -49,7 +49,7 @@ class Imagen(db.Model):
     __tablename__ = 'imagen'
     
     idimagen = db.Column('idimagen', db.Integer, primary_key=True)
-    ruta = db.Column(db.String(45))
+    ruta = db.Column(db.String(225))
     nombre = db.Column(db.String(45))
     
     @property
