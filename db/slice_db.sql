@@ -57,7 +57,7 @@ DROP TABLE IF EXISTS `imagen`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `imagen` (
   `idimagen` int NOT NULL AUTO_INCREMENT,
-  `ruta` varchar(45) DEFAULT NULL,
+  `ruta` varchar(225) DEFAULT NULL,
   `nombre` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`idimagen`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3;

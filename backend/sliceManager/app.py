@@ -62,18 +62,9 @@ def obtener_instancias_por_slice(id_slice: int):
 # Leer enlaces
 def obtener_enlaces_por_slice(id_slice: int):
     query = text("""
-        SELECT 
-            e.idenlace, 
-            e.vm1, 
-            e.vm2, 
-            e.vlan_idvlan, 
-            v.numero AS vlan_numero
-        FROM 
-            enlace e
-        JOIN 
-            vlan v ON e.vlan_idvlan = v.idvlan
-        WHERE 
-            e.slice_idslice = :id_slice;
+        SELECT idenlace, vm1, vm2, vlan_idvlan
+        FROM enlace
+        WHERE slice_idslice = :id_slice
     """)
     with engine.connect() as conn:
         result = conn.execute(query, {"id_slice": id_slice})
@@ -141,7 +132,7 @@ def generar_plan_deploy(id_slice: int,metrics_json: dict, instancias: list):
 
         # Parte NETWORK MANAGER
 
-        vlans_vm = [e["numero"] for e in enlaces if vm["idinstancia"] in (e["vm1"], e["vm2"])]
+        vlans_vm = [e["vlan_idvlan"] for e in enlaces if vm["idinstancia"] in (e["vm1"], e["vm2"])]
 
         # Si la VM tiene salida a internet, agregar VLAN de internet
         if vm.get("salidainternet"):
