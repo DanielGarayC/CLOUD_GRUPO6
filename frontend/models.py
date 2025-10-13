@@ -211,54 +211,38 @@ class Enlace(db.Model):
     __tablename__ = 'enlace'
     
     idenlace = db.Column('idenlace', db.Integer, primary_key=True)
-    vm1 = db.Column(db.String(45))
-    vm2 = db.Column(db.String(45))
-    vlan = db.Column(db.String(45))  # Número de VLAN como string para acceso rápido
-    vlan_idvlan = db.Column('vlan_idvlan', db.Integer, db.ForeignKey('vlan.idvlan'), nullable=False)
+    vm1 = db.Column(db.String(45))  # ID de instancia 1
+    vm2 = db.Column(db.String(45))  # ID de instancia 2
+    vlan = db.Column(db.String(45), nullable=True)
+    vlan_idvlan = db.Column('vlan_idvlan', db.Integer, db.ForeignKey('vlan.idvlan'), nullable=True)
     slice_idslice = db.Column('slice_idslice', db.Integer, db.ForeignKey('slice.idslice'), nullable=False)
     
     # Relationships
     vlan_obj = db.relationship('Vlan', backref='enlaces', foreign_keys=[vlan_idvlan])
-    # slice relationship is defined in Slice model
     
     @property
     def id(self):
         return self.idenlace
     
-    @classmethod
-    def create_link(cls, vm1, vm2, slice_id):
-        """Create a new link between two VMs, automatically assigning a VLAN"""
-        # Get available VLAN
-        available_vlan = Vlan.get_available_vlan()
-        if not available_vlan:
-            raise ValueError("No hay VLANs disponibles para crear el enlace")
-        
-        # Create the link
-        enlace = cls(
-            vm1=vm1,
-            vm2=vm2,
-            vlan=available_vlan.numero,
-            vlan_idvlan=available_vlan.idvlan,
-            slice_idslice=slice_id
-        )
-        
-        # Reserve the VLAN
-        available_vlan.reserve()
-        
-        db.session.add(enlace)
-        return enlace
+    @property
+    def vm1_instance(self):
+        """Get VM1 instance object"""
+        if self.vm1:
+            return Instancia.query.get(int(self.vm1))
+        return None
     
-    def delete_link(self):
-        """Delete link and release its VLAN"""
-        # Release the VLAN
-        if self.vlan_obj:
-            self.vlan_obj.release()
-        
-        # Delete the link
-        db.session.delete(self)
+    @property
+    def vm2_instance(self):
+        """Get VM2 instance object"""
+        if self.vm2:
+            return Instancia.query.get(int(self.vm2))
+        return None
     
     def __repr__(self):
-        return f'<Enlace {self.vm1}-{self.vm2} VLAN:{self.vlan}>'
+        vm1_name = self.vm1_instance.nombre if self.vm1_instance else f"VM{self.vm1}"
+        vm2_name = self.vm2_instance.nombre if self.vm2_instance else f"VM{self.vm2}"
+        vlan_info = f"VLAN:{self.vlan}" if self.vlan else "Sin VLAN"
+        return f'<Enlace {vm1_name}-{vm2_name} {vlan_info}>'
 
 # Association table for many-to-many relationship between users and slices
 usuario_has_slice = db.Table('usuario_has_slice',

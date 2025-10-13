@@ -407,8 +407,6 @@
                         <div class="col-md-2">
                             <label class="form-label">Imagen</label>
                             <select class="form-select" name="new_vm_${i}_image" required>
-                                <option value="ubuntu:latest">Ubuntu Latest</option>
-                                <option value="cirrus:latest">CirrOS Latest</option>
                                 {% for imagen in imagenes %}
                                 <option value="{{ imagen.nombre }}">{{ imagen.nombre }}</option>
                                 {% endfor %}

@@ -58,6 +58,129 @@ def get_user_slices(user):
     # Regular users can only see their own slices
     return user.slices
 
+# Agregar estas funciones antes de las rutas
+
+def save_topology_links(slice_obj, topology_data, node_to_instance_map):
+    """
+    Guarda los enlaces de la topología en la tabla enlace
+    """
+    if not topology_data or 'edges' not in topology_data:
+        return 0
+    
+    enlaces_creados = 0
+    for edge in topology_data['edges']:
+        from_node = edge.get('from')
+        to_node = edge.get('to')
+        
+        if from_node and to_node and from_node in node_to_instance_map and to_node in node_to_instance_map:
+            vm1_id = node_to_instance_map[from_node]
+            vm2_id = node_to_instance_map[to_node]
+            
+            # Verificar que no exista ya este enlace
+            existing_link = Enlace.query.filter(
+                db.and_(
+                    Enlace.slice_idslice == slice_obj.idslice,
+                    db.or_(
+                        db.and_(Enlace.vm1 == str(vm1_id), Enlace.vm2 == str(vm2_id)),
+                        db.and_(Enlace.vm1 == str(vm2_id), Enlace.vm2 == str(vm1_id))
+                    )
+                )
+            ).first()
+            
+            if not existing_link:
+                enlace = Enlace(
+                    vm1=str(vm1_id),
+                    vm2=str(vm2_id),
+                    slice_idslice=slice_obj.idslice,
+                    vlan=None,
+                    vlan_idvlan=None
+                )
+                db.session.add(enlace)
+                enlaces_creados += 1
+    
+    return enlaces_creados
+
+def assign_vlans_to_slice_links(slice_id):
+    """
+    Asigna VLANs automáticamente a los enlaces de un slice que no tengan
+    """
+    enlaces_sin_vlan = Enlace.query.filter_by(
+        slice_idslice=slice_id, 
+        vlan_idvlan=None
+    ).all()
+    
+    vlans_asignadas = 0
+    for enlace in enlaces_sin_vlan:
+        available_vlan = Vlan.query.filter_by(estado='disponible').first()
+        if available_vlan:
+            enlace.vlan = available_vlan.numero
+            enlace.vlan_idvlan = available_vlan.idvlan
+            available_vlan.estado = 'ocupada'
+            vlans_asignadas += 1
+        else:
+            break  # No hay más VLANs disponibles
+    
+    db.session.commit()
+    return vlans_asignadas
+
+def update_slice_links(slice_obj, topology_data, node_to_instance_map):
+    """
+    Actualiza los enlaces del slice basado en la nueva topología
+    """
+    if not topology_data or 'edges' not in topology_data:
+        return 0
+    
+    # 🟢 OBTENER ENLACES EXISTENTES
+    existing_links = Enlace.query.filter_by(slice_idslice=slice_obj.idslice).all()
+    existing_connections = set()
+    
+    for link in existing_links:
+        # Crear identificador único para cada conexión (ordenado para evitar duplicados)
+        vm_pair = tuple(sorted([int(link.vm1), int(link.vm2)]))
+        existing_connections.add(vm_pair)
+    
+    # 🟢 PROCESAR NUEVOS ENLACES DE LA TOPOLOGÍA
+    enlaces_creados = 0
+    new_connections = set()
+    
+    for edge in topology_data['edges']:
+        from_node = edge.get('from')
+        to_node = edge.get('to')
+        
+        if from_node and to_node and from_node in node_to_instance_map and to_node in node_to_instance_map:
+            vm1_id = node_to_instance_map[from_node]
+            vm2_id = node_to_instance_map[to_node]
+            
+            # Crear identificador único para esta conexión
+            vm_pair = tuple(sorted([vm1_id, vm2_id]))
+            new_connections.add(vm_pair)
+            
+            # 🟢 CREAR ENLACE SOLO SI NO EXISTE
+            if vm_pair not in existing_connections:
+                enlace = Enlace(
+                    vm1=str(vm1_id),
+                    vm2=str(vm2_id),
+                    slice_idslice=slice_obj.idslice,
+                    vlan=None,
+                    vlan_idvlan=None
+                )
+                db.session.add(enlace)
+                enlaces_creados += 1
+    
+    # 🟢 OPCIONAL: ELIMINAR ENLACES QUE YA NO ESTÁN EN LA TOPOLOGÍA
+    # (Solo si quieres que la topología sea la fuente de verdad absoluta)
+    enlaces_eliminados = 0
+    for link in existing_links:
+        vm_pair = tuple(sorted([int(link.vm1), int(link.vm2)]))
+        if vm_pair not in new_connections:
+            # Este enlace ya no está en la nueva topología
+            if link.vlan_obj:
+                link.vlan_obj.estado = 'disponible'  # Liberar VLAN
+            db.session.delete(link)
+            enlaces_eliminados += 1
+    
+    return enlaces_creados
+
 @app.route('/')
 def index():
     """Redirect to login if not authenticated, otherwise to dashboard"""
@@ -221,94 +344,135 @@ def create_slice():
         return redirect(url_for('login'))
     
     if request.method == 'POST':
-        # Get form data
-        slice_name = request.form.get('slice_name', 'Unnamed Slice')
-        num_vms = int(request.form['num_vms'])
-        topology_type = request.form['topology_type']
-        topology_data = request.form.get('topology_data', '')
-        zona_disponibilidad = request.form.get('zona_disponibilidad', 'default')
-        
-        # Crear slice
-        new_slice = Slice(
-            nombre=slice_name,
-            estado='STOPPED',
-            zonadisponibilidad=zona_disponibilidad
-        )
-        
-        # Set topology based on type
-        if topology_type == 'custom' and topology_data:
-            new_slice.topologia = topology_data
-        else:
-            # Generate predefined topology
-            nodes = []
-            edges = []
+        try:
+            # Get form data
+            slice_name = request.form.get('slice_name', 'Unnamed Slice')
+            num_vms = int(request.form['num_vms'])
+            topology_type = request.form['topology_type']
+            topology_data = request.form.get('topology_data', '')
+            zona_disponibilidad = request.form.get('zona_disponibilidad', 'default')
             
-            for i in range(1, num_vms + 1):
-                nodes.append({
-                    'id': i,
-                    'label': f'VM{i}',
-                    'color': '#28a745'
-                })
-            
-            if topology_type == 'star':
-                for i in range(2, num_vms + 1):
-                    edges.append({'from': 1, 'to': i})
-            elif topology_type == 'tree':
-                for i in range(2, num_vms + 1):
-                    parent = (i - 1) // 2
-                    if parent == 0:
-                        parent = 1
-                    edges.append({'from': parent, 'to': i})
-            
-            topology = {'nodes': nodes, 'edges': edges}
-            new_slice.set_topology_data(topology)
-        
-        db.session.add(new_slice)
-        db.session.commit()
-        
-        # Add current user to slice
-        new_slice.usuarios.append(user)
-        
-        # Crear instancias - MODIFICADO para imagen individual e internet
-        for i in range(1, num_vms + 1):
-            vm_name = request.form.get(f'vm_{i}_name', f'VM{i}')
-            vm_cpu = request.form.get(f'vm_{i}_cpu', '1')
-            vm_ram = request.form.get(f'vm_{i}_ram', '1GB')
-            vm_storage = request.form.get(f'vm_{i}_storage', '10GB')
-            vm_internet = request.form.get(f'vm_{i}_internet') == 'on'  # Checkbox individual
-            vm_ip = request.form.get(f'vm_{i}_ip', '')
-            vm_image_name = request.form.get(f'vm_{i}_image', 'ubuntu:latest')  # Imagen individual
-            
-            # Obtener o crear la imagen específica para esta VM
-            imagen = Imagen.query.filter_by(nombre=vm_image_name).first()
-            if not imagen:
-                max_id = db.session.query(db.func.max(Imagen.idimagen)).scalar()
-                next_id = (max_id or 0) + 1
-                imagen = Imagen(
-                    idimagen=next_id,
-                    nombre=vm_image_name,
-                    ruta=f'/images/{vm_image_name}'
-                )
-                db.session.add(imagen)
-                db.session.commit()
-            
-            instance = Instancia(
-                slice_idslice=new_slice.idslice,
-                nombre=vm_name,
-                cpu=vm_cpu,
-                ram=vm_ram,
-                storage=vm_storage,
-                salidainternet=vm_internet,  # Internet individual
-                imagen_idimagen=imagen.idimagen,  # Imagen individual
-                ip=vm_ip if vm_ip else None,
-                vnc_idvnc=None,
-                worker_idworker=None
+            # Crear slice
+            new_slice = Slice(
+                nombre=slice_name,
+                estado='STOPPED',
+                zonadisponibilidad=zona_disponibilidad,
+                fecha_creacion=datetime.now().date()
             )
-            db.session.add(instance)
-        
-        db.session.commit()
-        flash('Slice created successfully!', 'success')
-        return redirect(url_for('dashboard'))
+            
+            # Parse topology data
+            topology_dict = {}
+            if topology_type == 'custom' and topology_data:
+                try:
+                    topology_dict = json.loads(topology_data)
+                except json.JSONDecodeError:
+                    topology_dict = {'nodes': [], 'edges': []}
+            else:
+                # Generate predefined topology
+                nodes = []
+                edges = []
+                
+                for i in range(1, num_vms + 1):
+                    vm_name = request.form.get(f'vm_{i}_name', f'VM{i}')
+                    nodes.append({
+                        'id': i,
+                        'label': vm_name,
+                        'color': '#28a745'
+                    })
+                
+                if topology_type == 'star':
+                    for i in range(2, num_vms + 1):
+                        edges.append({'from': 1, 'to': i})
+                elif topology_type == 'tree':
+                    for i in range(2, num_vms + 1):
+                        parent = (i - 1) // 2
+                        if parent == 0:
+                            parent = 1
+                        edges.append({'from': parent, 'to': i})
+                
+                topology_dict = {'nodes': nodes, 'edges': edges}
+            
+            # Set topology as JSON
+            new_slice.set_topology_data(topology_dict)
+            
+            db.session.add(new_slice)
+            db.session.flush()  # 🟢 IMPORTANTE: flush para obtener el ID del slice
+            
+            # Add current user to slice
+            new_slice.usuarios.append(user)
+            
+            # 🟢 MAPEO: Diccionario para mapear nodo_id -> instancia_id
+            node_to_instance_map = {}
+            
+            # Crear instancias
+            for i in range(1, num_vms + 1):
+                vm_name = request.form.get(f'vm_{i}_name', f'VM{i}')
+                vm_cpu = request.form.get(f'vm_{i}_cpu', '1')
+                vm_ram = request.form.get(f'vm_{i}_ram', '1GB')
+                vm_storage = request.form.get(f'vm_{i}_storage', '10GB')
+                vm_internet = request.form.get(f'vm_{i}_internet') == 'on'
+                vm_image_name = request.form.get(f'vm_{i}_image', 'ubuntu:latest')
+                
+                # Obtener o crear la imagen
+                imagen = Imagen.query.filter_by(nombre=vm_image_name).first()
+                if not imagen:
+                    max_id = db.session.query(db.func.max(Imagen.idimagen)).scalar()
+                    next_id = (max_id or 0) + 1
+                    imagen = Imagen(
+                        idimagen=next_id,
+                        nombre=vm_image_name,
+                        ruta=f'default'
+                    )
+                    db.session.add(imagen)
+                    db.session.flush()
+                
+                instance = Instancia(
+                    slice_idslice=new_slice.idslice,
+                    nombre=vm_name,
+                    cpu=vm_cpu,
+                    ram=vm_ram,
+                    storage=vm_storage,
+                    salidainternet=vm_internet,
+                    imagen_idimagen=imagen.idimagen,
+                    ip=None,  # Se asignará después
+                    vnc_idvnc=None,
+                    worker_idworker=None
+                )
+                db.session.add(instance)
+                db.session.flush()  # 🟢 Flush para obtener el ID de la instancia
+                
+                # 🟢 MAPEAR: nodo_id (i) -> instancia_id real
+                node_to_instance_map[i] = instance.idinstancia
+            
+            # 🟢 CREAR ENLACES en la tabla enlace
+            if 'edges' in topology_dict:
+                for edge in topology_dict['edges']:
+                    from_node = edge.get('from')
+                    to_node = edge.get('to')
+                    
+                    if from_node and to_node and from_node in node_to_instance_map and to_node in node_to_instance_map:
+                        # Obtener los IDs reales de las instancias
+                        vm1_id = node_to_instance_map[from_node]
+                        vm2_id = node_to_instance_map[to_node]
+                        
+                        # Crear enlace sin VLAN (se asignará después)
+                        enlace = Enlace(
+                            vm1=str(vm1_id),
+                            vm2=str(vm2_id),
+                            slice_idslice=new_slice.idslice,
+                            vlan=None,
+                            vlan_idvlan=None
+                        )
+                        db.session.add(enlace)
+            
+            db.session.commit()
+            flash(f'Slice "{slice_name}" creado exitosamente con {len(topology_dict.get("edges", []))} enlaces!', 'success')
+            return redirect(url_for('dashboard'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creando slice: {str(e)}', 'error')
+            return redirect(url_for('create_slice'))
     
     # Pasar datos al template
     imagenes_disponibles = Imagen.query.all()
@@ -317,6 +481,9 @@ def create_slice():
     return render_template('create_slice2.html', 
                          imagenes=imagenes_disponibles,
                          zonas=zonas_disponibles)
+
+
+
 
 @app.route('/slice/<int:slice_id>')
 def slice_detail(slice_id):
@@ -540,10 +707,8 @@ def edit_slice(slice_id):
         flash('Solo se pueden editar slices en estado STOPPED', 'error')
         return redirect(url_for('dashboard'))
     
-    # Get current topology data
-    current_topology = slice_obj.get_topology_data()
-    if not current_topology:
-        current_topology = {'nodes': [], 'edges': []}
+    # 🟢 SINCRONIZAR TOPOLOGÍA CON ENLACES DE LA BASE DE DATOS
+    current_topology = synchronize_topology_with_links(slice_obj)
     
     # Convert instances to serializable format
     instances_data = []
@@ -554,10 +719,10 @@ def edit_slice(slice_id):
             'cpu': instance.cpu,
             'ram': instance.ram,
             'storage': instance.storage,
-            'imagen': instance.imagen.nombre if instance.imagen else 'N/A',  # 🟢 CORREGIDO
+            'imagen': instance.imagen.nombre if instance.imagen else 'N/A',
             'estado': instance.estado,
-            'ip': instance.ip or 'No asignada',  # 🟢 AGREGADO
-            'salidainternet': instance.salidainternet  # 🟢 AGREGADO
+            'ip': instance.ip or 'No asignada',
+            'salidainternet': instance.salidainternet
         })
     
     # Get available images and zones for new VMs
@@ -569,8 +734,55 @@ def edit_slice(slice_id):
                          user=user,
                          current_topology=current_topology,
                          instances_data=instances_data,
-                         imagenes=imagenes_disponibles,  # 🟢 AGREGADO
-                         zonas=zonas_disponibles)  # 🟢 AGREGADO
+                         imagenes=imagenes_disponibles,
+                         zonas=zonas_disponibles)
+
+def synchronize_topology_with_links(slice_obj):
+    """
+    Sincroniza la topología JSON con los enlaces reales de la base de datos
+    """
+    # Obtener topología actual
+    current_topology = slice_obj.get_topology_data()
+    if not current_topology:
+        current_topology = {'nodes': [], 'edges': []}
+    
+    # 🟢 CREAR NODOS BASADOS EN INSTANCIAS REALES
+    nodes = []
+    instance_to_node_map = {}
+    
+    for idx, instance in enumerate(slice_obj.instancias, 1):
+        node = {
+            'id': idx,
+            'label': instance.nombre,
+            'color': '#28a745'
+        }
+        nodes.append(node)
+        instance_to_node_map[instance.idinstancia] = idx
+    
+    # 🟢 CREAR EDGES BASADOS EN ENLACES REALES DE LA BD
+    edges = []
+    enlaces_bd = Enlace.query.filter_by(slice_idslice=slice_obj.idslice).all()
+    
+    for enlace in enlaces_bd:
+        vm1_id = int(enlace.vm1)
+        vm2_id = int(enlace.vm2)
+        
+        # Convertir IDs de instancia a IDs de nodo
+        if vm1_id in instance_to_node_map and vm2_id in instance_to_node_map:
+            edge = {
+                'from': instance_to_node_map[vm1_id],
+                'to': instance_to_node_map[vm2_id],
+                'id': f"link_{enlace.idenlace}"
+            }
+            edges.append(edge)
+    
+    # 🟢 TOPOLOGÍA SINCRONIZADA
+    synchronized_topology = {
+        'nodes': nodes,
+        'edges': edges
+    }
+    
+    return synchronized_topology
 
 @app.route('/update_slice/<int:slice_id>', methods=['POST'])
 def update_slice(slice_id):
@@ -597,19 +809,23 @@ def update_slice(slice_id):
         num_new_vms = int(request.form.get('num_new_vms', 0))
         zona_disponibilidad = request.form.get('zona_disponibilidad', slice_obj.zonadisponibilidad)
         
-        # 🟢 VALIDACIÓN: Solo permitir cambios seguros
-        original_vm_count = len(slice_obj.instancias)
+        # 🟢 OBTENER INSTANCIAS EXISTENTES PARA MAPEO
+        existing_instances = slice_obj.instancias
+        original_vm_count = len(existing_instances)
         
-        # Update slice information (solo campos permitidos)
+        # 🟢 CREAR MAPEO DE INSTANCIAS EXISTENTES (node_id -> instance_id)
+        # Asumimos que las instancias existentes mantienen su orden/ID de nodo
+        node_to_instance_map = {}
+        for idx, instance in enumerate(existing_instances, 1):
+            node_to_instance_map[idx] = instance.idinstancia
+        
+        # Update slice information
         slice_obj.nombre = slice_name
         slice_obj.zonadisponibilidad = zona_disponibilidad
         
-        # Update topology if provided
-        if topology_data:
-            slice_obj.topologia = topology_data
-        
-        # 🟢 CREAR SOLO NUEVAS INSTANCIAS (no tocar las existentes)
+        # 🟢 CREAR NUEVAS INSTANCIAS Y ACTUALIZAR MAPEO
         new_instances_created = 0
+        new_instances = []
         
         for i in range(1, num_new_vms + 1):
             vm_name = request.form.get(f'new_vm_{i}_name', f'VM{original_vm_count + i}')
@@ -617,24 +833,22 @@ def update_slice(slice_id):
             vm_ram = request.form.get(f'new_vm_{i}_ram', '1GB')
             vm_storage = request.form.get(f'new_vm_{i}_storage', '10GB')
             vm_image_name = request.form.get(f'new_vm_{i}_image', 'ubuntu:latest')
-            vm_internet = request.form.get(f'new_vm_{i}_internet', 'false') == 'true'
-            vm_ip = request.form.get(f'new_vm_{i}_ip', '')
+            vm_internet = request.form.get(f'new_vm_{i}_internet') == 'on'  # 🟢 Corregido checkbox
             
-            # 🟢 OBTENER O CREAR LA IMAGEN
+            # Obtener o crear la imagen
             imagen = Imagen.query.filter_by(nombre=vm_image_name).first()
             if not imagen:
-                # Crear imagen si no existe
                 max_id = db.session.query(db.func.max(Imagen.idimagen)).scalar()
                 next_id = (max_id or 0) + 1
                 imagen = Imagen(
                     idimagen=next_id,
                     nombre=vm_image_name,
-                    ruta=f'/images/{vm_image_name}'
+                    ruta=f'default'
                 )
                 db.session.add(imagen)
-                db.session.commit()
+                db.session.flush()  # Para obtener el ID
             
-            # 🟢 CREAR NUEVA INSTANCIA CON ESTRUCTURA CORRECTA
+            # Crear nueva instancia
             new_instance = Instancia(
                 slice_idslice=slice_obj.idslice,
                 nombre=vm_name,
@@ -642,13 +856,35 @@ def update_slice(slice_id):
                 ram=vm_ram,
                 storage=vm_storage,
                 salidainternet=vm_internet,
-                imagen_idimagen=imagen.idimagen,  # 🟢 RELACIÓN CORRECTA
-                ip=vm_ip if vm_ip else None,
-                vnc_idvnc=None,  # Opcional por ahora
-                worker_idworker=None  # Opcional por ahora
+                imagen_idimagen=imagen.idimagen,
+                ip=None,
+                vnc_idvnc=None,
+                worker_idworker=None
             )
             db.session.add(new_instance)
+            db.session.flush()  # 🟢 Para obtener el ID de la nueva instancia
+            
+            # 🟢 AGREGAR AL MAPEO: Las nuevas VMs empiezan después de las existentes
+            new_node_id = original_vm_count + i
+            node_to_instance_map[new_node_id] = new_instance.idinstancia
+            
+            new_instances.append(new_instance)
             new_instances_created += 1
+        
+        # 🟢 ACTUALIZAR TOPOLOGÍA Y ENLACES
+        enlaces_creados = 0
+        if topology_data:
+            try:
+                topology_dict = json.loads(topology_data)
+                
+                # Actualizar topología JSON
+                slice_obj.set_topology_data(topology_dict)
+                
+                # 🟢 GESTIONAR ENLACES EN LA TABLA ENLACE
+                enlaces_creados = update_slice_links(slice_obj, topology_dict, node_to_instance_map)
+                
+            except json.JSONDecodeError:
+                return jsonify({'error': 'Invalid topology data format'}), 400
         
         db.session.commit()
         
@@ -657,14 +893,15 @@ def update_slice(slice_id):
         if new_instances_created > 0:
             message += f'Se agregaron {new_instances_created} nueva(s) VM(s). '
         if topology_data:
-            message += 'Topología actualizada. '
-        message += f'Las {original_vm_count} VM(s) existentes se mantuvieron intactas.'
+            message += f'Topología actualizada con {enlaces_creados} enlaces. '
+        message += f'Total: {len(slice_obj.instancias)} VMs.'
         
         return jsonify({
             'success': True,
             'message': message,
             'slice_name': slice_obj.nombre,
             'new_vms_added': new_instances_created,
+            'links_created': enlaces_creados,
             'total_vms': len(slice_obj.instancias),
             'original_vms': original_vm_count
         })
@@ -675,6 +912,7 @@ def update_slice(slice_id):
             'success': False,
             'error': f'Error updating slice: {str(e)}'
         }), 500
+
 
 if __name__ == '__main__':
     initialize_database()

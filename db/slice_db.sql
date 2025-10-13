@@ -258,11 +258,11 @@ DROP TABLE IF EXISTS `enlace`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `enlace` (
   `idenlace` int NOT NULL AUTO_INCREMENT,
-  `vm1` varchar(45) DEFAULT NULL,
-  `vm2` varchar(45) DEFAULT NULL,
-  `vlan` varchar(45) DEFAULT NULL,
-  `vlan_idvlan` int NOT NULL,
-  `slice_idslice` int NOT NULL,
+  `vm1` varchar(45) DEFAULT NULL,           -- ID de la primera VM
+  `vm2` varchar(45) DEFAULT NULL,           -- ID de la segunda VM  
+  `vlan` varchar(45) DEFAULT NULL,          -- Número de VLAN (puede ser NULL)
+  `vlan_idvlan` int DEFAULT NULL,           -- 🟢 CAMBIADO: Ahora puede ser NULL
+  `slice_idslice` int NOT NULL,             -- ID del slice (obligatorio)
   PRIMARY KEY (`idenlace`),
   KEY `fk_enlace_vlan1_idx` (`vlan_idvlan`),
   KEY `fk_enlace_slice1_idx` (`slice_idslice`),
@@ -276,7 +276,7 @@ CREATE TABLE `enlace` (
 --
 
 LOCK TABLES `enlace` WRITE;
-
+INSERT INTO `enlace` VALUES (1,1,2,NULL,NULL,19),(2,2,3,NULL,NULL,19),(3,3,1,NULL,NULL,19);
 UNLOCK TABLES;
 
 -- Dump completed on 2025-10-12  7:01:41
