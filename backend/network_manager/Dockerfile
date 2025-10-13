@@ -6,4 +6,4 @@ COPY . /app
 
 RUN pip install fastapi uvicorn pymysql sqlalchemy
 
-CMD ["uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8100"]
