@@ -19,55 +19,68 @@ async def create_vm(request: Request):
 
     # --- Parámetros desde JSON ---
     nombre_vm = data.get("nombre_vm")
-    worker = data.get("worker")
+    worker = data.get("worker")  # IP del worker
     vlans = data.get("vlans", [])
     puerto_vnc = str(data.get("puerto_vnc"))
     imagen = data.get("imagen", "cirros-base.qcow2")
-    ram = str(data.get("ram_mb", 512))
+    ram_mb = str(data.get("ram_mb", 512))  # 🟢 USAR ram_mb directamente
     cpus = str(data.get("cpus", 1))
-    disco = str(data.get("disco_gb", 2))
+    disco_gb = str(data.get("disco_gb", 2))
 
-    # Validaciones
+    # Validaciones mejoradas
     if not all([nombre_vm, worker, puerto_vnc]):
-        return {"success": False, "error": "Faltan parámetros obligatorios"}
+        return {"success": False, "error": "Faltan parámetros obligatorios: nombre_vm, worker, puerto_vnc"}
+    
     if not vlans:
         return {"success": False, "error": "No se especificaron VLANs"}
 
+    # 🟢 AGREGAR BRIDGE OVS (FALTABA!)
+    OVS_BRIDGE = "br-int"  # Bridge fijo
     vlan_args = " ".join(vlans)
 
     # --- Comando remoto ejecutado en el worker ---
     cmd = (
         f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
         f"{USER}@{worker} "
-        f"\"sudo /home/ubuntu/vm_create.sh {nombre_vm} {OVS_BRIDGE} {puerto_vnc} {imagen} {ram} {cpus} {disco} {vlan_args}\""
+        f"\"sudo /home/ubuntu/vm_create.sh {nombre_vm} {OVS_BRIDGE} {puerto_vnc} {imagen} {ram_mb} {cpus} {disco_gb} {vlan_args}\""
     )
 
-    print(f"[DEBUG] Ejecutando comando remoto:\n{cmd}")
+    print(f"[DEBUG] Ejecutando comando SSH:")
+    print(f"[DEBUG] {cmd}")
 
     # --- Ejecutar comando ---
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     pid = None
 
+    print(f"[DEBUG] Return code: {result.returncode}")
+    print(f"[DEBUG] STDOUT: {result.stdout}")
+    print(f"[DEBUG] STDERR: {result.stderr}")
+
     # --- Analizar resultado ---
     if result.returncode == 0:
-        # Buscar un número de PID en la salida (última línea del script)
+        # Buscar PID en la salida
         for line in result.stdout.splitlines():
             if line.strip().isdigit():
                 pid = int(line.strip())
                 break
+        
         return {
+            "success": True,  # 🟢 USAR 'success' para consistencia
             "status": True,
             "pid": pid,
             "message": f"VM {nombre_vm} desplegada correctamente en {worker}",
-            "stdout": result.stdout.strip()
+            "stdout": result.stdout.strip(),
+            "comando_ejecutado": cmd  # Para debug
         }
     else:
         return {
+            "success": False,
             "status": False,
             "pid": pid,
-            "message": "Falló el despliegue remoto",
-            "stderr": result.stderr.strip(),
-            "stdout": result.stdout.strip()
+            "message": f"Falló el despliegue de {nombre_vm} en {worker}",
+            "error": result.stderr.strip(),
+            "stdout": result.stdout.strip(),
+            "comando_ejecutado": cmd
         }
 
 @app.post("/delete_vm")

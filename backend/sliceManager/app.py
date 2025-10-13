@@ -260,35 +260,78 @@ def solicitar_vnc():
 
 #Despliegue :D
 def desplegar_vm_en_worker(vm_data: dict):
-    """Envía la petición al Linux Driver y devuelve JSON normalizado."""
+    """Envía la petición al Linux Driver con formato correcto y logs detallados."""
     LINUX_DRIVER_URL = os.getenv("LINUX_DRIVER_URL", "http://linux-driver:9100")
     url = f"{LINUX_DRIVER_URL}/create_vm"
 
     try:
         print(f"[HTTP] → POST {url}")
-        print(f"[HTTP] Payload: {json.dumps(vm_data)[:500]}")
+        print(f"[HTTP] VM: {vm_data['nombre_vm']} → Worker: {vm_data['worker']}")
 
-        resp = requests.post(url, json=vm_data, timeout=200)
+        # 🟢 TRANSFORMAR DATOS AL FORMATO CORRECTO
+        transformed_payload = {
+            "nombre_vm": vm_data["nombre_vm"],
+            "worker": vm_data["worker"],
+            "vlans": [str(v) for v in vm_data["vlans"]],
+            "puerto_vnc": str(vm_data["puerto_vnc"]),
+            "imagen": vm_data["imagen"],
+            "ram_mb": int(vm_data["ram_gb"] * 1024),  # GB → MB
+            "cpus": int(vm_data["cpus"]),
+            "disco_gb": int(vm_data["disco_gb"])
+        }
+        
+        print(f"[HTTP] Payload: RAM={transformed_payload['ram_mb']}MB, CPUs={transformed_payload['cpus']}, VLANs={transformed_payload['vlans']}")
+
+        resp = requests.post(url, json=transformed_payload, timeout=200)
         raw = resp.text
-        print(f"[HTTP] ← {resp.status_code}: {raw[:500]}")
+        
+        print(f"[HTTP] ← {resp.status_code}")
+        print(f"[HTTP] Response: {raw[:300]}...")
 
         if resp.status_code != 200:
-            return {"status": False, "message": f"HTTP {resp.status_code}", "raw": raw}
+            return {
+                "status": False, 
+                "message": f"HTTP {resp.status_code}: {raw[:200]}", 
+                "raw": raw
+            }
 
         try:
             data = resp.json()
-        except json.JSONDecodeError:
-            return {"status": False, "message": "Respuesta no es JSON", "raw": raw}
+        except json.JSONDecodeError as e:
+            return {
+                "status": False, 
+                "message": f"Respuesta no es JSON válido: {raw[:200]}", 
+                "raw": raw
+            }
 
-        ok = bool(data.get("success", data.get("status", False)))
-        msg = data.get("mensaje") or data.get("message") or data.get("stdout") or "Sin mensaje"
+        # 🟢 VERIFICAR AMBOS CAMPOS DE SUCCESS
+        success = bool(data.get("success", data.get("status", False)))
+        message = data.get("message") or data.get("mensaje") or data.get("stdout") or "VM procesada"
         pid = data.get("pid")
-        return {"status": ok, "message": msg, "pid": pid, "raw": data}
+        
+        if success:
+            print(f"[SUCCESS] VM {vm_data['nombre_vm']} desplegada - PID: {pid}")
+        else:
+            print(f"[FAILED] VM {vm_data['nombre_vm']} falló: {message}")
+            print(f"[ERROR] STDERR: {data.get('stderr', 'N/A')}")
+        
+        return {
+            "status": success,
+            "message": message,
+            "pid": pid,
+            "raw": data,
+            "comando_ssh": data.get("comando_ejecutado", "N/A")  # Para debug
+        }
 
+    except requests.exceptions.Timeout:
+        error_msg = f"Timeout desplegando VM {vm_data['nombre_vm']} en {vm_data['worker']}"
+        print(f"[TIMEOUT] {error_msg}")
+        return {"status": False, "message": error_msg}
+        
     except Exception as e:
-        return {"status": False, "message": f"❌ Error de conexión con Linux Driver: {e}"}
-
-
+        error_msg = f"Error de conexión con Linux Driver: {e}"
+        print(f"[ERROR] {error_msg}")
+        return {"status": False, "message": error_msg}
 
 
 # ======================================
@@ -332,7 +375,6 @@ def deploy_slice(data: dict = Body(...)):
     print(f"🚀 Iniciando despliegue real del slice {id_slice}...")
 
     # 🟡 Estado inicial del slice
-    # 🟡 Estado inicial del slice
     with engine.begin() as conn:
         conn.execute(text("""
             UPDATE slice 
@@ -340,131 +382,197 @@ def deploy_slice(data: dict = Body(...)):
             WHERE idslice = :sid
         """), {"sid": id_slice})
 
+    try:
+        # 1️⃣ Obtener instancias y métricas
+        instancias = obtener_instancias_por_slice(id_slice)
+        if not instancias:
+            return {"error": "No se encontraron instancias"}
+        
+        metrics = obtener_metricas_actuales()
+        if not metrics:
+            return {"error": "No se pudo obtener métricas"}
 
+        # 2️⃣ Generar plan de despliegue
+        plan = generar_plan_deploy(id_slice, metrics, instancias)
+        if not plan.get("can_deploy"):
+            return {"can_deploy": False, "error": "Recursos insuficientes"}
 
-    # 1️⃣ Obtener instancias y métricas
-    instancias = obtener_instancias_por_slice(id_slice)
-    if not instancias:
-        return {"error": "No se encontraron instancias"}
-    metrics = obtener_metricas_actuales()
-    if not metrics:
-        return {"error": "No se pudo obtener métricas"}
+        # 3️⃣ Desplegar VMs en paralelo
+        resultados = []
+        fallos = 0
+        vms_exitosas = []
+        
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            future_map = {}
 
-    # 2️⃣ Generar plan de despliegue
-    plan = generar_plan_deploy(id_slice, metrics, instancias)
-    if not plan.get("can_deploy"):
-        return {"can_deploy": False, "error": "Recursos insuficientes"}
+            # Enviar cada VM al Linux Driver
+            for vm in plan["placement_plan"]:
+                # 🟢 PAYLOAD CORREGIDO
+                vm_req = {
+                    "nombre_vm": vm["nombre_vm"],
+                    "worker": vm["worker"],
+                    "vlans": [str(v) for v in vm["vlans"]],
+                    "puerto_vnc": str(vm["puerto_vnc"]),
+                    "imagen": vm["imagen"],
+                    "ram_gb": float(vm["ram_gb"]),
+                    "cpus": int(vm["cpus"]),
+                    "disco_gb": float(vm["disco_gb"])
+                }
+                
+                print(f"🖥️ Enviando VM {vm['nombre_vm']} a worker {vm['worker']}")
+                print(f"   VLANs: {vm_req['vlans']}, RAM: {vm_req['ram_gb']}GB, CPU: {vm_req['cpus']}")
+                
+                future = executor.submit(desplegar_vm_en_worker, vm_req)
+                future_map[future] = vm  # 🟢 Guardar objeto VM completo
 
-    # 3️⃣ Desplegar VMs en paralelo
-    resultados = []
-    fallos = 0
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        future_map = {}
-
-        # Enviar cada VM al Linux Driver
-        for vm in plan["placement_plan"]:
-            vm_req = {
-                "nombre_vm": vm["nombre_vm"],
-                "worker": vm["worker"],
-                "vlans": [str(v) for v in vm["vlans"]],
-                "puerto_vnc": vm["puerto_vnc"],
-                "imagen": vm["imagen"],
-                "ram_mb": int(vm["ram_gb"] * 1024),
-                "cpus": vm["cpus"],
-                "disco_gb": vm["disco_gb"]
-            }
-            fut = executor.submit(desplegar_vm_en_worker, vm_req)
-            future_map[fut] = vm
-
-        # Procesar resultados conforme terminan
-        for fut in as_completed(future_map):
-            vm = future_map[fut]
-            try:
-                resp = fut.result()
-            except Exception as e:
-                resp = {"status": False, "message": f"Error interno: {e}"}
-
-            ok = resp.get("status", False)
-            msg = resp.get("message", "Sin mensaje")
-            pid = resp.get("pid")
-
-            if ok:
-                print(f"✅ VM {vm['nombre_vm']} desplegada correctamente en {vm['worker']}")
-                with engine.begin() as conn:
-                    conn.execute(text("""
-                        UPDATE instancia
-                        SET estado = 'RUNNING',
-                            cpu = :cpu,
-                            ram = :ram,
-                            storage = :storage,
-                            vnc_idvnc = (SELECT idvnc FROM vnc WHERE puerto = :p LIMIT 1),
-                            worker_idworker = (SELECT idworker FROM worker WHERE ip = :ip LIMIT 1)
-                        WHERE nombre = :vm AND slice_idslice = :sid
-                    """), {
-                        "cpu": str(vm["cpus"]),
-                        "ram": f"{vm['ram_gb']} GB",
-                        "storage": f"{vm['disco_gb']} GB",
-                        "p": vm["puerto_vnc"],
-                        "ip": vm["worker"],
-                        "vm": vm["nombre_vm"],
-                        "sid": id_slice
+            # 4️⃣ Procesar resultados conforme terminan
+            for future in as_completed(future_map):
+                vm = future_map[future]
+                vm_name = vm["nombre_vm"]
+                
+                try:
+                    result = future.result()
+                    
+                    if result["status"]:
+                        # ✅ VM DESPLEGADA EXITOSAMENTE
+                        print(f"✅ VM {vm_name}: PID {result.get('pid', 'N/A')}")
+                        
+                        # 🟢 ACTUALIZAR BASE DE DATOS
+                        with engine.begin() as conn:
+                            # Actualizar instancia
+                            conn.execute(text("""
+                                UPDATE instancia
+                                SET estado = 'RUNNING',
+                                    ip = :ip
+                                WHERE nombre = :vm_name AND slice_idslice = :sid
+                            """), {
+                                "ip": vm.get("ip_asignada"),  # Si tienes asignación de IP
+                                "vm_name": vm_name,
+                                "sid": id_slice
+                            })
+                            
+                            # Actualizar VNC como ocupado
+                            if vm.get("puerto_vnc"):
+                                conn.execute(text("""
+                                    UPDATE vnc 
+                                    SET estado = 'ocupada'
+                                    WHERE puerto = :puerto
+                                """), {"puerto": vm["puerto_vnc"]})
+                            
+                            # 🟢 MARCAR VLANs COMO OCUPADAS
+                            for vlan_numero in vm["vlans"]:
+                                conn.execute(text("""
+                                    UPDATE vlan
+                                    SET estado = 'ocupada'
+                                    WHERE numero = :vlan_numero
+                                """), {"vlan_numero": str(vlan_numero)})
+                        
+                        vms_exitosas.append(vm_name)
+                        
+                        resultados.append({
+                            "vm": vm_name,
+                            "worker": vm["worker"],
+                            "vlans": vm["vlans"],
+                            "puerto_vnc": vm["puerto_vnc"],
+                            "success": True,
+                            "message": result["message"],
+                            "pid": result.get("pid"),
+                            "status": "RUNNING"
+                        })
+                        
+                    else:
+                        # ❌ VM FALLÓ AL DESPLEGARSE
+                        fallos += 1
+                        print(f"❌ VM {vm_name}: {result['message']}")
+                        
+                        # 🟢 MARCAR INSTANCIA COMO FAILED
+                        with engine.begin() as conn:
+                            conn.execute(text("""
+                                UPDATE instancia
+                                SET estado = 'FAILED'
+                                WHERE nombre = :vm_name AND slice_idslice = :sid
+                            """), {"vm_name": vm_name, "sid": id_slice})
+                        
+                        resultados.append({
+                            "vm": vm_name,
+                            "worker": vm["worker"],
+                            "vlans": vm.get("vlans", []),
+                            "success": False,
+                            "message": result["message"],
+                            "pid": None,
+                            "status": "FAILED"
+                        })
+                        
+                except Exception as e:
+                    fallos += 1
+                    error_msg = f"Excepción desplegando VM {vm_name}: {str(e)}"
+                    print(f"❌ {error_msg}")
+                    
+                    # Marcar como failed en BD
+                    with engine.begin() as conn:
+                        conn.execute(text("""
+                            UPDATE instancia
+                            SET estado = 'FAILED'
+                            WHERE nombre = :vm_name AND slice_idslice = :sid
+                        """), {"vm_name": vm_name, "sid": id_slice})
+                    
+                    resultados.append({
+                        "vm": vm_name,
+                        "worker": vm.get("worker", "N/A"),
+                        "success": False,
+                        "message": error_msg,
+                        "pid": None,
+                        "status": "EXCEPTION"
                     })
 
-                    # Marcar VLANs usadas por esta VM como ocupadas
-                    for vlan_id in vm["vlans"]:
-                        conn.execute(text("""
-                            UPDATE vlan
-                            SET estado = 'ocupada'
-                            WHERE idvlan = :vlan_id
-                        """), {"vlan_id": vlan_id})
-            else:
-                # ❌ Fallo → rollback de VM y marcar como FAILED
-                print("fashó")
-                fallos += 1
-                #try:
-                    #requests.post("http://linux-driver:9100/delete_vm", json={
-                        #nombre_vm": vm["nombre_vm"],
-                        #"worker": vm["worker"]
-                    #}, timeout=10)
-                #except Exception as e:
-                    #print(f"⚠️ Error al eliminar VM fallida: {e}")
+        # 5️⃣ Estado final del slice
+        estado_final = "RUNNING" if fallos == 0 else ("PARTIAL" if len(vms_exitosas) > 0 else "FAILED")
+        
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE slice 
+                SET estado = :e 
+                WHERE idslice = :sid
+            """), {"e": estado_final, "sid": id_slice})
 
-                #with engine.begin() as conn:
-                    #conn.execute(text("""
-                        #UPDATE instancia
-                        #SET estado = 'FAILED'
-                        #WHERE nombre = :vm AND slice_idslice = :sid
-                    #"""), {"vm": vm["nombre_vm"], "sid": id_slice})
-
-            resultados.append({
-                "vm": vm["nombre_vm"],
-                "worker": vm["worker"],
-                "vlans": vm["vlans"],
-                "puerto_vnc": vm["puerto_vnc"],
-                "pid": pid,
-                "status": ok,
-                "mensaje": msg
-            })
-
-    # Estado final del slice
-    estado_final = "RUNNING" if fallos == 0 else "ERROR"
-    with engine.begin() as conn:
-        conn.execute(text("""
-            UPDATE slice 
-            SET estado = :e 
-            WHERE idslice = :sid
-        """), {"e": estado_final, "sid": id_slice})
-
-    # 5️⃣ Respuesta final
-    return {
-        "timestamp": datetime.utcnow().isoformat(),
-        "slice": id_slice,
-        "estado_final": estado_final,
-        "total_vms": len(plan["placement_plan"]),
-        "exitosas": len(plan["placement_plan"]) - fallos,
-        "fallidas": fallos,
-        "detalle": resultados
-    }
+        # 6️⃣ Respuesta final detallada
+        return {
+            "success": fallos == 0,
+            "timestamp": datetime.utcnow().isoformat(),
+            "slice_id": id_slice,
+            "estado_final": estado_final,
+            "resumen": {
+                "total_vms": len(plan["placement_plan"]),
+                "exitosas": len(vms_exitosas),
+                "fallidas": fallos,
+                "porcentaje_exito": round((len(vms_exitosas) / len(plan["placement_plan"])) * 100, 2)
+            },
+            "vms_exitosas": vms_exitosas,
+            "deployment_plan": plan["placement_plan"],
+            "workers_utilizados": list(set([vm["worker"] for vm in plan["placement_plan"]])),
+            "vlans_asignadas": list(set([str(v) for vm in plan["placement_plan"] for v in vm["vlans"]])),
+            "detalle_completo": resultados,
+            "message": f"Despliegue {'completo' if fallos == 0 else 'parcial' if len(vms_exitosas) > 0 else 'fallido'} del slice {id_slice}"
+        }
+        
+    except Exception as e:
+        # 🟢 ROLLBACK EN CASO DE ERROR CRÍTICO
+        print(f"❌ Error crítico en despliegue del slice {id_slice}: {e}")
+        
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE slice 
+                SET estado = 'FAILED' 
+                WHERE idslice = :sid
+            """), {"sid": id_slice})
+        
+        return {
+            "success": False,
+            "error": f"Error crítico durante despliegue: {str(e)}",
+            "slice_id": id_slice,
+            "timestamp": datetime.utcnow().isoformat(),
+            "estado_final": "FAILED"
+        }
 
 
 #prueba de borrado
