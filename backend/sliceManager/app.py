@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Body
 from datetime import datetime
 from sqlalchemy import create_engine, text
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests, json, os
 
 app = FastAPI(title="Slice Manager", version="3.0")
@@ -22,9 +23,9 @@ NETWORK_BASE = "http://network_manager:8100"
 
 # Mapeo estático de workers
 WORKER_IPS = {
-    "server2": "10.0.0.2",
-    "server3": "10.0.0.3",
-    "server4": "10.0.0.4"
+    "server2": "10.0.10.2",
+    "server3": "10.0.10.3",
+    "server4": "10.0.10.4"
 }
 
 
@@ -187,6 +188,19 @@ def solicitar_vnc():
         return None
 
 
+#Despliegue :D
+def desplegar_vm_en_worker(vm_data: dict):
+    """Envía la petición al Linux Driver para crear una VM"""
+    LINUX_DRIVER_URL = os.getenv("LINUX_DRIVER_URL", "http://linux-driver:9100/create_vm")
+    try:
+        resp = requests.post(LINUX_DRIVER_URL, json=vm_data, timeout=200)
+        if resp.status_code == 200:
+            return resp.json()  # El JSON que devuelve el Linux Driver
+        else:
+            return {"status": False, "message": f"Error {resp.status_code}: {resp.text}"}
+    except Exception as e:
+        return {"status": False, "message": f"❌ Error de conexión con Linux Driver: {e}"}
+
 # ======================================
 # ENDPOINT: verificar viabilidad
 # ======================================
@@ -216,6 +230,152 @@ def verificar_viabilidad_endpoint(data: dict = Body(...)):
 @app.get("/")
 def root():
     return {"status": "ok", "message": "Slice Manager operativo en el Headnode"}
+
+
+#ga
+@app.post("/placement/deploy")
+def deploy_slice(data: dict = Body(...)):
+    id_slice = data.get("id_slice")
+    if not id_slice:
+        return {"error": "Falta el parámetro 'id_slice'"}
+
+    print(f"🚀 Iniciando despliegue real del slice {id_slice}...")
+
+    # 🟡 Estado inicial del slice
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE slice 
+            SET estado = 'DEPLOYING'
+            WHERE idslice = :sid
+        """), {"sid": id_slice})
+
+    # 1️⃣ Obtener instancias y métricas
+    instancias = obtener_instancias_por_slice(id_slice)
+    if not instancias:
+        return {"error": "No se encontraron instancias"}
+    metrics = obtener_metricas_actuales()
+    if not metrics:
+        return {"error": "No se pudo obtener métricas"}
+
+    # 2️⃣ Generar plan de despliegue
+    plan = generar_plan_deploy(id_slice, metrics, instancias)
+    if not plan.get("can_deploy"):
+        return {"can_deploy": False, "error": "Recursos insuficientes"}
+
+    # 3️⃣ Desplegar VMs en paralelo
+    resultados = []
+    fallos = 0
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        future_map = {}
+
+        # Enviar cada VM al Linux Driver
+        for vm in plan["placement_plan"]:
+            vm_req = {
+                "nombre_vm": vm["nombre_vm"],
+                "worker": vm["worker"],
+                "vlans": [str(v) for v in vm["vlans"]],
+                "puerto_vnc": vm["puerto_vnc"],
+                "imagen": vm["imagen"],
+                "ram_mb": int(vm["ram_gb"] * 1024),
+                "cpus": vm["cpus"],
+                "disco_gb": vm["disco_gb"]
+            }
+            fut = executor.submit(desplegar_vm_en_worker, vm_req)
+            future_map[fut] = vm
+
+        # Procesar resultados conforme terminan
+        for fut in as_completed(future_map):
+            vm = future_map[fut]
+            try:
+                resp = fut.result()
+            except Exception as e:
+                resp = {"status": False, "message": f"Error interno: {e}"}
+
+            ok = resp.get("status", False)
+            msg = resp.get("message", "Sin mensaje")
+            pid = resp.get("pid")
+
+            if ok:
+                print("oka")
+                # VM desplegada correctamente → actualizar instancia y VLANs
+                #with engine.begin() as conn:
+                    # Actualizar datos de la instancia
+                    #conn.execute(text("""
+                        #UPDATE instancia
+                        #SET 
+                            #estado = 'RUNNING',
+                            #cpu = :cpu,
+                            #ram = :ram,
+                            #storage = :storage,
+                            #vnc_idvnc = (SELECT idvnc FROM vnc WHERE puerto = :p LIMIT 1),
+                            #worker_idworker = (SELECT idworker FROM worker WHERE ip = :ip LIMIT 1)
+                        #WHERE nombre = :vm 
+                          #AND slice_idslice = :sid
+                    #"""), {
+                        #"cpu": str(vm["cpus"]),
+                        #"ram": f"{vm['ram_gb']} GB",
+                        #"storage": f"{vm['disco_gb']} GB",
+                        #"p": vm["puerto_vnc"],
+                        #"ip": vm["worker"],
+                        #"vm": vm["nombre_vm"],
+                        #"sid": id_slice
+                    #})
+
+                    # Marcar VLANs usadas por esta VM como "ocupadas"
+                    #for vlan_id in vm["vlans"]:
+                        #conn.execute(text("""
+                           #UPDATE vlan
+                           #SET estado = 'ocupada'
+                           #WHERE idvlan = :vlan_id
+                        #"""), {"vlan_id": vlan_id})
+
+            #else:
+                # ❌ Fallo → rollback de VM y marcar como FAILED
+                fallos += 1
+                #try:
+                    #requests.post("http://linux-driver:9100/delete_vm", json={
+                        #nombre_vm": vm["nombre_vm"],
+                        #"worker": vm["worker"]
+                    #}, timeout=10)
+                #except Exception as e:
+                    #print(f"⚠️ Error al eliminar VM fallida: {e}")
+
+                #with engine.begin() as conn:
+                    #conn.execute(text("""
+                        #UPDATE instancia
+                        #SET estado = 'FAILED'
+                        #WHERE nombre = :vm AND slice_idslice = :sid
+                    #"""), {"vm": vm["nombre_vm"], "sid": id_slice})
+
+            #resultados.append({
+                #"vm": vm["nombre_vm"],
+                #"worker": vm["worker"],
+                #"vlans": vm["vlans"],
+                #"puerto_vnc": vm["puerto_vnc"],
+                #"pid": pid,
+                #"status": ok,
+                #"mensaje": msg
+            #})
+
+    # 4️⃣ Estado final del slice
+    #estado_final = "RUNNING" if fallos == 0 else "ERROR"
+    #with engine.begin() as conn:
+        #conn.execute(text("""
+            #UPDATE slice 
+            #SET estado = :e 
+            #WHERE idslice = :sid
+        #"""), {"e": estado_final, "sid": id_slice})
+
+    # 5️⃣ Respuesta final
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "slice": id_slice,
+        "estado_final": estado_final,
+        "total_vms": len(plan["placement_plan"]),
+        "exitosas": len(plan["placement_plan"]) - fallos,
+        "fallidas": fallos,
+        "detalle": resultados
+    }
 
 
 # ======================================
