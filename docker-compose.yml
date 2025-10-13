@@ -195,7 +195,7 @@ services:
     build: ./backend/linux-driver
     container_name: linux-driver
     ports:
-      - "9100:9100"
+      - "9100:8000"
     environment:
       - SSH_KEY=/home/ubuntu/.ssh/id_rsa_orch
       - USER=ubuntu
