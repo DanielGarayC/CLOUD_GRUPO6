@@ -1,7 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
 import json
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -11,7 +11,6 @@ class Rol(db.Model):
     idrol = db.Column('idrol', db.Integer, primary_key=True)
     nombre_rol = db.Column(db.String(45), nullable=False)
     
-    # Alias for easier access
     @property
     def id(self):
         return self.idrol
@@ -23,82 +22,28 @@ class User(db.Model):
     __tablename__ = 'usuario'
     
     idusuario = db.Column('idusuario', db.Integer, primary_key=True)
-    nombre = db.Column(db.String(45), unique=True, nullable=False)
-    contrasenia = db.Column(db.String(128), nullable=False)
+    nombre = db.Column(db.String(45))
+    contrasenia = db.Column(db.String(128))
     rol_idrol = db.Column('rol_idrol', db.Integer, db.ForeignKey('rol.idrol'), nullable=False)
     
     # Relationships
     rol = db.relationship('Rol', backref='usuarios', foreign_keys=[rol_idrol])
     
-    # Aliases for easier access
+    # Many-to-many relationship with slices
+    slices = db.relationship('Slice', secondary='usuario_has_slice', back_populates='usuarios')
+    
     @property
     def id(self):
         return self.idusuario
     
-    @property 
-    def rol_id(self):
-        return self.rol_idrol
-    
     def set_password(self, password):
-        """Set password in plain text (temporary - for development only)"""
-        self.contrasenia = password
-    
-    def check_password(self, password):
-        """Check password against plain text stored password"""
-        # For now, compare directly without hashing
-        return self.contrasenia == password
-    
-    def set_password_hashed(self, password):
-        """Set password with hash (for future use when migrating to hashed passwords)"""
         self.contrasenia = generate_password_hash(password)
     
-    def check_password_hashed(self, password):
-        """Check password against hashed password (for future use)"""
+    def check_password(self, password):
         return check_password_hash(self.contrasenia, password)
     
     def __repr__(self):
         return f'<User {self.nombre}>'
-
-class Slice(db.Model):
-    __tablename__ = 'slice'
-    
-    idslice = db.Column('idslice', db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100))
-    estado = db.Column(db.String(45), default='STOPPED')
-    topologia = db.Column(db.Text)
-    fecha_creacion = db.Column(db.Date, default=datetime.utcnow)
-    fecha_upload = db.Column(db.Date)
-    zonadisponibilidad = db.Column(db.String(45))
-    
-    # Relationships
-    instancias = db.relationship('Instancia', backref='slice', lazy=True, cascade='all, delete-orphan', foreign_keys='Instancia.slice_idslice')
-    
-    # Many-to-many relationship with users
-    usuarios = db.relationship('User', secondary='usuario_has_slice', backref='slices')
-    
-    # Aliases for easier access
-    @property
-    def id(self):
-        return self.idslice
-    
-    def get_topology_data(self):
-        """Parse topology JSON data"""
-        if self.topologia:
-            try:
-                return json.loads(self.topologia)
-            except json.JSONDecodeError:
-                return None
-        return None
-    
-    def set_topology_data(self, data):
-        """Set topology as JSON string"""
-        if data:
-            self.topologia = json.dumps(data)
-        else:
-            self.topologia = None
-    
-    def __repr__(self):
-        return f'<Slice {self.nombre or self.idslice}>'
 
 class Imagen(db.Model):
     __tablename__ = 'imagen'
@@ -107,7 +52,6 @@ class Imagen(db.Model):
     ruta = db.Column(db.String(45))
     nombre = db.Column(db.String(45))
     
-    # Aliases for easier access
     @property
     def id(self):
         return self.idimagen
@@ -120,8 +64,8 @@ class Vnc(db.Model):
     
     idvnc = db.Column('idvnc', db.Integer, primary_key=True)
     puerto = db.Column(db.String(45))
+    estado = db.Column(db.String(45))
     
-    # Aliases for easier access
     @property
     def id(self):
         return self.idvnc
@@ -134,18 +78,55 @@ class Worker(db.Model):
     
     idworker = db.Column('idworker', db.Integer, primary_key=True)
     nombre = db.Column(db.String(45))
-    puerto = db.Column(db.String(45))
+    ip = db.Column(db.String(45))  # 🟢 ACTUALIZADO: Cambiado de 'puerto' a 'ip'
     cpu = db.Column(db.String(45))
     ram = db.Column(db.String(45))
     storage = db.Column(db.String(45))
     
-    # Aliases for easier access
     @property
     def id(self):
         return self.idworker
     
     def __repr__(self):
         return f'<Worker {self.nombre}>'
+
+class Slice(db.Model):
+    __tablename__ = 'slice'
+    
+    idslice = db.Column('idslice', db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100))
+    estado = db.Column(db.String(45))
+    topologia = db.Column(db.Text)
+    fecha_creacion = db.Column(db.Date)
+    fecha_upload = db.Column(db.Date)
+    zonadisponibilidad = db.Column(db.String(45))
+    
+    # Relationships
+    instancias = db.relationship('Instancia', backref='slice', cascade='all, delete-orphan')
+    enlaces = db.relationship('Enlace', backref='slice', cascade='all, delete-orphan')  # 🟢 NUEVO
+    
+    # Many-to-many relationship with users
+    usuarios = db.relationship('User', secondary='usuario_has_slice', back_populates='slices')
+    
+    @property
+    def id(self):
+        return self.idslice
+    
+    def set_topology_data(self, topology_dict):
+        """Store topology as JSON string"""
+        self.topologia = json.dumps(topology_dict)
+    
+    def get_topology_data(self):
+        """Retrieve topology as Python dict"""
+        if self.topologia:
+            try:
+                return json.loads(self.topologia)
+            except json.JSONDecodeError:
+                return {'nodes': [], 'edges': []}
+        return {'nodes': [], 'edges': []}
+    
+    def __repr__(self):
+        return f'<Slice {self.nombre}>'
 
 class Instancia(db.Model):
     __tablename__ = 'instancia'
@@ -168,7 +149,6 @@ class Instancia(db.Model):
     vnc = db.relationship('Vnc', backref='instancias', foreign_keys=[vnc_idvnc])
     worker = db.relationship('Worker', backref='instancias', foreign_keys=[worker_idworker])
     
-    # Aliases for easier access
     @property
     def id(self):
         return self.idinstancia
@@ -192,22 +172,6 @@ class Instancia(db.Model):
     def __repr__(self):
         return f'<Instancia {self.nombre}>'
 
-class Enlace(db.Model):
-    __tablename__ = 'enlace'
-    
-    idenlace = db.Column('idenlace', db.Integer, primary_key=True)
-    vm1 = db.Column(db.String(45))
-    vm2 = db.Column(db.String(45))
-    vlan = db.Column(db.String(45))
-    
-    # Aliases for easier access
-    @property
-    def id(self):
-        return self.idenlace
-    
-    def __repr__(self):
-        return f'<Enlace {self.vm1}-{self.vm2}>'
-
 class Vlan(db.Model):
     __tablename__ = 'vlan'
     
@@ -215,13 +179,86 @@ class Vlan(db.Model):
     numero = db.Column(db.String(45))
     estado = db.Column(db.String(45))
     
-    # Aliases for easier access
     @property
     def id(self):
         return self.idvlan
     
+    @classmethod
+    def get_available_vlan(cls):
+        """Get the next available VLAN"""
+        return cls.query.filter_by(estado='disponible').first()
+    
+    @classmethod
+    def get_available_vlans_count(cls):
+        """Count available VLANs"""
+        return cls.query.filter_by(estado='disponible').count()
+    
+    def reserve(self):
+        """Mark VLAN as occupied"""
+        self.estado = 'ocupada'
+        db.session.commit()
+    
+    def release(self):
+        """Mark VLAN as available"""
+        self.estado = 'disponible'
+        db.session.commit()
+    
     def __repr__(self):
-        return f'<Vlan {self.numero}>'
+        return f'<Vlan {self.numero} ({self.estado})>'
+
+# 🟢 MODELO ENLACE ACTUALIZADO
+class Enlace(db.Model):
+    __tablename__ = 'enlace'
+    
+    idenlace = db.Column('idenlace', db.Integer, primary_key=True)
+    vm1 = db.Column(db.String(45))
+    vm2 = db.Column(db.String(45))
+    vlan = db.Column(db.String(45))  # Número de VLAN como string para acceso rápido
+    vlan_idvlan = db.Column('vlan_idvlan', db.Integer, db.ForeignKey('vlan.idvlan'), nullable=False)
+    slice_idslice = db.Column('slice_idslice', db.Integer, db.ForeignKey('slice.idslice'), nullable=False)
+    
+    # Relationships
+    vlan_obj = db.relationship('Vlan', backref='enlaces', foreign_keys=[vlan_idvlan])
+    # slice relationship is defined in Slice model
+    
+    @property
+    def id(self):
+        return self.idenlace
+    
+    @classmethod
+    def create_link(cls, vm1, vm2, slice_id):
+        """Create a new link between two VMs, automatically assigning a VLAN"""
+        # Get available VLAN
+        available_vlan = Vlan.get_available_vlan()
+        if not available_vlan:
+            raise ValueError("No hay VLANs disponibles para crear el enlace")
+        
+        # Create the link
+        enlace = cls(
+            vm1=vm1,
+            vm2=vm2,
+            vlan=available_vlan.numero,
+            vlan_idvlan=available_vlan.idvlan,
+            slice_idslice=slice_id
+        )
+        
+        # Reserve the VLAN
+        available_vlan.reserve()
+        
+        db.session.add(enlace)
+        return enlace
+    
+    def delete_link(self):
+        """Delete link and release its VLAN"""
+        # Release the VLAN
+        if self.vlan_obj:
+            self.vlan_obj.release()
+        
+        # Delete the link
+        db.session.delete(self)
+    
+    def __repr__(self):
+        return f'<Enlace {self.vm1}-{self.vm2} VLAN:{self.vlan}>'
 
 # Association table for many-to-many relationship between users and slices
 usuario_has_slice = db.Table('usuario_has_slice',

@@ -208,6 +208,7 @@ def dashboard():
                          user_role=user_role,
                          is_admin=is_admin)
 
+
 @app.route('/create_slice', methods=['GET', 'POST'])
 def create_slice():
     if 'user_id' not in session:
@@ -225,26 +226,9 @@ def create_slice():
         num_vms = int(request.form['num_vms'])
         topology_type = request.form['topology_type']
         topology_data = request.form.get('topology_data', '')
-        global_image_name = request.form.get('global_image', 'ubuntu:latest')
         zona_disponibilidad = request.form.get('zona_disponibilidad', 'default')
         
-        # 🟢 OBTENER O CREAR LA IMAGEN CON ID MANUAL
-        imagen = Imagen.query.filter_by(nombre=global_image_name).first()
-        if not imagen:
-            # 🟢 Obtener el próximo ID disponible
-            max_id = db.session.query(db.func.max(Imagen.idimagen)).scalar()
-            next_id = (max_id or 0) + 1
-            
-            # Crear imagen con ID manual
-            imagen = Imagen(
-                idimagen=next_id,  # 🟢 ID manual
-                nombre=global_image_name,
-                ruta=f'/images/{global_image_name}'
-            )
-            db.session.add(imagen)
-            db.session.commit()
-        
-        # Crear slice sin security
+        # Crear slice
         new_slice = Slice(
             nombre=slice_name,
             estado='STOPPED',
@@ -285,14 +269,28 @@ def create_slice():
         # Add current user to slice
         new_slice.usuarios.append(user)
         
-        # Crear instancias
+        # Crear instancias - MODIFICADO para imagen individual e internet
         for i in range(1, num_vms + 1):
             vm_name = request.form.get(f'vm_{i}_name', f'VM{i}')
             vm_cpu = request.form.get(f'vm_{i}_cpu', '1')
             vm_ram = request.form.get(f'vm_{i}_ram', '1GB')
             vm_storage = request.form.get(f'vm_{i}_storage', '10GB')
-            vm_internet = request.form.get(f'vm_{i}_internet', 'false') == 'true'
+            vm_internet = request.form.get(f'vm_{i}_internet') == 'on'  # Checkbox individual
             vm_ip = request.form.get(f'vm_{i}_ip', '')
+            vm_image_name = request.form.get(f'vm_{i}_image', 'ubuntu:latest')  # Imagen individual
+            
+            # Obtener o crear la imagen específica para esta VM
+            imagen = Imagen.query.filter_by(nombre=vm_image_name).first()
+            if not imagen:
+                max_id = db.session.query(db.func.max(Imagen.idimagen)).scalar()
+                next_id = (max_id or 0) + 1
+                imagen = Imagen(
+                    idimagen=next_id,
+                    nombre=vm_image_name,
+                    ruta=f'/images/{vm_image_name}'
+                )
+                db.session.add(imagen)
+                db.session.commit()
             
             instance = Instancia(
                 slice_idslice=new_slice.idslice,
@@ -300,8 +298,8 @@ def create_slice():
                 cpu=vm_cpu,
                 ram=vm_ram,
                 storage=vm_storage,
-                salidainternet=vm_internet,
-                imagen_idimagen=imagen.idimagen,  # Usar el ID de la imagen
+                salidainternet=vm_internet,  # Internet individual
+                imagen_idimagen=imagen.idimagen,  # Imagen individual
                 ip=vm_ip if vm_ip else None,
                 vnc_idvnc=None,
                 worker_idworker=None
@@ -319,8 +317,6 @@ def create_slice():
     return render_template('create_slice2.html', 
                          imagenes=imagenes_disponibles,
                          zonas=zonas_disponibles)
-
-
 
 @app.route('/slice/<int:slice_id>')
 def slice_detail(slice_id):
@@ -490,8 +486,8 @@ def delete_slice(slice_id):
             'success': False,
             'error': f'Error deleting slice: {str(e)}'
         }), 500
-"""
-@app.route('/download_topology/<int:slice_id>')
+
+"""@app.route('/download_topology/<int:slice_id>')
 def download_topology(slice_id):
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401

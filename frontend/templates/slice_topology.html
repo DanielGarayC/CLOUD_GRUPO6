@@ -3,82 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeleFlow - Topología del Slice</title>
+    <title>VNRT - Topología del Slice</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/create_slice.css') }}" rel="stylesheet">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
-        /* Estilos específicos para topología - evitar conflictos con dashboard.css */
-        #topology-viewer {
-            height: 500px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            margin: 20px 0;
-            position: relative;
-            background: white;
+        .main-container {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
         }
-
-        /* Controles de navegación estilo dashboard pero específicos para topología */
-        .topology-navigation-controls {
+        
+        .slice-designer {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .step-header {
             display: flex;
-            gap: 8px;
             align-items: center;
-            flex-wrap: wrap;
-            z-index: 1000 !important;
+            margin-bottom: 25px;
         }
-
-        .topology-navigation-controls .btn {
-            border-radius: 6px;
-            font-size: 0.85rem;
-            padding: 8px 12px;
-            border: 1px solid #dee2e6;
-            background: white;
-            color: #495057;
-            transition: all 0.2s ease;
-            z-index: 1001 !important;
-            position: relative;
-        }
-
-        .topology-navigation-controls .btn:hover {
-            background: #28a745;
-            border-color: #28a745;
+        
+        .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .topology-navigation-controls .btn:focus {
-            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
-        }
-
-        /* Panel de zoom circular como en la imagen */
-        .topology-zoom-panel {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            z-index: 1000 !important;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .topology-zoom-panel-right {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000 !important;
-            display: flex;
-            gap: 5px;
-        }
-
-        /* Botones circulares de navegación (flechas) */
-        .nav-btn-circular {
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background: #28a745;
-            border: 2px solid #1e7e34;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        
+        .step-title {
+            color: #2c3e50;
+            margin: 0;
+            font-weight: 600;
+        }
+        
+        .info-card {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 2px solid #2196f3;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .info-card h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .info-card .value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #0d47a1;
+            margin-bottom: 5px;
+        }
+        
+        .info-card .label {
+            color: #1976d2;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .status-running {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-stopped {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        #topology-viewer {
+            height: 500px;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            background: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .vm-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 2px solid #dee2e6;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .vm-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            border-color: #667eea;
+        }
+        
+        .vm-card h5 {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .vm-detail {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 5px 0;
+        }
+        
+        .vm-detail .label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .vm-detail .value {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        /* Controles de navegación estilo create_slice */
+        .topology-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: grid;
+            grid-template-columns: 40px 40px 40px;
+            grid-template-rows: 40px 40px 40px;
+            gap: 5px;
+        }
+        
+        .topology-zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .nav-control-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 2px solid #5a6fd8;
             color: white;
             display: flex;
             align-items: center;
@@ -86,273 +178,281 @@
             cursor: pointer;
             transition: all 0.3s ease;
             font-size: 14px;
-            z-index: 1001 !important;
-            position: relative;
         }
-
-        .nav-btn-circular:hover {
-            background: #1e7e34;
+        
+        .nav-control-btn:hover {
             transform: scale(1.1);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
-
-        /* Botones circulares de zoom */
-        .zoom-btn-circular {
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            background: #28a745;
-            border: 2px solid #1e7e34;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 16px;
-            font-weight: bold;
-            z-index: 1001 !important;
-            position: relative;
-        }
-
-        .zoom-btn-circular:hover {
-            background: #1e7e34;
-            transform: scale(1.1);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
-
-        /* Disposición en cruz para navegación */
-        .nav-controls-cross {
+        
+        .topology-info {
             position: absolute;
-            bottom: 80px;
-            left: 20px;
-            z-index: 1000 !important;
-            display: grid;
-            grid-template-columns: 40px 40px 40px;
-            grid-template-rows: 40px 40px 40px;
-            gap: 5px;
-        }
-
-        .nav-up { grid-column: 2; grid-row: 1; }
-        .nav-left { grid-column: 1; grid-row: 2; }
-        .nav-center { grid-column: 2; grid-row: 2; }
-        .nav-right { grid-column: 3; grid-row: 2; }
-        .nav-down { grid-column: 2; grid-row: 3; }
-
-        /* Panel de información de zoom */
-        .zoom-info-panel {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 1000 !important;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
             background: rgba(255, 255, 255, 0.95);
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
             padding: 10px 15px;
             font-size: 0.9rem;
             color: #495057;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-
-        .instance-card {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-            background: white;
+        
+        .btn-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 12px 25px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
         }
-
-        /* Asegurar que los elementos no sean ocultados por z-index */
-        .topology-controls-container {
-            position: relative;
-            z-index: 1000 !important;
+        
+        .btn-gradient:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+            color: white;
         }
-
-        .topology-controls-container * {
-            z-index: 1001 !important;
+        
+        .internet-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
         }
-
-        /* Media queries para responsivo */
-        @media (max-width: 768px) {
-            .topology-navigation-controls {
-                justify-content: center;
-                margin-bottom: 15px;
-            }
-            
-            .nav-controls-cross {
-                bottom: 120px;
-                left: 10px;
-            }
-            
-            .topology-zoom-panel-right {
-                bottom: 10px;
-                right: 10px;
-            }
-            
-            .zoom-info-panel {
-                top: 10px;
-                right: 10px;
-                font-size: 0.8rem;
-                padding: 8px 12px;
-            }
+        
+        .internet-yes {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .internet-no {
+            background-color: #f8d7da;
+            color: #721c24;
         }
     </style>
 </head>
-<body class="dashboard-body">
-    <div class="container-fluid p-0">
-        <!-- Navigation -->
-        <nav class="navbar navbar-expand-lg">
-            <div class="container-fluid">
-                <div class="navbar-brand">
-                    <i class="fas fa-cloud me-2"></i>
-                    <strong>TeleFlow</strong>
-                    <span class="ms-2 text-muted">| Topología del Slice</span>
-                </div>
-                <div class="navbar-nav ms-auto">
-                    <div class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle user-menu" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user-circle me-1"></i>{{ session.username }}
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid">
+            <div class="navbar-brand">
+                <i class="fas fa-cloud me-2"></i>
+                <strong>VNRT</strong>
+                <span class="ms-2 text-muted">| Topología del Slice</span>
+            </div>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-1"></i>{{ session.username or 'Usuario' }}
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end">
+                        <a class="dropdown-item" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                         </a>
-                        <div class="dropdown-menu dropdown-menu-end">
-                            <a class="dropdown-item" href="{{ url_for('dashboard') }}">
-                                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
-                            </a>
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="{{ url_for('logout') }}">
-                                <i class="fas fa-sign-out-alt me-1"></i>Logout
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Main Content -->
-        <div class="main-content">
-            <div class="page-header">
-                <h1 class="page-title">Topología del Slice #{{ slice.id }}</h1>
-                <p class="page-subtitle">Vista interactiva de la topología de red</p>
-            </div>
-
-            <!-- Slice Info -->
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="content-card text-center">
-                        <h5>{{ slice.instancias|length }}</h5>
-                        <p class="text-muted mb-0">Instancias</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="content-card text-center">
-                        <h5>{{ slice.estado }}</h5>
-                        <p class="text-muted mb-0">Estado</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="content-card text-center">
-                        <h5>{{ slice.fecha_creacion.strftime('%Y-%m-%d') }}</h5>
-                        <p class="text-muted mb-0">Creación</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="content-card text-center">
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">
-                            <i class="fas fa-arrow-left me-1"></i>Volver
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt me-1"></i>Logout
                         </a>
                     </div>
                 </div>
             </div>
+        </div>
+    </nav>
 
-            <!-- Topology Visualization -->
-            <div class="content-card mb-4">
-                <div class="topology-controls-container">
-                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
-                        <h4><i class="fas fa-project-diagram me-2"></i>Topología de Red</h4>
-                    
-                    </div>
+    <div class="main-container">
+        <!-- Información del Slice -->
+        <div class="slice-designer">
+            <div class="step-header">
+                <div class="step-number">
+                    <i class="fas fa-info-circle"></i>
                 </div>
-                
-                <div class="position-relative">
-                    <div id="topology-viewer"></div>
-                    
-                    <!-- Panel de información de zoom (top-right) -->
-                    <div class="zoom-info-panel">
-                        <div class="d-flex align-items-center gap-2">
-                            <small class="text-muted">Nodos: {{ slice.instancias|length }}</small>
-                            <span>|</span>
-                            <small class="text-muted">Conexiones: 0</small>
-                        </div>
-                    </div>
-                    
-                    <!-- Controles de navegación en cruz (bottom-left) -->
-                    <div class="nav-controls-cross">
-                        <div class="nav-btn-circular nav-up" onclick="panUp()" title="Arriba">
-                            <i class="fas fa-chevron-up"></i>
-                        </div>
-                        <div class="nav-btn-circular nav-left" onclick="panLeft()" title="Izquierda">
-                            <i class="fas fa-chevron-left"></i>
-                        </div>
-                        <div class="nav-btn-circular nav-center" onclick="centerView()" title="Centrar">
-                            <i class="fas fa-crosshairs"></i>
-                        </div>
-                        <div class="nav-btn-circular nav-right" onclick="panRight()" title="Derecha">
-                            <i class="fas fa-chevron-right"></i>
-                        </div>
-                        <div class="nav-btn-circular nav-down" onclick="panDown()" title="Abajo">
-                            <i class="fas fa-chevron-down"></i>
-                        </div>
-                    </div>
-                    
-                    <!-- Controles de zoom (bottom-right) -->
-                    <div class="topology-zoom-panel-right">
-                        <div class="zoom-btn-circular" onclick="fitToScreen()" title="Ajustar pantalla">
-                            <i class="fas fa-expand-arrows-alt"></i>
-                        </div>
-                        <div class="zoom-btn-circular" onclick="zoomOut()" title="Zoom Out">
-                            <i class="fas fa-minus"></i>
-                        </div>
-                        <div class="zoom-btn-circular" onclick="zoomIn()" title="Zoom In">
-                            <i class="fas fa-plus"></i>
-                        </div>
-                    </div>
-                </div>
+                <h3 class="step-title">{{ slice.nombre or 'Slice #' + slice.idslice|string }}</h3>
             </div>
 
-            <!-- Instance Details -->
-            <div class="content-card">
-                <h4><i class="fas fa-server me-2"></i>Detalles de Instancias</h4>
-                <div class="row">
-                    {% for instance in slice.instancias %}
-                    <div class="col-md-6">
-                        <div class="instance-card">
-                            <h6><i class="fas fa-desktop me-2"></i>{{ instance.nombre }}</h6>
-                            <div class="row">
-                                <div class="col-sm-6">
-                                    <p><strong>CPU:</strong> {{ instance.cpu }}</p>
-                                    <p><strong>RAM:</strong> {{ instance.ram }}</p>
-                                </div>
-                                <div class="col-sm-6">
-                                    <p><strong>Storage:</strong> {{ instance.storage }}</p>
-                                    <p><strong>Imagen:</strong> {{ instance.imagen }}</p>
-                                </div>
-                            </div>
-                            <span class="badge bg-{{ 'success' if instance.estado == 'RUNNING' else 'secondary' }}">
-                                {{ instance.estado }}
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="value">{{ slice.instancias|length }}</div>
+                        <div class="label">Máquinas Virtuales</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="value">
+                            <span class="status-badge status-{{ 'running' if slice.estado == 'RUNNING' else 'stopped' }}">
+                                {{ slice.estado }}
                             </span>
                         </div>
+                        <div class="label">Estado del Slice</div>
                     </div>
-                    {% endfor %}
                 </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="value">{{ slice.fecha_creacion.strftime('%d/%m/%Y') if slice.fecha_creacion else 'N/A' }}</div>
+                        <div class="label">Fecha de Creación</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="value">{{ slice.zonadisponibilidad or 'default' }}</div>
+                        <div class="label">Zona Disponibilidad</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-lg w-100">
+                        <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url_for('edit_slice', slice_id=slice.idslice) }}" class="btn btn-gradient btn-lg w-100">
+                        <i class="fas fa-edit me-2"></i>Editar Slice
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visualización de Topología -->
+        <div class="slice-designer">
+            <div class="step-header">
+                <div class="step-number">
+                    <i class="fas fa-project-diagram"></i>
+                </div>
+                <h3 class="step-title">Topología de Red</h3>
+            </div>
+            
+            <div class="position-relative">
+                <div id="topology-viewer">
+                    <!-- Información de topología -->
+                    <div class="topology-info">
+                        <div><i class="fas fa-circle me-1"></i>Nodos: <span id="node-count">{{ slice.instancias|length }}</span></div>
+                        <div><i class="fas fa-link me-1"></i>Conexiones: <span id="edge-count">0</span></div>
+                    </div>
+                    
+                    <!-- Controles de navegación (cruz) -->
+                    <div class="topology-controls">
+                        <div></div>
+                        <div class="nav-control-btn" onclick="panUp()" title="Mover arriba" style="grid-column: 2; grid-row: 1;">
+                            <i class="fas fa-chevron-up"></i>
+                        </div>
+                        <div></div>
+                        
+                        <div class="nav-control-btn" onclick="panLeft()" title="Mover izquierda" style="grid-column: 1; grid-row: 2;">
+                            <i class="fas fa-chevron-left"></i>
+                        </div>
+                        <div class="nav-control-btn" onclick="centerView()" title="Centrar vista" style="grid-column: 2; grid-row: 2;">
+                            <i class="fas fa-crosshairs"></i>
+                        </div>
+                        <div class="nav-control-btn" onclick="panRight()" title="Mover derecha" style="grid-column: 3; grid-row: 2;">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                        
+                        <div></div>
+                        <div class="nav-control-btn" onclick="panDown()" title="Mover abajo" style="grid-column: 2; grid-row: 3;">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div></div>
+                    </div>
+                    
+                    <!-- Controles de zoom -->
+                    <div class="topology-zoom-controls">
+                        <div class="nav-control-btn" onclick="fitToScreen()" title="Ajustar a pantalla">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                        </div>
+                        <div class="nav-control-btn" onclick="zoomIn()" title="Zoom In">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                        <div class="nav-control-btn" onclick="zoomOut()" title="Zoom Out">
+                            <i class="fas fa-minus"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detalles de las VMs -->
+        <div class="slice-designer">
+            <div class="step-header">
+                <div class="step-number">
+                    <i class="fas fa-server"></i>
+                </div>
+                <h3 class="step-title">Detalles de Máquinas Virtuales</h3>
+            </div>
+            
+            <div class="row">
+                {% for instance in slice.instancias %}
+                <div class="col-lg-6 col-xl-4 mb-3">
+                    <div class="vm-card">
+                        <h5>
+                            <i class="fas fa-desktop me-2"></i>{{ instance.nombre }}
+                            <span class="status-badge status-{{ 'running' if instance.estado == 'RUNNING' else 'stopped' }} float-end">
+                                {{ instance.estado }}
+                            </span>
+                        </h5>
+                        
+                        <div class="vm-detail">
+                            <span class="label"><i class="fas fa-microchip me-1"></i>CPU:</span>
+                            <span class="value">{{ instance.cpu }} core(s)</span>
+                        </div>
+                        
+                        <div class="vm-detail">
+                            <span class="label"><i class="fas fa-memory me-1"></i>RAM:</span>
+                            <span class="value">{{ instance.ram }}</span>
+                        </div>
+                        
+                        <div class="vm-detail">
+                            <span class="label"><i class="fas fa-hdd me-1"></i>Storage:</span>
+                            <span class="value">{{ instance.storage }}</span>
+                        </div>
+                        
+                        <div class="vm-detail">
+                            <span class="label"><i class="fas fa-compact-disc me-1"></i>Imagen:</span>
+                            <span class="value">{{ instance.imagen.nombre if instance.imagen else 'N/A' }}</span>
+                        </div>
+                        
+                        {% if instance.ip %}
+                        <div class="vm-detail">
+                            <span class="label"><i class="fas fa-network-wired me-1"></i>IP:</span>
+                            <span class="value">{{ instance.ip }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="vm-detail">
+                            <span class="label"><i class="fas fa-globe me-1"></i>Internet:</span>
+                            <span class="internet-badge internet-{{ 'yes' if instance.salidainternet else 'no' }}">
+                                {{ 'Sí' if instance.salidainternet else 'No' }}
+                            </span>
+                        </div>
+                        
+                        {% if instance.vnc %}
+                        <div class="vm-detail">
+                            <span class="label"><i class="fas fa-desktop me-1"></i>VNC:</span>
+                            <span class="value">{{ instance.vnc.puerto if instance.vnc.puerto else 'N/A' }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if instance.worker %}
+                        <div class="vm-detail">
+                            <span class="label"><i class="fas fa-server me-1"></i>Worker:</span>
+                            <span class="value">{{ instance.worker.nombre if instance.worker.nombre else 'N/A' }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Variables globales
         let network;
         let currentScale = 1;
-        const panStep = 100; // Pixels para moverse en cada dirección
+        let edgeCount = 0;
 
         document.addEventListener('DOMContentLoaded', function() {
             const container = document.getElementById('topology-viewer');
@@ -360,33 +460,77 @@
             // Get topology data from slice
             const topologyData = {{ slice.get_topology_data() | tojson if slice.get_topology_data() else '{"nodes": [], "edges": []}' | safe }};
             
+            // If no topology data, create default nodes for each instance
+            if (!topologyData.nodes || topologyData.nodes.length === 0) {
+                topologyData.nodes = [];
+                topologyData.edges = [];
+                
+                {% for instance in slice.instancias %}
+                topologyData.nodes.push({
+                    id: {{ loop.index }},
+                    label: "{{ instance.nombre }}",
+                    x: Math.random() * 400 - 200,
+                    y: Math.random() * 300 - 150
+                });
+                {% endfor %}
+            }
+            
             // Initialize Vis.js network
             const nodes = new vis.DataSet(topologyData.nodes || []);
             const edges = new vis.DataSet(topologyData.edges || []);
+            
+            edgeCount = edges.length;
+            document.getElementById('edge-count').textContent = edgeCount;
             
             const data = { nodes: nodes, edges: edges };
             const options = {
                 nodes: {
                     shape: 'circle',
-                    size: 30,
-                    font: { size: 16, color: '#333333', face: 'Arial' },
-                    borderWidth: 2,
-                    color: { background: '#28a745', border: '#1e7e34' },
-                    shadow: { enabled: true, color: 'rgba(0,0,0,0.2)', size: 5, x: 2, y: 2 }
+                    size: 35,
+                    font: { 
+                        size: 16, 
+                        color: '#333333', 
+                        face: 'Arial',
+                        background: 'rgba(255,255,255,0.8)',
+                        strokeWidth: 2,
+                        strokeColor: '#ffffff'
+                    },
+                    borderWidth: 3,
+                    color: { 
+                        background: '#28a745', 
+                        border: '#1e7e34',
+                        highlight: { background: '#20c997', border: '#17a2b8' }
+                    },
+                    shadow: { 
+                        enabled: true, 
+                        color: 'rgba(0,0,0,0.3)', 
+                        size: 8, 
+                        x: 3, 
+                        y: 3 
+                    }
                 },
                 edges: {
-                    width: 3,
-                    color: '#848484',
-                    smooth: { type: 'continuous' },
-                    shadow: { enabled: true, color: 'rgba(0,0,0,0.1)', size: 3, x: 1, y: 1 }
+                    width: 4,
+                    color: '#6c757d',
+                    smooth: { 
+                        type: 'continuous',
+                        roundness: 0.5
+                    },
+                    shadow: { 
+                        enabled: true, 
+                        color: 'rgba(0,0,0,0.2)', 
+                        size: 4, 
+                        x: 2, 
+                        y: 2 
+                    }
                 },
                 physics: {
                     enabled: true,
-                    stabilization: { enabled: true, iterations: 100 },
+                    stabilization: { enabled: true, iterations: 200 },
                     barnesHut: {
                         gravitationalConstant: -2000,
                         centralGravity: 0.3,
-                        springLength: 95,
+                        springLength: 120,
                         springConstant: 0.04,
                         damping: 0.09
                     }
@@ -395,23 +539,50 @@
                     hover: true,
                     tooltipDelay: 200,
                     dragView: true,
-                    zoomView: true
+                    zoomView: true,
+                    selectConnectedEdges: false
                 }
             };
             
             network = new vis.Network(container, data, options);
             
-            // Event listeners para zoom
+            // Event listeners
             network.on('zoom', function(params) {
                 currentScale = params.scale;
             });
             
-            // Add click event for nodes
             network.on('click', function(params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
                     const node = nodes.get(nodeId);
-                    alert(`Nodo: ${node.label}\nID: ${nodeId}`);
+                    
+                    // Find corresponding instance data
+                    const instanceData = [
+                        {% for instance in slice.instancias %}
+                        {
+                            nombre: "{{ instance.nombre }}",
+                            cpu: "{{ instance.cpu }}",
+                            ram: "{{ instance.ram }}",
+                            storage: "{{ instance.storage }}",
+                            imagen: "{{ instance.imagen.nombre if instance.imagen else 'N/A' }}",
+                            estado: "{{ instance.estado }}",
+                            internet: {{ 'true' if instance.salidainternet else 'false' }},
+                            ip: "{{ instance.ip or 'N/A' }}"
+                        }{{ ',' if not loop.last else '' }}
+                        {% endfor %}
+                    ];
+                    
+                    if (instanceData[nodeId - 1]) {
+                        const instance = instanceData[nodeId - 1];
+                        alert(`🖥️ ${instance.nombre}\n\n` +
+                              `💻 CPU: ${instance.cpu}\n` +
+                              `🧠 RAM: ${instance.ram}\n` +
+                              `💾 Storage: ${instance.storage}\n` +
+                              `💿 Imagen: ${instance.imagen}\n` +
+                              `🌐 Internet: ${instance.internet ? 'Sí' : 'No'}\n` +
+                              `📡 IP: ${instance.ip}\n` +
+                              `📊 Estado: ${instance.estado}`);
+                    }
                 }
             });
             
@@ -476,12 +647,11 @@
             }
         }
 
-        // Funciones de paneo (movimiento)
         function panUp() {
             if (network) {
                 const position = network.getViewPosition();
                 network.moveTo({
-                    position: { x: position.x, y: position.y - panStep },
+                    position: { x: position.x, y: position.y - 100 },
                     scale: currentScale,
                     animation: { duration: 300 }
                 });
@@ -492,7 +662,7 @@
             if (network) {
                 const position = network.getViewPosition();
                 network.moveTo({
-                    position: { x: position.x, y: position.y + panStep },
+                    position: { x: position.x, y: position.y + 100 },
                     scale: currentScale,
                     animation: { duration: 300 }
                 });
@@ -503,7 +673,7 @@
             if (network) {
                 const position = network.getViewPosition();
                 network.moveTo({
-                    position: { x: position.x - panStep, y: position.y },
+                    position: { x: position.x - 100, y: position.y },
                     scale: currentScale,
                     animation: { duration: 300 }
                 });
@@ -514,7 +684,7 @@
             if (network) {
                 const position = network.getViewPosition();
                 network.moveTo({
-                    position: { x: position.x + panStep, y: position.y },
+                    position: { x: position.x + 100, y: position.y },
                     scale: currentScale,
                     animation: { duration: 300 }
                 });
