@@ -200,6 +200,8 @@ services:
       - SSH_KEY=/home/ubuntu/.ssh/id_rsa_orch
       - USER=ubuntu
       - OVS_BRIDGE=br-int
+    volumes:
+      - /home/ubuntu/.ssh:/home/ubuntu/.ssh:ro
     networks: [cloudnet]
 
 # Kafka
