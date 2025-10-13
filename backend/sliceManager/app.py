@@ -17,7 +17,7 @@ DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}"
 engine = create_engine(DATABASE_URL)
 
 # Servicio de monitoreo en el headnode
-MONITORING_URL = "http://10.0.10.1:5010/metrics"
+MONITORING_URL = "http://monitoring_service:5010/metrics"
 NETWORK_BASE = "http://network_manager:8100"
 
 # Mapeo estático de workers
