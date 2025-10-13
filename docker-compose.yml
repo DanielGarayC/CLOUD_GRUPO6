@@ -195,14 +195,16 @@ services:
     build: ./backend/linux-driver
     container_name: linux-driver
     ports:
-      - "9100:8000"
+      - "9100:9100"
     environment:
       - SSH_KEY=/home/ubuntu/.ssh/id_rsa_orch
       - USER=ubuntu
       - OVS_BRIDGE=br-int
     volumes:
       - /home/ubuntu/.ssh:/home/ubuntu/.ssh:ro
-    networks: [cloudnet]
+    networks:
+      - cloudnet
+
 
 # Kafka
   
