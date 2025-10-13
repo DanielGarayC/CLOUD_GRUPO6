@@ -355,7 +355,7 @@ def create_slice():
             # Crear slice
             new_slice = Slice(
                 nombre=slice_name,
-                estado='STOPPED',
+                estado='DRAW',
                 zonadisponibilidad=zona_disponibilidad,
                 fecha_creacion=datetime.now().date()
             )
@@ -703,8 +703,8 @@ def edit_slice(slice_id):
         return redirect(url_for('dashboard'))
     
     # Check if slice is in STOPPED state
-    if slice_obj.estado != 'STOPPED':
-        flash('Solo se pueden editar slices en estado STOPPED', 'error')
+    if slice_obj.estado not in ['STOPPED', 'DRAW']:
+        flash('Solo se pueden editar slices en estado STOPPED o DRAW', 'error')
         return redirect(url_for('dashboard'))
     
     # 🟢 SINCRONIZAR TOPOLOGÍA CON ENLACES DE LA BASE DE DATOS
@@ -913,6 +913,102 @@ def update_slice(slice_id):
             'error': f'Error updating slice: {str(e)}'
         }), 500
 
+
+@app.route('/deploy_slice/<int:slice_id>', methods=['POST'])
+def deploy_slice(slice_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 401
+    
+    slice_obj = Slice.query.get_or_404(slice_id)
+    
+    # Check if user can access this slice
+    if not can_access_slice(user, slice_obj):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    # 🟢 VERIFICAR QUE EL SLICE ESTÉ EN ESTADO DRAW
+    if slice_obj.estado != 'DRAW':
+        return jsonify({
+            'error': f'El slice debe estar en estado DRAW para desplegarse. Estado actual: {slice_obj.estado}'
+        }), 400
+    
+    try:
+        # 🟢 ENVIAR SOLICITUD AL SLICE MANAGER
+        SLICE_MANAGER_URL = os.getenv("SLICE_MANAGER_URL", "http://localhost:8000")
+        payload = {"id_slice": slice_id}
+        
+        print(f"🚀 Enviando solicitud de despliegue para slice {slice_id}...")
+        
+        response = requests.post(
+            f"{SLICE_MANAGER_URL}/placement/deploy",
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            deployment_result = response.json()
+            
+            # 🟢 ACTUALIZAR ESTADO DEL SLICE
+            if deployment_result.get('can_deploy', False):
+                slice_obj.estado = 'DEPLOYING'
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Slice "{slice_obj.nombre}" enviado a despliegue exitosamente',
+                    'deployment_plan': deployment_result.get('placement_plan', []),
+                    'workers_status': deployment_result.get('workers_status', []),
+                    'new_status': 'DEPLOYING'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'El slice no puede ser desplegado en este momento',
+                    'details': deployment_result.get('error', 'Recursos insuficientes')
+                })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Error del Slice Manager: {response.status_code}',
+                'details': response.text
+            })
+            
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            'success': False,
+            'error': 'Error de comunicación con Slice Manager',
+            'details': str(e)
+        }), 500
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Error interno del servidor',
+            'details': str(e)
+        }), 500
+
+@app.route('/check_slice_status/<int:slice_id>')
+def check_slice_status(slice_id):
+    """Endpoint para verificar el estado actual de un slice"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    user = User.query.get(session['user_id'])
+    slice_obj = Slice.query.get_or_404(slice_id)
+    
+    if not can_access_slice(user, slice_obj):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    return jsonify({
+        'slice_id': slice_id,
+        'nombre': slice_obj.nombre,
+        'estado': slice_obj.estado,
+        'can_deploy': slice_obj.estado == 'DRAW',
+        'total_vms': len(slice_obj.instancias)
+    })
 
 if __name__ == '__main__':
     initialize_database()
