@@ -141,7 +141,7 @@ def generar_plan_deploy(id_slice: int,metrics_json: dict, instancias: list):
 
         # Parte NETWORK MANAGER
 
-        vlans_vm = [e["numero"] for e in enlaces if vm["nombre"] in (e["vm1"], e["vm2"])]
+        vlans_vm = [e["numero"] for e in enlaces if vm["idinstancia"] in (e["vm1"], e["vm2"])]
 
         # Si la VM tiene salida a internet, agregar VLAN de internet
         if vm.get("salidainternet"):
