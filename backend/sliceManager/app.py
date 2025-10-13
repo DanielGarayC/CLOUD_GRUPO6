@@ -69,6 +69,32 @@ def obtener_enlaces_por_slice(id_slice: int):
     with engine.connect() as conn:
         result = conn.execute(query, {"id_slice": id_slice})
         return [dict(row._mapping) for row in result]
+
+def asignar_vlans_a_enlaces(id_slice: int):
+    """
+    Revisa los enlaces del slice y asigna VLANs nuevas si no tienen ninguna.
+    Devuelve la lista de enlaces actualizada.
+    """
+    enlaces = obtener_enlaces_por_slice(id_slice)
+    for e in enlaces:
+        if e["vlan_idvlan"] is None:
+            vlan_info = solicitar_vlan()
+            if vlan_info and vlan_info.get("idvlan"):
+                idvlan = vlan_info["idvlan"]
+                # Guardar en BD
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        UPDATE enlace
+                        SET vlan_idvlan = :idvlan
+                        WHERE idenlace = :idenlace
+                    """), {"idvlan": idvlan, "idenlace": e["idenlace"]})
+                # Actualizar en memoria
+                e["vlan_idvlan"] = idvlan
+                print(f"🔗 Enlace {e['idenlace']} → VLAN asignada {idvlan}")
+            else:
+                print(f"⚠️ No se pudo asignar VLAN al enlace {e['idenlace']}")
+    return enlaces
+
 # ======================================
 # FUNCIÓN: generar plan de despliegue
 # ======================================
@@ -97,7 +123,7 @@ def generar_plan_deploy(id_slice: int,metrics_json: dict, instancias: list):
     # Asignación Round-Robin
     plan = []
     idx = 0
-    enlaces = obtener_enlaces_por_slice(id_slice)
+    enlaces = asignar_vlans_a_enlaces(id_slice)
 
     for vm in instancias:
         w = workers[idx]
@@ -329,8 +355,9 @@ def deploy_slice(data: dict = Body(...)):
                            #WHERE idvlan = :vlan_id
                         #"""), {"vlan_id": vlan_id})
 
-            #else:
+            else:
                 # ❌ Fallo → rollback de VM y marcar como FAILED
+                print("fashó")
                 fallos += 1
                 #try:
                     #requests.post("http://linux-driver:9100/delete_vm", json={
@@ -347,18 +374,18 @@ def deploy_slice(data: dict = Body(...)):
                         #WHERE nombre = :vm AND slice_idslice = :sid
                     #"""), {"vm": vm["nombre_vm"], "sid": id_slice})
 
-            #resultados.append({
-                #"vm": vm["nombre_vm"],
-                #"worker": vm["worker"],
-                #"vlans": vm["vlans"],
-                #"puerto_vnc": vm["puerto_vnc"],
-                #"pid": pid,
-                #"status": ok,
-                #"mensaje": msg
-            #})
+            resultados.append({
+                "vm": vm["nombre_vm"],
+                "worker": vm["worker"],
+                "vlans": vm["vlans"],
+                "puerto_vnc": vm["puerto_vnc"],
+                "pid": pid,
+                "status": ok,
+                "mensaje": msg
+            })
 
-    # 4️⃣ Estado final del slice
-    #estado_final = "RUNNING" if fallos == 0 else "ERROR"
+    # Estado final del slice
+    estado_final = "RUNNING" if fallos == 0 else "ERROR"
     #with engine.begin() as conn:
         #conn.execute(text("""
             #UPDATE slice 
