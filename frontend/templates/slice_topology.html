@@ -6,144 +6,98 @@
     <title>TeleFlow - Topología del Slice</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/create_slice.css') }}" rel="stylesheet">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
-        .main-container {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-            padding: 20px;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f8fafc; min-height: 100vh; }
+        
+        .top-bar { 
+            background: #ffffff; 
+            border-bottom: 1px solid #e2e8f0; 
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); 
+            padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
         }
         
-        .slice-designer {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        .topology-page {
+            padding-top: 80px;
         }
         
-        .step-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 25px;
-        }
+        .navbar-brand { font-size: 1.5rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.75rem; }
+        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25); }
         
-        .step-number {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            margin-right: 15px;
-        }
+        .main-content { max-width: 1400px; margin: 0 auto; padding: 2rem 1.5rem; }
         
-        .step-title {
-            color: #2c3e50;
-            margin: 0;
-            font-weight: 600;
-        }
+        .page-header { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15); }
+        .page-title { font-size: 2rem; font-weight: 700; color: white; margin-bottom: 0.5rem; }
+        .page-subtitle { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; margin: 0; }
+        
+        .content-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); padding: 2rem; margin-bottom: 2rem; }
+        
+        .info-cards-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         
         .info-card {
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-            border: 2px solid #2196f3;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
             text-align: center;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
         }
         
-        .info-card h3 {
-            color: #1976d2;
-            margin-bottom: 10px;
-            font-weight: 700;
+        .info-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
         
         .info-card .value {
-            font-size: 2.5rem;
+            font-size: 2rem;
             font-weight: 700;
-            color: #0d47a1;
-            margin-bottom: 5px;
+            color: #0f172a;
+            margin-bottom: 0.5rem;
         }
         
         .info-card .label {
-            color: #1976d2;
+            color: #64748b;
             font-weight: 500;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
-        .status-badge {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
+        .badge { padding: 0.35rem 0.85rem; border-radius: 16px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; border: 1px solid; }
+        .bg-success { background-color: #dcfce7 !important; color: #166534 !important; border-color: #86efac !important; }
+        .bg-danger { background-color: #fee2e2 !important; color: #991b1b !important; border-color: #fca5a5 !important; }
+        .bg-warning { background-color: #fef3c7 !important; color: #92400e !important; border-color: #fcd34d !important; }
+        .bg-info { background-color: #dbeafe !important; color: #1e40af !important; border-color: #93c5fd !important; }
+        .bg-secondary { background-color: #f1f5f9 !important; color: #475569 !important; border-color: #cbd5e1 !important; }
         
-        .status-running {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
+        .btn { font-weight: 500; border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.875rem; transition: all 0.2s ease; border: none; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .btn-outline-primary { color: #0ea5e9; border: 1px solid #bae6fd; background: #f0f9ff; }
+        .btn-outline-primary:hover { background: #e0f2fe; border-color: #7dd3fc; color: #0284c7; }
+        .btn-outline-secondary { color: #64748b; border: 1px solid #cbd5e1; background: #f8fafc; }
+        .btn-outline-secondary:hover { background: #e2e8f0; border-color: #94a3b8; color: #475569; }
         
-        .status-stopped {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
+        .user-badge { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border: 1px solid #cbd5e1; border-radius: 10px; padding: 0.5rem 1rem; }
+        .user-avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
         
         #topology-viewer {
             height: 500px;
-            border: 2px solid #e9ecef;
-            border-radius: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
             background: white;
             position: relative;
             overflow: hidden;
         }
         
-        .vm-card {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            border: 2px solid #dee2e6;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 15px;
-            transition: all 0.3s ease;
-        }
-        
-        .vm-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-            border-color: #667eea;
-        }
-        
-        .vm-card h5 {
-            color: #2c3e50;
-            font-weight: 600;
-            margin-bottom: 15px;
-        }
-        
-        .vm-detail {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            padding: 5px 0;
-        }
-        
-        .vm-detail .label {
-            font-weight: 600;
-            color: #495057;
-        }
-        
-        .vm-detail .value {
-            color: #6c757d;
-            font-weight: 500;
-        }
-        
-        /* Controles de navegación estilo create_slice */
         .topology-controls {
             position: absolute;
             bottom: 20px;
@@ -169,8 +123,8 @@
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: 2px solid #5a6fd8;
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            border: 2px solid #0284c7;
             color: white;
             display: flex;
             align-items: center;
@@ -178,11 +132,12 @@
             cursor: pointer;
             transition: all 0.3s ease;
             font-size: 14px;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25);
         }
         
         .nav-control-btn:hover {
             transform: scale(1.1);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
         }
         
         .topology-info {
@@ -191,259 +146,396 @@
             right: 15px;
             z-index: 1000;
             background: rgba(255, 255, 255, 0.95);
-            border: 2px solid #e9ecef;
+            border: 1px solid #e2e8f0;
             border-radius: 10px;
             padding: 10px 15px;
-            font-size: 0.9rem;
-            color: #495057;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            font-size: 0.875rem;
+            color: #64748b;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         
-        .btn-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            color: white;
-            font-weight: 600;
-            padding: 12px 25px;
-            border-radius: 25px;
-            transition: all 0.3s ease;
+        .vm-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
         }
         
-        .btn-gradient:hover {
+        .vm-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-color: #0ea5e9;
+        }
+        
+        .vm-card h5 {
+            color: #0f172a;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .vm-detail {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .vm-detail:last-child {
+            border-bottom: none;
+        }
+        
+        .vm-detail .label {
+            font-weight: 500;
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+        
+        .vm-detail .value {
+            color: #0f172a;
+            font-weight: 500;
+            font-size: 0.875rem;
         }
         
         .internet-badge {
-            padding: 4px 10px;
+            padding: 0.25rem 0.75rem;
             border-radius: 12px;
-            font-size: 0.75em;
+            font-size: 0.75rem;
             font-weight: 600;
         }
         
         .internet-yes {
-            background-color: #d1ecf1;
-            color: #0c5460;
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
         }
         
         .internet-no {
-            background-color: #f8d7da;
-            color: #721c24;
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .section-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25);
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
         }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg">
-        <div class="container-fluid">
-            <div class="navbar-brand">
-                <i class="fas fa-cloud me-2"></i>
-                <strong>TeleFlow</strong>
-                <span class="ms-2 text-muted">| Topología del Slice</span>
-            </div>
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-circle me-1"></i>{{ session.username or 'Usuario' }}
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-end">
-                        <a class="dropdown-item" href="{{ url_for('dashboard') }}">
-                            <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+    <div class="topology-page">
+        <!-- Barra Superior -->
+        <nav class="top-bar">
+            <div class="container-fluid">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="logo-icon"><i class="fas fa-network-wired text-white"></i></div>
+                        <div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">TeleFlow</div>
+                            <small style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Network Orchestration</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="user-badge d-flex align-items-center gap-2">
+                            <div class="user-avatar"><i class="fas fa-user text-white" style="font-size: 0.75rem;"></i></div>
+                            <div>
+                                <div style="font-size: 0.875rem; font-weight: 600; color: #0f172a;">Usuario</div>
+                                <div style="font-size: 0.7rem; color: #64748b;">Administrador</div>
+                            </div>
+                        </div>
+                        <a href="#" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-sign-out-alt me-1"></i>Salir
                         </a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('logout') }}">
-                            <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Contenido Principal -->
+        <div class="main-content">
+            <div class="page-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="page-title">Slice #123 - Topología de Red</h1>
+                        <p class="page-subtitle">Visualiza y gestiona la topología de tu slice</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="#" class="btn btn-outline-secondary" style="background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                            <i class="fas fa-arrow-left me-2"></i>Dashboard
+                        </a>
+                        <a href="#" class="btn btn-success">
+                            <i class="fas fa-edit me-2"></i>Editar Slice
                         </a>
                     </div>
                 </div>
             </div>
-        </div>
-    </nav>
 
-    <div class="main-container">
-        <!-- Información del Slice -->
-        <div class="slice-designer">
-            <div class="step-header">
-                <div class="step-number">
-                    <i class="fas fa-info-circle"></i>
+            <!-- Información del Slice -->
+            <div class="info-cards-row">
+                <div class="info-card">
+                    <div class="value">5</div>
+                    <div class="label">Máquinas Virtuales</div>
                 </div>
-                <h3 class="step-title">{{ slice.nombre or 'Slice #' + slice.idslice|string }}</h3>
-            </div>
-
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="info-card">
-                        <div class="value">{{ slice.instancias|length }}</div>
-                        <div class="label">Máquinas Virtuales</div>
+                <div class="info-card">
+                    <div class="value">
+                        <span class="badge bg-success">
+                            <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>RUNNING
+                        </span>
                     </div>
+                    <div class="label">Estado del Slice</div>
                 </div>
-                <div class="col-md-3">
-                    <div class="info-card">
-                        <div class="value">
-                            <span class="status-badge status-{{ 'running' if slice.estado == 'RUNNING' else 'stopped' }}">
-                                {{ slice.estado }}
-                            </span>
-                        </div>
-                        <div class="label">Estado del Slice</div>
-                    </div>
+                <div class="info-card">
+                    <div class="value">22/10/2025</div>
+                    <div class="label">Fecha de Creación</div>
                 </div>
-                <div class="col-md-3">
-                    <div class="info-card">
-                        <div class="value">{{ slice.fecha_creacion.strftime('%d/%m/%Y') if slice.fecha_creacion else 'N/A' }}</div>
-                        <div class="label">Fecha de Creación</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="info-card">
-                        <div class="value">{{ slice.zonadisponibilidad or 'default' }}</div>
-                        <div class="label">Zona Disponibilidad</div>
-                    </div>
+                <div class="info-card">
+                    <div class="value">Default</div>
+                    <div class="label">Zona Disponibilidad</div>
                 </div>
             </div>
 
-            <div class="row mt-3">
-                <div class="col-md-6">
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-lg w-100">
-                        <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
-                    </a>
+            <!-- Visualización de Topología -->
+            <div class="content-card">
+                <div class="section-header">
+                    <div class="section-icon">
+                        <i class="fas fa-project-diagram text-white"></i>
+                    </div>
+                    <h3 class="section-title">Topología de Red</h3>
                 </div>
-                <div class="col-md-6">
-                    <a href="{{ url_for('edit_slice', slice_id=slice.idslice) }}" class="btn btn-gradient btn-lg w-100">
-                        <i class="fas fa-edit me-2"></i>Editar Slice
-                    </a>
+                
+                <div class="position-relative">
+                    <div id="topology-viewer">
+                        <!-- Información de topología -->
+                        <div class="topology-info">
+                            <div><i class="fas fa-circle me-1"></i>Nodos: <span id="node-count">5</span></div>
+                            <div><i class="fas fa-link me-1"></i>Conexiones: <span id="edge-count">0</span></div>
+                        </div>
+                        
+                        <!-- Controles de navegación (cruz) -->
+                        <div class="topology-controls">
+                            <div></div>
+                            <div class="nav-control-btn" onclick="panUp()" title="Mover arriba" style="grid-column: 2; grid-row: 1;">
+                                <i class="fas fa-chevron-up"></i>
+                            </div>
+                            <div></div>
+                            
+                            <div class="nav-control-btn" onclick="panLeft()" title="Mover izquierda" style="grid-column: 1; grid-row: 2;">
+                                <i class="fas fa-chevron-left"></i>
+                            </div>
+                            <div class="nav-control-btn" onclick="centerView()" title="Centrar vista" style="grid-column: 2; grid-row: 2;">
+                                <i class="fas fa-crosshairs"></i>
+                            </div>
+                            <div class="nav-control-btn" onclick="panRight()" title="Mover derecha" style="grid-column: 3; grid-row: 2;">
+                                <i class="fas fa-chevron-right"></i>
+                            </div>
+                            
+                            <div></div>
+                            <div class="nav-control-btn" onclick="panDown()" title="Mover abajo" style="grid-column: 2; grid-row: 3;">
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div></div>
+                        </div>
+                        
+                        <!-- Controles de zoom -->
+                        <div class="topology-zoom-controls">
+                            <div class="nav-control-btn" onclick="fitToScreen()" title="Ajustar a pantalla">
+                                <i class="fas fa-expand-arrows-alt"></i>
+                            </div>
+                            <div class="nav-control-btn" onclick="zoomIn()" title="Zoom In">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                            <div class="nav-control-btn" onclick="zoomOut()" title="Zoom Out">
+                                <i class="fas fa-minus"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Visualización de Topología -->
-        <div class="slice-designer">
-            <div class="step-header">
-                <div class="step-number">
-                    <i class="fas fa-project-diagram"></i>
+            <!-- Detalles de las VMs -->
+            <div class="content-card">
+                <div class="section-header">
+                    <div class="section-icon">
+                        <i class="fas fa-server text-white"></i>
+                    </div>
+                    <h3 class="section-title">Detalles de Máquinas Virtuales</h3>
                 </div>
-                <h3 class="step-title">Topología de Red</h3>
-            </div>
-            
-            <div class="position-relative">
-                <div id="topology-viewer">
-                    <!-- Información de topología -->
-                    <div class="topology-info">
-                        <div><i class="fas fa-circle me-1"></i>Nodos: <span id="node-count">{{ slice.instancias|length }}</span></div>
-                        <div><i class="fas fa-link me-1"></i>Conexiones: <span id="edge-count">0</span></div>
+                
+                <div class="row">
+                    <div class="col-lg-6 col-xl-4">
+                        <div class="vm-card">
+                            <h5>
+                                <span><i class="fas fa-desktop me-2"></i>VM-Web-Server</span>
+                                <span class="badge bg-success">RUNNING</span>
+                            </h5>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-microchip me-1"></i>CPU:</span>
+                                <span class="value">4 core(s)</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-memory me-1"></i>RAM:</span>
+                                <span class="value">8 GB</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-hdd me-1"></i>Storage:</span>
+                                <span class="value">50 GB</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-compact-disc me-1"></i>Imagen:</span>
+                                <span class="value">Ubuntu 22.04</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-network-wired me-1"></i>IP:</span>
+                                <span class="value">192.168.1.10</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-globe me-1"></i>Internet:</span>
+                                <span class="internet-badge internet-yes">Sí</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-desktop me-1"></i>VNC:</span>
+                                <span class="value">5900</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-server me-1"></i>Worker:</span>
+                                <span class="value">Worker-01</span>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <!-- Controles de navegación (cruz) -->
-                    <div class="topology-controls">
-                        <div></div>
-                        <div class="nav-control-btn" onclick="panUp()" title="Mover arriba" style="grid-column: 2; grid-row: 1;">
-                            <i class="fas fa-chevron-up"></i>
-                        </div>
-                        <div></div>
-                        
-                        <div class="nav-control-btn" onclick="panLeft()" title="Mover izquierda" style="grid-column: 1; grid-row: 2;">
-                            <i class="fas fa-chevron-left"></i>
-                        </div>
-                        <div class="nav-control-btn" onclick="centerView()" title="Centrar vista" style="grid-column: 2; grid-row: 2;">
-                            <i class="fas fa-crosshairs"></i>
-                        </div>
-                        <div class="nav-control-btn" onclick="panRight()" title="Mover derecha" style="grid-column: 3; grid-row: 2;">
-                            <i class="fas fa-chevron-right"></i>
-                        </div>
-                        
-                        <div></div>
-                        <div class="nav-control-btn" onclick="panDown()" title="Mover abajo" style="grid-column: 2; grid-row: 3;">
-                            <i class="fas fa-chevron-down"></i>
-                        </div>
-                        <div></div>
-                    </div>
-                    
-                    <!-- Controles de zoom -->
-                    <div class="topology-zoom-controls">
-                        <div class="nav-control-btn" onclick="fitToScreen()" title="Ajustar a pantalla">
-                            <i class="fas fa-expand-arrows-alt"></i>
-                        </div>
-                        <div class="nav-control-btn" onclick="zoomIn()" title="Zoom In">
-                            <i class="fas fa-plus"></i>
-                        </div>
-                        <div class="nav-control-btn" onclick="zoomOut()" title="Zoom Out">
-                            <i class="fas fa-minus"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Detalles de las VMs -->
-        <div class="slice-designer">
-            <div class="step-header">
-                <div class="step-number">
-                    <i class="fas fa-server"></i>
-                </div>
-                <h3 class="step-title">Detalles de Máquinas Virtuales</h3>
-            </div>
-            
-            <div class="row">
-                {% for instance in slice.instancias %}
-                <div class="col-lg-6 col-xl-4 mb-3">
-                    <div class="vm-card">
-                        <h5>
-                            <i class="fas fa-desktop me-2"></i>{{ instance.nombre }}
-                            <span class="status-badge status-{{ 'running' if instance.estado == 'RUNNING' else 'stopped' }} float-end">
-                                {{ instance.estado }}
-                            </span>
-                        </h5>
-                        
-                        <div class="vm-detail">
-                            <span class="label"><i class="fas fa-microchip me-1"></i>CPU:</span>
-                            <span class="value">{{ instance.cpu }} core(s)</span>
+                    <div class="col-lg-6 col-xl-4">
+                        <div class="vm-card">
+                            <h5>
+                                <span><i class="fas fa-desktop me-2"></i>VM-Database</span>
+                                <span class="badge bg-success">RUNNING</span>
+                            </h5>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-microchip me-1"></i>CPU:</span>
+                                <span class="value">8 core(s)</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-memory me-1"></i>RAM:</span>
+                                <span class="value">16 GB</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-hdd me-1"></i>Storage:</span>
+                                <span class="value">200 GB</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-compact-disc me-1"></i>Imagen:</span>
+                                <span class="value">CentOS 8</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-network-wired me-1"></i>IP:</span>
+                                <span class="value">192.168.1.20</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-globe me-1"></i>Internet:</span>
+                                <span class="internet-badge internet-no">No</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-desktop me-1"></i>VNC:</span>
+                                <span class="value">5901</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-server me-1"></i>Worker:</span>
+                                <span class="value">Worker-02</span>
+                            </div>
                         </div>
-                        
-                        <div class="vm-detail">
-                            <span class="label"><i class="fas fa-memory me-1"></i>RAM:</span>
-                            <span class="value">{{ instance.ram }}</span>
+                    </div>
+
+                    <div class="col-lg-6 col-xl-4">
+                        <div class="vm-card">
+                            <h5>
+                                <span><i class="fas fa-desktop me-2"></i>VM-Cache</span>
+                                <span class="badge bg-danger">STOPPED</span>
+                            </h5>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-microchip me-1"></i>CPU:</span>
+                                <span class="value">2 core(s)</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-memory me-1"></i>RAM:</span>
+                                <span class="value">4 GB</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-hdd me-1"></i>Storage:</span>
+                                <span class="value">30 GB</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-compact-disc me-1"></i>Imagen:</span>
+                                <span class="value">Debian 11</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-network-wired me-1"></i>IP:</span>
+                                <span class="value">192.168.1.30</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-globe me-1"></i>Internet:</span>
+                                <span class="internet-badge internet-yes">Sí</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-desktop me-1"></i>VNC:</span>
+                                <span class="value">N/A</span>
+                            </div>
+                            
+                            <div class="vm-detail">
+                                <span class="label"><i class="fas fa-server me-1"></i>Worker:</span>
+                                <span class="value">Worker-01</span>
+                            </div>
                         </div>
-                        
-                        <div class="vm-detail">
-                            <span class="label"><i class="fas fa-hdd me-1"></i>Storage:</span>
-                            <span class="value">{{ instance.storage }}</span>
-                        </div>
-                        
-                        <div class="vm-detail">
-                            <span class="label"><i class="fas fa-compact-disc me-1"></i>Imagen:</span>
-                            <span class="value">{{ instance.imagen.nombre if instance.imagen else 'N/A' }}</span>
-                        </div>
-                        
-                        {% if instance.ip %}
-                        <div class="vm-detail">
-                            <span class="label"><i class="fas fa-network-wired me-1"></i>IP:</span>
-                            <span class="value">{{ instance.ip }}</span>
-                        </div>
-                        {% endif %}
-                        
-                        <div class="vm-detail">
-                            <span class="label"><i class="fas fa-globe me-1"></i>Internet:</span>
-                            <span class="internet-badge internet-{{ 'yes' if instance.salidainternet else 'no' }}">
-                                {{ 'Sí' if instance.salidainternet else 'No' }}
-                            </span>
-                        </div>
-                        
-                        {% if instance.vnc %}
-                        <div class="vm-detail">
-                            <span class="label"><i class="fas fa-desktop me-1"></i>VNC:</span>
-                            <span class="value">{{ instance.vnc.puerto if instance.vnc.puerto else 'N/A' }}</span>
-                        </div>
-                        {% endif %}
-                        
-                        {% if instance.worker %}
-                        <div class="vm-detail">
-                            <span class="label"><i class="fas fa-server me-1"></i>Worker:</span>
-                            <span class="value">{{ instance.worker.nombre if instance.worker.nombre else 'N/A' }}</span>
-                        </div>
-                        {% endif %}
                     </div>
                 </div>
-                {% endfor %}
             </div>
         </div>
     </div>
@@ -457,27 +549,25 @@
         document.addEventListener('DOMContentLoaded', function() {
             const container = document.getElementById('topology-viewer');
             
-            // Get topology data from slice
-            const topologyData = {{ slice.get_topology_data() | tojson if slice.get_topology_data() else '{"nodes": [], "edges": []}' | safe }};
+            // Datos de ejemplo
+            const topologyData = {
+                nodes: [
+                    { id: 1, label: "VM-Web-Server", x: -200, y: -100 },
+                    { id: 2, label: "VM-Database", x: 0, y: -100 },
+                    { id: 3, label: "VM-Cache", x: 200, y: -100 },
+                    { id: 4, label: "VM-LoadBalancer", x: -100, y: 100 },
+                    { id: 5, label: "VM-Monitoring", x: 100, y: 100 }
+                ],
+                edges: [
+                    { from: 1, to: 2 },
+                    { from: 1, to: 4 },
+                    { from: 2, to: 3 },
+                    { from: 4, to: 5 }
+                ]
+            };
             
-            // If no topology data, create default nodes for each instance
-            if (!topologyData.nodes || topologyData.nodes.length === 0) {
-                topologyData.nodes = [];
-                topologyData.edges = [];
-                
-                {% for instance in slice.instancias %}
-                topologyData.nodes.push({
-                    id: {{ loop.index }},
-                    label: "{{ instance.nombre }}",
-                    x: Math.random() * 400 - 200,
-                    y: Math.random() * 300 - 150
-                });
-                {% endfor %}
-            }
-            
-            // Initialize Vis.js network
-            const nodes = new vis.DataSet(topologyData.nodes || []);
-            const edges = new vis.DataSet(topologyData.edges || []);
+            const nodes = new vis.DataSet(topologyData.nodes);
+            const edges = new vis.DataSet(topologyData.edges);
             
             edgeCount = edges.length;
             document.getElementById('edge-count').textContent = edgeCount;
@@ -490,35 +580,35 @@
                     font: { 
                         size: 16, 
                         color: '#333333', 
-                        face: 'Arial',
+                        face: 'Inter',
                         background: 'rgba(255,255,255,0.8)',
                         strokeWidth: 2,
                         strokeColor: '#ffffff'
                     },
                     borderWidth: 3,
                     color: { 
-                        background: '#28a745', 
-                        border: '#1e7e34',
-                        highlight: { background: '#20c997', border: '#17a2b8' }
+                        background: '#10b981', 
+                        border: '#059669',
+                        highlight: { background: '#0ea5e9', border: '#0284c7' }
                     },
                     shadow: { 
                         enabled: true, 
-                        color: 'rgba(0,0,0,0.3)', 
+                        color: 'rgba(0,0,0,0.2)', 
                         size: 8, 
-                        x: 3, 
-                        y: 3 
+                        x: 2, 
+                        y: 2 
                     }
                 },
                 edges: {
-                    width: 4,
-                    color: '#6c757d',
+                    width: 3,
+                    color: '#94a3b8',
                     smooth: { 
                         type: 'continuous',
                         roundness: 0.5
                     },
                     shadow: { 
                         enabled: true, 
-                        color: 'rgba(0,0,0,0.2)', 
+                        color: 'rgba(0,0,0,0.15)', 
                         size: 4, 
                         x: 2, 
                         y: 2 
@@ -546,7 +636,6 @@
             
             network = new vis.Network(container, data, options);
             
-            // Event listeners
             network.on('zoom', function(params) {
                 currentScale = params.scale;
             });
@@ -556,20 +645,57 @@
                     const nodeId = params.nodes[0];
                     const node = nodes.get(nodeId);
                     
-                    // Find corresponding instance data
                     const instanceData = [
-                        {% for instance in slice.instancias %}
                         {
-                            nombre: "{{ instance.nombre }}",
-                            cpu: "{{ instance.cpu }}",
-                            ram: "{{ instance.ram }}",
-                            storage: "{{ instance.storage }}",
-                            imagen: "{{ instance.imagen.nombre if instance.imagen else 'N/A' }}",
-                            estado: "{{ instance.estado }}",
-                            internet: {{ 'true' if instance.salidainternet else 'false' }},
-                            ip: "{{ instance.ip or 'N/A' }}"
-                        }{{ ',' if not loop.last else '' }}
-                        {% endfor %}
+                            nombre: "VM-Web-Server",
+                            cpu: "4",
+                            ram: "8 GB",
+                            storage: "50 GB",
+                            imagen: "Ubuntu 22.04",
+                            estado: "RUNNING",
+                            internet: true,
+                            ip: "192.168.1.10"
+                        },
+                        {
+                            nombre: "VM-Database",
+                            cpu: "8",
+                            ram: "16 GB",
+                            storage: "200 GB",
+                            imagen: "CentOS 8",
+                            estado: "RUNNING",
+                            internet: false,
+                            ip: "192.168.1.20"
+                        },
+                        {
+                            nombre: "VM-Cache",
+                            cpu: "2",
+                            ram: "4 GB",
+                            storage: "30 GB",
+                            imagen: "Debian 11",
+                            estado: "STOPPED",
+                            internet: true,
+                            ip: "192.168.1.30"
+                        },
+                        {
+                            nombre: "VM-LoadBalancer",
+                            cpu: "2",
+                            ram: "4 GB",
+                            storage: "20 GB",
+                            imagen: "Ubuntu 22.04",
+                            estado: "RUNNING",
+                            internet: true,
+                            ip: "192.168.1.40"
+                        },
+                        {
+                            nombre: "VM-Monitoring",
+                            cpu: "2",
+                            ram: "4 GB",
+                            storage: "40 GB",
+                            imagen: "Ubuntu 22.04",
+                            estado: "RUNNING",
+                            internet: true,
+                            ip: "192.168.1.50"
+                        }
                     ];
                     
                     if (instanceData[nodeId - 1]) {
@@ -586,13 +712,11 @@
                 }
             });
             
-            // Centrar vista al cargar
             setTimeout(() => {
                 centerView();
             }, 1000);
         });
 
-        // Funciones de navegación
         function centerView() {
             if (network) {
                 network.fit({

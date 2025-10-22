@@ -6,34 +6,516 @@
     <title>TeleFlow - Crear Slice</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/create_slice.css') }}" rel="stylesheet">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f8fafc; min-height: 100vh; }
+        
+        /* Top Bar Styles */
+        .top-bar { 
+            background: #ffffff; 
+            border-bottom: 1px solid #e2e8f0; 
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); 
+            padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        .logo-icon { 
+            width: 40px; 
+            height: 40px; 
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); 
+            border-radius: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25); 
+        }
+        .user-badge { 
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); 
+            border: 1px solid #cbd5e1; 
+            border-radius: 10px; 
+            padding: 0.5rem 1rem; 
+        }
+        .user-avatar { 
+            width: 32px; 
+            height: 32px; 
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); 
+            border-radius: 50%; 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        
+        /* Main Content */
+        .main-content { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 2rem 1.5rem; 
+            padding-top: 100px;
+        }
+        
+        /* Progress Indicator */
+        .progress-indicator {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+        .progress-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        .progress-step span {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: #f1f5f9;
+            color: #64748b;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        .progress-step.active span {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            color: white;
+            border-color: #0284c7;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+        .progress-step.completed span {
+            background: #dcfce7;
+            color: #166534;
+            border-color: #86efac;
+        }
+        .progress-step {
+            position: relative;
+        }
+        .progress-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 60%;
+            width: calc(100% - 20%);
+            height: 2px;
+            background: #e2e8f0;
+            z-index: 0;
+            transform: translateY(-50%);
+            }
+        
+        /* Step Container */
+        .slice-designer {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+            padding: 2rem;
+        }
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .step-number {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+        .step-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+        }
+        
+        /* Form Elements */
+        .form-control, .form-select {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+        }
+        .form-floating > label {
+            color: #64748b;
+            font-weight: 500;
+        }
+        
+        /* VM Cards */
+        .vm-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        }
+        .vm-card h5 {
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        .vm-card h5 i {
+            color: #0ea5e9;
+            margin-right: 0.5rem;
+        }
+        
+        /* Buttons */
+        .btn {
+            font-weight: 500;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            border: none;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .btn-gradient {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        .btn-outline-secondary {
+            color: #64748b;
+            border: 2px solid #cbd5e1;
+            background: #f8fafc;
+        }
+        .btn-outline-secondary:hover {
+            background: #e2e8f0;
+            border-color: #94a3b8;
+            color: #475569;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        .btn-outline-light {
+            color: #64748b;
+            border: 2px solid #cbd5e1;
+            background: #f8fafc;
+        }
+        .btn-outline-light:hover {
+            background: #e2e8f0;
+            border-color: #94a3b8;
+            color: #475569;
+        }
+        .btn-sm {
+            padding: 0.4rem 0.85rem;
+            font-size: 0.8rem;
+        }
+        
+        /* Topology Styles */
+        .topology-container {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .topology-controls {
+            flex: 0 0 280px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        .topology-controls h5, .topology-controls h6 {
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 1rem;
+        }
+        .topology-option {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+        .topology-option:hover {
+            border-color: #bae6fd;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .topology-option.active {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            border-color: #0284c7;
+            color: white;
+        }
+        .topology-option i {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .topology-visualizer {
+            flex: 1;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            min-height: 500px;
+        }
+        #network-container {
+            width: 100%;
+            height: 500px;
+        }
+        .topology-stats {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Navigation Controls */
+        .direction-controls {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: grid;
+            grid-template-columns: repeat(3, 40px);
+            grid-template-rows: repeat(3, 40px);
+            gap: 4px;
+            z-index: 10;
+        }
+        .direction-btn {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #475569;
+        }
+        .direction-btn:hover {
+            background: #0ea5e9;
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+        .direction-btn.up { grid-column: 2; grid-row: 1; }
+        .direction-btn.left { grid-column: 1; grid-row: 2; }
+        .direction-btn.center { grid-column: 2; grid-row: 2; }
+        .direction-btn.right { grid-column: 3; grid-row: 2; }
+        .direction-btn.down { grid-column: 2; grid-row: 3; }
+        
+        .navigation-controls {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 10;
+        }
+        .nav-control-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #475569;
+        }
+        .nav-control-btn:hover {
+            background: #0ea5e9;
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+        
+        /* Preset Topologies */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+        .preset-btn {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+        .preset-btn:hover {
+            border-color: #0ea5e9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+        }
+        .preset-btn i {
+            font-size: 1.75rem;
+            color: #0ea5e9;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        
+        /* Review Table */
+        .table {
+            margin-bottom: 0;
+        }
+        .table thead {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        }
+        .table thead th {
+            padding: 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #475569;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .table tbody tr {
+            transition: all 0.15s ease;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .table tbody tr:hover {
+            background: #f8fafc;
+        }
+        .table tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+        }
+        
+        /* Badge */
+        .badge {
+            padding: 0.35rem 0.85rem;
+            border-radius: 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            border: 1px solid;
+        }
+        .bg-success {
+            background-color: #dcfce7 !important;
+            color: #166534 !important;
+            border-color: #86efac !important;
+        }
+        .bg-info {
+            background-color: #dbeafe !important;
+            color: #1e40af !important;
+            border-color: #93c5fd !important;
+        }
+        .bg-secondary {
+            background-color: #f1f5f9 !important;
+            color: #475569 !important;
+            border-color: #cbd5e1 !important;
+        }
+        
+        /* Modal */
+        .modal-content {
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+        .modal-header {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 2px solid #e2e8f0;
+            border-radius: 12px 12px 0 0;
+        }
+        .modal-title {
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .alert-info {
+            background-color: #dbeafe;
+            border-color: #93c5fd;
+            color: #1e40af;
+            border-radius: 8px;
+        }
+        
+        /* Form Check Switch */
+        .form-check-input:checked {
+            background-color: #10b981;
+            border-color: #10b981;
+        }
+    </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg">
+    <!-- Top Bar -->
+    <nav class="top-bar">
         <div class="container-fluid">
-            <div class="navbar-brand">
-                <i class="fas fa-cloud me-2"></i>
-                <strong>TeleFlow</strong>
-                <span class="ms-2 text-muted">| Diseñador de Slice</span>
-            </div>
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-circle me-1"></i>Usuario
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-end">
-                        <a class="dropdown-item" href="{{ url_for('dashboard') }}"><i class="fas fa-tachometer-alt me-1"></i>Dashboard</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="logo-icon"><i class="fas fa-network-wired text-white"></i></div>
+                    <div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">TeleFlow</div>
+                        <small style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Diseñador de Slice</small>
                     </div>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <a href="/dashboard" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                    </a>
+                    <a href="/logout" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt me-1"></i>Salir
+                    </a>
                 </div>
             </div>
         </div>
     </nav>
 
-    <div class="main-container">
+    <!-- Main Content -->
+    <div class="main-content">
         <!-- Progress Indicator -->
         <div class="progress-indicator">
             <div class="progress-step active">
@@ -62,13 +544,13 @@
                 </div>
                 
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-6 mb-3">
                         <div class="form-floating">
                             <input type="text" class="form-control" id="slice-name" name="slice_name" placeholder="Nombre del slice" required>
                             <label for="slice-name">Nombre del Slice</label>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-6 mb-3">
                         <div class="form-floating">
                             <input type="number" class="form-control" id="vm-count" name="num_vms" placeholder="Número de VMs" min="2" max="20" value="3" required>
                             <label for="vm-count">Número de VMs</label>
@@ -76,13 +558,13 @@
                     </div>
                 </div>
                 
-                <div class="form-floating">
+                <div class="form-floating mb-3">
                     <textarea class="form-control" id="slice-description" name="slice_description" placeholder="Descripción" style="height: 100px"></textarea>
                     <label for="slice-description">Descripción (opcional)</label>
                 </div>
                 
                 <div class="text-end">
-                    <button type="button" class="btn btn-gradient" onclick="nextStep()">
+                    <button type="button" class="btn btn-gradient btn-lg" onclick="nextStep()">
                         Configurar VMs <i class="fas fa-arrow-right ms-2"></i>
                     </button>
                 </div>
@@ -99,11 +581,11 @@
                     <!-- VM cards will be generated here -->
                 </div>
                 
-                <div class="d-flex justify-content-between">
-                    <button type="button" class="btn btn-outline-secondary" onclick="previousStep()">
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-outline-secondary btn-lg" onclick="previousStep()">
                         <i class="fas fa-arrow-left me-2"></i>Anterior
                     </button>
-                    <button type="button" class="btn btn-gradient" onclick="nextStep()">
+                    <button type="button" class="btn btn-gradient btn-lg" onclick="nextStep()">
                         Diseñar Red <i class="fas fa-arrow-right ms-2"></i>
                     </button>
                 </div>
@@ -118,9 +600,8 @@
                 
                 <div class="topology-container">
                     <div class="topology-controls">
-                        <h5><i class="fas fa-tools me-2"></i>Herramientas de Diseño</h5>
+                        <h5><i class="fas fa-tools me-2"></i>Herramientas</h5>
                         
-                        <!-- Topology Type Selection -->
                         <div class="mb-4">
                             <h6>Tipo de Topología</h6>
                             <div class="topology-option active" data-type="custom" onclick="selectTopologyType('custom')">
@@ -131,11 +612,10 @@
                             <div class="topology-option" data-type="template" onclick="selectTopologyType('template')">
                                 <i class="fas fa-shapes"></i>
                                 <div><strong>Plantilla</strong></div>
-                                <small>Topologías predefinidas</small>
+                                <small>Predefinidas</small>
                             </div>
                         </div>
 
-                        <!-- Custom Topology Controls -->
                         <div id="custom-controls">
                             <h6>Controles</h6>
                             <button type="button" class="btn btn-success btn-sm w-100 mb-2" onclick="addNode()">
@@ -145,72 +625,68 @@
                                 <i class="fas fa-link me-1"></i>Modo Conexión
                             </button>
                             <button type="button" class="btn btn-warning btn-sm w-100 mb-2" onclick="clearTopology()">
-                                <i class="fas fa-trash me-1"></i>Limpiar Todo
+                                <i class="fas fa-trash me-1"></i>Limpiar
                             </button>
                             
                             <div class="mt-3">
                                 <small class="text-muted">
                                     <i class="fas fa-info-circle me-1"></i>
-                                    Click en los nodos para conectarlos
+                                    Click en nodos para conectar
                                 </small>
                             </div>
                         </div>
 
-                        <!-- Template Controls -->
                         <div id="template-controls" style="display: none;">
-                            <div class="preset-topologies">
-                                <h6>Plantillas Disponibles</h6>
-                                <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>Haz clic para agregar topologías</p>
-                                <div class="preset-grid">
-                                    <div class="preset-btn" data-template="star" onclick="showTopologyModal('star')">
-                                        <i class="fas fa-star"></i>
-                                        <div><small>Estrella</small></div>
-                                    </div>
-                                    <div class="preset-btn" data-template="tree" onclick="showTopologyModal('tree')">
-                                        <i class="fas fa-sitemap"></i>
-                                        <div><small>Árbol</small></div>
-                                    </div>
-                                    <div class="preset-btn" data-template="ring" onclick="showTopologyModal('ring')">
-                                        <i class="fas fa-circle-notch"></i>
-                                        <div><small>Anillo</small></div>
-                                    </div>
-                                    <div class="preset-btn" data-template="mesh" onclick="showTopologyModal('mesh')">
-                                        <i class="fas fa-project-diagram"></i>
-                                        <div><small>Malla</small></div>
-                                    </div>
-                                    <div class="preset-btn" data-template="linear" onclick="showTopologyModal('linear')">
-                                        <i class="fas fa-grip-lines"></i>
-                                        <div><small>Lineal</small></div>
-                                    </div>
+                            <h6>Plantillas</h6>
+                            <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>Click para agregar</p>
+                            <div class="preset-grid">
+                                <div class="preset-btn" onclick="showTopologyModal('star')">
+                                    <i class="fas fa-star"></i>
+                                    <small>Estrella</small>
+                                </div>
+                                <div class="preset-btn" onclick="showTopologyModal('tree')">
+                                    <i class="fas fa-sitemap"></i>
+                                    <small>Árbol</small>
+                                </div>
+                                <div class="preset-btn" onclick="showTopologyModal('ring')">
+                                    <i class="fas fa-circle-notch"></i>
+                                    <small>Anillo</small>
+                                </div>
+                                <div class="preset-btn" onclick="showTopologyModal('mesh')">
+                                    <i class="fas fa-project-diagram"></i>
+                                    <small>Malla</small>
+                                </div>
+                                <div class="preset-btn" onclick="showTopologyModal('linear')">
+                                    <i class="fas fa-grip-lines"></i>
+                                    <small>Lineal</small>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    
                     <div class="topology-visualizer">
                         <div id="network-container"></div>
                         
-                        <!-- CONTROLES DE DIRECCIÓN (IZQUIERDA) -->
                         <div class="direction-controls">
-                            <div class="direction-btn up" onclick="moveView('up')" title="Mover hacia arriba">
+                            <div class="direction-btn up" onclick="moveView('up')" title="Arriba">
                                 <i class="fas fa-chevron-up"></i>
                             </div>
-                            <div class="direction-btn left" onclick="moveView('left')" title="Mover hacia la izquierda">
+                            <div class="direction-btn left" onclick="moveView('left')" title="Izquierda">
                                 <i class="fas fa-chevron-left"></i>
                             </div>
-                            <div class="direction-btn center" onclick="centerView()" title="Centrar vista">
+                            <div class="direction-btn center" onclick="centerView()" title="Centrar">
                                 <i class="fas fa-crosshairs"></i>
                             </div>
-                            <div class="direction-btn right" onclick="moveView('right')" title="Mover hacia la derecha">
+                            <div class="direction-btn right" onclick="moveView('right')" title="Derecha">
                                 <i class="fas fa-chevron-right"></i>
                             </div>
-                            <div class="direction-btn down" onclick="moveView('down')" title="Mover hacia abajo">
+                            <div class="direction-btn down" onclick="moveView('down')" title="Abajo">
                                 <i class="fas fa-chevron-down"></i>
                             </div>
                         </div>
                         
-                        <!-- CONTROLES DE ZOOM (DERECHA) -->
                         <div class="navigation-controls">
-                            <div class="nav-control-btn" onclick="fitToScreen()" title="Ajustar a pantalla">
+                            <div class="nav-control-btn" onclick="fitToScreen()" title="Ajustar">
                                 <i class="fas fa-expand-arrows-alt"></i>
                             </div>
                             <div class="nav-control-btn" onclick="zoomOut()" title="Zoom Out">
@@ -226,19 +702,17 @@
                             <span id="edge-count">Conexiones: 0</span>
                         </div>
                     </div>
-                    
                 </div>
 
                 <input type="hidden" id="topology_data" name="topology_data">
                 <input type="hidden" id="topology_type" name="topology_type" value="custom">
-
                 
-                <div class="d-flex justify-content-between">
-                    <button type="button" class="btn btn-outline-secondary" onclick="previousStep()">
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-outline-secondary btn-lg" onclick="previousStep()">
                         <i class="fas fa-arrow-left me-2"></i>Anterior
                     </button>
-                    <button type="button" class="btn btn-gradient" onclick="nextStep()">
-                        Revisar Configuración <i class="fas fa-arrow-right ms-2"></i>
+                    <button type="button" class="btn btn-gradient btn-lg" onclick="nextStep()">
+                        Revisar <i class="fas fa-arrow-right ms-2"></i>
                     </button>
                 </div>
             </div>
@@ -250,7 +724,7 @@
                     <h3 class="step-title">Revisión y Creación</h3>
                 </div>
                 
-                <div class="row">
+                <div class="row mb-3">
                     <div class="col-md-6">
                         <div class="vm-card">
                             <h5><i class="fas fa-info-circle me-2"></i>Información del Slice</h5>
@@ -284,14 +758,13 @@
                                 </tr>
                             </thead>
                             <tbody id="vm-review-list">
-                                <!-- VM review will be generated here -->
                             </tbody>
                         </table>
                     </div>
                 </div>
                 
-                <div class="d-flex justify-content-between">
-                    <button type="button" class="btn btn-outline-secondary" onclick="previousStep()">
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-outline-secondary btn-lg" onclick="previousStep()">
                         <i class="fas fa-arrow-left me-2"></i>Anterior
                     </button>
                     <button type="submit" class="btn btn-gradient btn-lg">
@@ -302,24 +775,24 @@
         </form>
     </div>
 
-    <!-- Modal para seleccionar cantidad de VMs en topología -->
-    <div class="modal fade" id="topologyModal" tabindex="-1" aria-labelledby="topologyModalLabel" aria-hidden="true">
+    <!-- Modal -->
+    <div class="modal fade" id="topologyModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="topologyModalLabel">
+                    <h5 class="modal-title">
                         <i class="fas fa-network-wired me-2"></i>Agregar Topología <span id="topology-name-modal"></span>
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        La topología se agregará a los nodos existentes sin eliminarlos.
+                        La topología se agregará a los nodos existentes.
                     </div>
                     <div class="form-group">
                         <label for="topology-vm-count" class="form-label">
-                            <strong>¿Cuántas VMs deseas para esta topología?</strong>
+                            <strong>¿Cuántas VMs para esta topología?</strong>
                         </label>
                         <input type="number" class="form-control form-control-lg" id="topology-vm-count" min="2" value="3">
                         <small class="text-muted d-block mt-2">
@@ -329,11 +802,11 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                         <i class="fas fa-times me-1"></i>Cancelar
                     </button>
                     <button type="button" class="btn btn-primary" onclick="confirmAddTopology()">
-                        <i class="fas fa-plus me-1"></i>Agregar Topología
+                        <i class="fas fa-plus me-1"></i>Agregar
                     </button>
                 </div>
             </div>
@@ -355,14 +828,12 @@
         let selectedTopologyTemplate = null;
         let topologyModal = null;
 
-        // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             initializeNetworkVisualization();
             generateVMConfiguration();
             topologyModal = new bootstrap.Modal(document.getElementById('topologyModal'));
         });
 
-        // Función para mover la vista en direcciones específicas
         function moveView(direction) {
             if (network) {
                 const currentPosition = network.getViewPosition();
@@ -370,129 +841,79 @@
                 let newPosition = { ...currentPosition };
 
                 switch(direction) {
-                    case 'up':
-                        newPosition.y -= moveDistance;
-                        break;
-                    case 'down':
-                        newPosition.y += moveDistance;
-                        break;
-                    case 'left':
-                        newPosition.x -= moveDistance;
-                        break;
-                    case 'right':
-                        newPosition.x += moveDistance;
-                        break;
+                    case 'up': newPosition.y -= moveDistance; break;
+                    case 'down': newPosition.y += moveDistance; break;
+                    case 'left': newPosition.x -= moveDistance; break;
+                    case 'right': newPosition.x += moveDistance; break;
                 }
 
                 network.moveTo({
                     position: newPosition,
-                    animation: {
-                        duration: 300,
-                        easingFunction: 'easeInOutQuad'
-                    }
+                    animation: { duration: 300, easingFunction: 'easeInOutQuad' }
                 });
             }
         }
 
-        // Función para centrar la vista en los nodos
         function centerView() {
             if (network && nodes.length > 0) {
                 network.fit({
-                    animation: {
-                        duration: 800,
-                        easingFunction: 'easeInOutQuad'
-                    }
+                    animation: { duration: 800, easingFunction: 'easeInOutQuad' }
                 });
-                updateZoomDisplay();
-            } else {
-                // Si no hay nodos, centrar en el origen
+            } else if (network) {
                 network.moveTo({
                     position: { x: 0, y: 0 },
                     scale: 1,
-                    animation: {
-                        duration: 500,
-                        easingFunction: 'easeInOutQuad'
-                    }
+                    animation: { duration: 500, easingFunction: 'easeInOutQuad' }
                 });
-                currentScale = 1;
-                updateZoomDisplay();
             }
+            updateZoomDisplay();
         }
 
-        // Función para ajustar toda la topología en pantalla
         function fitToScreen() {
             if (network) {
                 if (nodes.length > 0) {
                     network.fit({
-                        animation: {
-                            duration: 800,
-                            easingFunction: 'easeInOutQuad'
-                        }
+                        animation: { duration: 800, easingFunction: 'easeInOutQuad' }
                     });
                 } else {
                     network.moveTo({
                         position: { x: 0, y: 0 },
                         scale: 1,
-                        animation: {
-                            duration: 500,
-                            easingFunction: 'easeInOutQuad'
-                        }
+                        animation: { duration: 500, easingFunction: 'easeInOutQuad' }
                     });
                 }
                 updateZoomDisplay();
             }
         }
 
-        // Función para hacer zoom in
         function zoomIn() {
             if (network) {
                 currentScale = Math.min(currentScale * 1.2, 3);
                 const position = network.getViewPosition();
-                
                 network.moveTo({
                     position: position,
                     scale: currentScale,
-                    animation: {
-                        duration: 300,
-                        easingFunction: 'easeInOutQuad'
-                    }
+                    animation: { duration: 300, easingFunction: 'easeInOutQuad' }
                 });
                 updateZoomDisplay();
             }
         }
 
-        // Función para hacer zoom out
         function zoomOut() {
             if (network) {
                 currentScale = Math.max(currentScale / 1.2, 0.2);
                 const position = network.getViewPosition();
-                
                 network.moveTo({
                     position: position,
                     scale: currentScale,
-                    animation: {
-                        duration: 300,
-                        easingFunction: 'easeInOutQuad'
-                    }
+                    animation: { duration: 300, easingFunction: 'easeInOutQuad' }
                 });
                 updateZoomDisplay();
             }
         }
 
-        // Función para actualizar el display del zoom
         function updateZoomDisplay() {
-            // Solo actualizar si los elementos existen
-            const zoomLevelElement = document.getElementById('zoom-level');
-            const zoomSliderElement = document.getElementById('zoom-slider');
-            
-            if (zoomLevelElement) {
-                const zoomPercentage = Math.round(currentScale * 100);
-                zoomLevelElement.textContent = `${zoomPercentage}%`;
-            }
-            
-            if (zoomSliderElement) {
-                zoomSliderElement.value = currentScale;
-            }
+            currentScale = network ? network.getScale() : 1;
         }
 
         function initializeNetworkVisualization() {
@@ -528,17 +949,14 @@
 
             network = new vis.Network(container, data, options);
             
-            // Event listeners para actualizar el zoom
             network.on('zoom', function(params) {
                 currentScale = params.scale;
-                updateZoomDisplay();
             });
             
             network.on('dragEnd', function(params) {
                 viewPosition = network.getViewPosition();
             });
             
-            // Handle node clicks for connection mode
             network.on('click', function(params) {
                 if (connectionMode && params.nodes.length > 0) {
                     handleNodeClick(params.nodes[0]);
@@ -546,25 +964,17 @@
             });
 
             updateStats();
-            updateZoomDisplay();
         }
 
         function nextStep() {
-            // Validate current step
             if (!validateStep(currentStep)) return;
             
-            // Hide current step
             document.getElementById(`step-${currentStep}`).style.display = 'none';
-            
-            // Update progress
             updateProgress(currentStep, 'completed');
             currentStep++;
             updateProgress(currentStep, 'active');
-            
-            // Show next step
             document.getElementById(`step-${currentStep}`).style.display = 'block';
             
-            // Special actions for specific steps
             if (currentStep === 2) {
                 generateVMConfiguration();
             } else if (currentStep === 4) {
@@ -573,15 +983,10 @@
         }
 
         function previousStep() {
-            // Hide current step
             document.getElementById(`step-${currentStep}`).style.display = 'none';
-            
-            // Update progress
             updateProgress(currentStep, '');
             currentStep--;
             updateProgress(currentStep, 'active');
-            
-            // Show previous step
             document.getElementById(`step-${currentStep}`).style.display = 'block';
         }
 
@@ -595,7 +1000,6 @@
                 case 1:
                     const sliceName = document.getElementById('slice-name').value;
                     const vmCount = document.getElementById('vm-count').value;
-                    
                     if (!sliceName.trim()) {
                         alert('Por favor ingresa un nombre para el slice');
                         return false;
@@ -606,7 +1010,6 @@
                     }
                     return true;
                 case 2:
-                    // Validate VM configurations
                     const vmCount2 = parseInt(document.getElementById('vm-count').value);
                     for (let i = 1; i <= vmCount2; i++) {
                         const vmName = document.getElementById(`vm-${i}-name`).value.trim();
@@ -626,7 +1029,6 @@
                         alert('La topología debe tener al menos 2 nodos');
                         return false;
                     }
-                    // Update topology data before proceeding
                     updateTopologyData();
                     return true;
                 default:
@@ -641,17 +1043,17 @@
 
             for (let i = 1; i <= vmCount; i++) {
                 const vmCard = document.createElement('div');
-                vmCard.className = 'vm-card mb-3';
+                vmCard.className = 'vm-card';
                 vmCard.innerHTML = `
                     <h5><i class="fas fa-desktop me-2"></i>VM ${i}</h5>
                     <div class="row">
-                        <div class="col-md-2">
+                        <div class="col-md-2 mb-3">
                             <div class="form-floating">
                                 <input type="text" class="form-control" id="vm-${i}-name" name="vm_${i}_name" value="VM${i}" required>
                                 <label for="vm-${i}-name">Nombre</label>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-2 mb-3">
                             <div class="form-floating">
                                 <select class="form-select" id="vm-${i}-cpu" name="vm_${i}_cpu" required>
                                     <option value="1">1 Core</option>
@@ -661,7 +1063,7 @@
                                 <label for="vm-${i}-cpu">CPU</label>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-2 mb-3">
                             <div class="form-floating">
                                 <select class="form-select" id="vm-${i}-ram" name="vm_${i}_ram" required>
                                     <option value="1GB">1GB</option>
@@ -672,7 +1074,7 @@
                                 <label for="vm-${i}-ram">RAM</label>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-2 mb-3">
                             <div class="form-floating">
                                 <select class="form-select" id="vm-${i}-storage" name="vm_${i}_storage" required>
                                     <option value="10GB">10GB</option>
@@ -680,25 +1082,23 @@
                                     <option value="20GB">20GB</option>
                                     <option value="25GB">25GB</option>
                                 </select>
-                                <label for="vm-${i}-storage">Almacenamiento</label>
+                                <label for="vm-${i}-storage">Storage</label>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-2 mb-3">
                             <div class="form-floating">
-                                <select class="form-control" id="vm_${i}_image" name="vm_${i}_image" required>
-                                    <option value="ubuntu:latest">Ubuntu Latest</option>
-                                    <option value="cirrus:latest">CirrOS Latest</option>
+                                <select class="form-select" id="vm_${i}_image" name="vm_${i}_image" required>
+                                    <option value="ubuntu:latest">Ubuntu</option>
+                                    <option value="cirrus:latest">CirrOS</option>
                                 </select>
-                                <label for="vm_${i}_image" class="form-label">Imagen del SO</label>
+                                <label for="vm_${i}_image">Imagen</label>
                             </div>
                         </div>
-                    </div>
-                    <div class="row mt-2">
-                        <div class="col-md-4">
+                        <div class="col-md-2 mb-3 d-flex align-items-center">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="vm_${i}_internet" name="vm_${i}_internet">
                                 <label class="form-check-label" for="vm_${i}_internet">
-                                    <i class="fas fa-globe me-1"></i>Acceso a Internet
+                                    <i class="fas fa-globe me-1"></i>Internet
                                 </label>
                             </div>
                         </div>
@@ -715,7 +1115,6 @@
             });
             document.querySelector(`[data-type="${type}"]`).classList.add('active');
             
-            // Show/hide appropriate controls
             if (type === 'custom') {
                 document.getElementById('custom-controls').style.display = 'block';
                 document.getElementById('template-controls').style.display = 'none';
@@ -747,7 +1146,7 @@
             connectionMode = !connectionMode;
             const btn = document.querySelector('button[onclick="toggleConnectionMode()"]');
             if (connectionMode) {
-                btn.innerHTML = '<i class="fas fa-times me-1"></i>Cancelar Conexión';
+                btn.innerHTML = '<i class="fas fa-times me-1"></i>Cancelar';
                 btn.className = 'btn btn-danger btn-sm w-100 mb-2';
             } else {
                 btn.innerHTML = '<i class="fas fa-link me-1"></i>Modo Conexión';
@@ -759,28 +1158,21 @@
         function handleNodeClick(nodeId) {
             if (!selectedNode) {
                 selectedNode = nodeId;
-                // Highlight selected node
                 nodes.update({id: nodeId, color: {background: '#ffc107', border: '#e0a800'}});
             } else {
                 if (selectedNode !== nodeId) {
-                    // Check if edge already exists
                     const existingEdge = edges.get().find(edge => 
                         (edge.from === selectedNode && edge.to === nodeId) ||
                         (edge.from === nodeId && edge.to === selectedNode)
                     );
                     
                     if (!existingEdge) {
-                        // Create new edge
-                        edges.add({
-                            from: selectedNode,
-                            to: nodeId
-                        });
+                        edges.add({ from: selectedNode, to: nodeId });
                     } else {
-                        alert('La conexión ya existe entre estos nodos');
+                        alert('La conexión ya existe');
                     }
                 }
                 
-                // Reset node colors and selection
                 nodes.get().forEach(node => {
                     nodes.update({
                         id: node.id, 
@@ -793,7 +1185,7 @@
         }
 
         function clearTopology() {
-            if (confirm('¿Estás seguro de que quieres limpiar toda la topología?')) {
+            if (confirm('¿Limpiar toda la topología?')) {
                 nodes.clear();
                 edges.clear();
                 nodeId = 1;
@@ -802,11 +1194,9 @@
             }
         }
 
-        // Nueva función para mostrar el modal
         function showTopologyModal(template) {
             selectedTopologyTemplate = template;
             
-            // Configurar título del modal
             const templateNames = {
                 'star': 'Estrella',
                 'tree': 'Árbol',
@@ -816,37 +1206,32 @@
             };
             document.getElementById('topology-name-modal').textContent = templateNames[template];
             
-            // Calcular VMs disponibles
             const totalVMs = parseInt(document.getElementById('vm-count').value);
             const usedVMs = nodes.length;
             const availableVMs = totalVMs - usedVMs;
             
             document.getElementById('available-vms').textContent = availableVMs;
             
-            // Configurar input
             const input = document.getElementById('topology-vm-count');
             input.max = availableVMs;
             input.value = Math.min(3, availableVMs);
             
             if (availableVMs < 2) {
-                alert('No hay suficientes VMs disponibles para agregar otra topología. Mínimo requerido: 2 VMs');
+                alert('No hay suficientes VMs disponibles');
                 return;
             }
             
-            // Mostrar modal
             topologyModal.show();
         }
 
-        // Nueva función para confirmar y agregar topología
         function confirmAddTopology() {
             const requestedVMs = parseInt(document.getElementById('topology-vm-count').value);
             const totalVMs = parseInt(document.getElementById('vm-count').value);
             const usedVMs = nodes.length;
             const availableVMs = totalVMs - usedVMs;
             
-            // Validaciones
             if (requestedVMs < 2) {
-                alert('Se requieren al menos 2 VMs para crear una topología');
+                alert('Se requieren al menos 2 VMs');
                 return;
             }
             
@@ -855,21 +1240,15 @@
                 return;
             }
             
-            // Cerrar modal
             topologyModal.hide();
-            
-            // Aplicar la topología con el número especificado
             applyTemplateWithCount(selectedTopologyTemplate, requestedVMs);
         }
 
-        // Función modificada para aplicar plantillas con conteo específico
         function applyTemplateWithCount(template, vmCount) {
-            // Calcular offset para posicionar la nueva topología
             let offsetX = 0;
             let offsetY = 0;
             
             if (nodes.length > 0) {
-                // Si hay nodos existentes, calcular un offset para no sobreponerlos
                 const existingNodes = nodes.get();
                 const maxX = Math.max(...existingNodes.map(n => n.x || 0));
                 const maxY = Math.max(...existingNodes.map(n => n.y || 0));
@@ -877,32 +1256,18 @@
                 offsetY = maxY;
             }
             
-            // Generar topología basada en la plantilla
             switch(template) {
-                case 'star':
-                    generateStarTopologyAdditive(vmCount, offsetX, offsetY);
-                    break;
-                case 'tree':
-                    generateTreeTopologyAdditive(vmCount, offsetX, offsetY);
-                    break;
-                case 'ring':
-                    generateRingTopologyAdditive(vmCount, offsetX, offsetY);
-                    break;
-                case 'mesh':
-                    generateMeshTopologyAdditive(vmCount, offsetX, offsetY);
-                    break;
-                case 'linear':
-                    generateLinearTopologyAdditive(vmCount, offsetX, offsetY);
-                    break;
+                case 'star': generateStarTopologyAdditive(vmCount, offsetX, offsetY); break;
+                case 'tree': generateTreeTopologyAdditive(vmCount, offsetX, offsetY); break;
+                case 'ring': generateRingTopologyAdditive(vmCount, offsetX, offsetY); break;
+                case 'mesh': generateMeshTopologyAdditive(vmCount, offsetX, offsetY); break;
+                case 'linear': generateLinearTopologyAdditive(vmCount, offsetX, offsetY); break;
             }
             
             updateStats();
-            setTimeout(() => {
-                fitToScreen();
-            }, 500);
+            setTimeout(() => { fitToScreen(); }, 500);
         }
 
-        // Funciones aditivas para cada topología
         function generateStarTopologyAdditive(vmCount, offsetX, offsetY) {
             const startId = nodeId;
             const centerNode = { id: nodeId++, label: `VM${startId}`, x: offsetX, y: offsetY };
@@ -937,12 +1302,7 @@
                     const xPos = offsetX + (i + 1) * spacing - 150;
                     
                     const newId = nodeId++;
-                    nodes.add({ 
-                        id: newId, 
-                        label: `VM${newId}`, 
-                        x: xPos, 
-                        y: yPos 
-                    });
+                    nodes.add({ id: newId, label: `VM${newId}`, x: xPos, y: yPos });
                     
                     const parentId = startId + Math.floor((currentId - startId) / 2);
                     edges.add({ from: parentId, to: newId });
@@ -966,7 +1326,6 @@
                     edges.add({ from: currentId - 1, to: currentId });
                 }
             }
-            // Conectar el último con el primero para cerrar el anillo
             edges.add({ from: nodeId - 1, to: startId });
         }
 
@@ -985,7 +1344,6 @@
                 nodeIds.push(currentId);
             }
             
-            // Conectar todos los nodos entre sí
             for (let i = 0; i < nodeIds.length; i++) {
                 for (let j = i + 1; j < nodeIds.length; j++) {
                     edges.add({ from: nodeIds[i], to: nodeIds[j] });
@@ -1021,21 +1379,13 @@
         }
 
         function generateReview() {
-            // Basic information
-            document.getElementById('review-name').textContent = 
-                document.getElementById('slice-name').value;
-            document.getElementById('review-vm-count').textContent = 
-                document.getElementById('vm-count').value;
-            document.getElementById('review-description').textContent = 
-                document.getElementById('slice-description').value || 'Sin descripción';
-            
-            // Topology information
+            document.getElementById('review-name').textContent = document.getElementById('slice-name').value;
+            document.getElementById('review-vm-count').textContent = document.getElementById('vm-count').value;
+            document.getElementById('review-description').textContent = document.getElementById('slice-description').value || 'Sin descripción';
             document.getElementById('review-nodes').textContent = nodes.length;
             document.getElementById('review-connections').textContent = edges.length;
-            document.getElementById('review-topology-type').textContent = 
-                topologyType === 'custom' ? 'Personalizada' : 'Plantilla';
+            document.getElementById('review-topology-type').textContent = topologyType === 'custom' ? 'Personalizada' : 'Plantilla';
             
-            // VM configurations
             const vmReviewList = document.getElementById('vm-review-list');
             vmReviewList.innerHTML = '';
             

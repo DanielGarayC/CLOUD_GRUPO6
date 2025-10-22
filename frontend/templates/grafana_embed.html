@@ -6,8 +6,44 @@
     <title>TeleFlow - Monitoreo</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f8fafc; min-height: 100vh; }
+        .top-bar { 
+            background: #ffffff; 
+            border-bottom: 1px solid #e2e8f0; 
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); 
+            padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        .dashboard-page {
+            padding-top: 80px;
+        }
+        .navbar-brand { font-size: 1.5rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.75rem; }
+        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25); }
+        .main-content { max-width: 1400px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .page-header { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15); }
+        .page-title { font-size: 2rem; font-weight: 700; color: white; margin-bottom: 0.5rem; }
+        .page-subtitle { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; margin: 0; }
+        .content-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); overflow: hidden; }
+        .btn { font-weight: 500; border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.875rem; transition: all 0.2s ease; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+        .btn-outline-secondary { color: #64748b; border-color: #cbd5e1; background: #f8fafc; }
+        .btn-outline-secondary:hover { background: #e2e8f0; border-color: #94a3b8; color: #475569; }
+        .alert { border-radius: 10px; border: 1px solid; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+        .alert-success { background-color: #dcfce7; border-color: #86efac; color: #166534; }
+        .alert-danger { background-color: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+        .alert-warning { background-color: #fef3c7; border-color: #fcd34d; color: #92400e; }
+        .user-badge { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border: 1px solid #cbd5e1; border-radius: 10px; padding: 0.5rem 1rem; }
+        .user-avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-outline-light { color: #64748b; border-color: #cbd5e1; background: #f8fafc; }
+        .btn-outline-light:hover { background: #e2e8f0; border-color: #94a3b8; color: #475569; }
+        .btn-sm { padding: 0.4rem 0.85rem; font-size: 0.8rem; }
         .monitoring-frame {
             width: 100%;
             height: calc(100vh - 220px);
@@ -22,8 +58,25 @@
         <nav class="top-bar">
             <div class="container-fluid">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span class="navbar-brand mb-0">TeleFlow</span>
-                    
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="logo-icon"><i class="fas fa-network-wired text-white"></i></div>
+                        <div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">TeleFlow</div>
+                            <small style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Network Orchestration</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="user-badge d-flex align-items-center gap-2">
+                            <div class="user-avatar"><i class="fas fa-user text-white" style="font-size: 0.75rem;"></i></div>
+                            <div>
+                                <div style="font-size: 0.875rem; font-weight: 600; color: #0f172a;">{{ user.nombre }}</div>
+                                <div style="font-size: 0.7rem; color: #64748b;">Administrador</div>
+                            </div>
+                        </div>
+                        <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-sign-out-alt me-1"></i>Salir
+                        </a>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -50,6 +103,7 @@
                 {% if messages %}
                     {% for category, message in messages %}
                         <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-triangle' if category == 'warning' else 'times-circle' }} me-2"></i>
                             {{ message }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>

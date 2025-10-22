@@ -6,7 +6,101 @@
     <title>TeleFlow - Dashboard</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f8fafc; min-height: 100vh; }
+        .top-bar { 
+            background: #ffffff; 
+            border-bottom: 1px solid #e2e8f0; 
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); 
+            padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        .dashboard-page {
+            padding-top: 80px;
+        }
+        .navbar-brand { font-size: 1.5rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.75rem; }
+        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25); }
+        .main-content { max-width: 1400px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .page-header { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15); }
+        .page-title { font-size: 2rem; font-weight: 700; color: white; margin-bottom: 0.5rem; }
+        .page-subtitle { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; margin: 0; }
+        .content-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); overflow: hidden; }
+        .data-table { margin: 0; }
+        .data-table thead { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); }
+        .data-table thead th { padding: 1rem 1.5rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #475569; border-bottom: 2px solid #e2e8f0; }
+        .data-table tbody tr { transition: all 0.15s ease; border-bottom: 1px solid #f1f5f9; }
+        .data-table tbody tr:hover { background: #f8fafc; }
+        .data-table tbody td { padding: 1rem 1.5rem; vertical-align: middle; }
+        .slice-link { font-weight: 600; color: #0ea5e9; text-decoration: none; transition: all 0.2s ease; }
+        .slice-link:hover { color: #0284c7; transform: translateX(2px); }
+        .badge { padding: 0.35rem 0.85rem; border-radius: 16px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; border: 1px solid; }
+        .bg-success { background-color: #dcfce7 !important; color: #166534 !important; border-color: #86efac !important; }
+        .bg-danger { background-color: #fee2e2 !important; color: #991b1b !important; border-color: #fca5a5 !important; }
+        .bg-warning { background-color: #fef3c7 !important; color: #92400e !important; border-color: #fcd34d !important; }
+        .bg-info { background-color: #dbeafe !important; color: #1e40af !important; border-color: #93c5fd !important; }
+        .bg-secondary { background-color: #f1f5f9 !important; color: #475569 !important; border-color: #cbd5e1 !important; }
+        .btn { font-weight: 500; border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.875rem; transition: all 0.2s ease; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: white; }
+        .btn-outline-primary { color: #0ea5e9; border-color: #bae6fd; background: #f0f9ff; }
+        .btn-outline-primary:hover { background: #e0f2fe; border-color: #7dd3fc; color: #0284c7; }
+        .btn-outline-warning { color: #f59e0b; border-color: #fde68a; background: #fffbeb; }
+        .btn-outline-warning:hover { background: #fef3c7; border-color: #fcd34d; color: #d97706; }
+        .btn-outline-danger { color: #ef4444; border-color: #fecaca; background: #fef2f2; }
+        .btn-outline-danger:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+        .btn-outline-light { color: #64748b; border-color: #cbd5e1; background: #f8fafc; }
+        .btn-outline-light:hover { background: #e2e8f0; border-color: #94a3b8; color: #475569; }
+        .btn-sm { padding: 0.4rem 0.85rem; font-size: 0.8rem; }
+        .alert { border-radius: 10px; border: 1px solid; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+        .alert-success { background-color: #dcfce7; border-color: #86efac; color: #166534; }
+        .alert-danger { background-color: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+        .alert-warning { background-color: #fef3c7; border-color: #fcd34d; color: #92400e; }
+        .slice-details { margin-top: 2rem; padding: 1.5rem; background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); }
+        .icon-wrapper { width: 36px; height: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+        .user-badge { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border: 1px solid #cbd5e1; border-radius: 10px; padding: 0.5rem 1rem; }
+        .user-avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+        .name-cell .name-icon {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            width: 32px; 
+            height: 32px; 
+            border-radius: 10px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+        }
+        .name-cell .name-text .slice-title {
+            font-weight: 700; 
+            color: #0f172a; 
+            font-size: 0.95rem; 
+            letter-spacing: 0.2px;
+        }
+        .name-cell .d-flex {
+            gap: 0.5rem;
+            padding: 0.25rem 0;
+        }
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+        .empty-state-icon {
+            width: 64px;
+            height: 64px;
+            background: #f1f5f9;
+            border-radius: 16px;
+            border: 2px solid #cbd5e1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+    </style>
 </head>
 <body>
     <div class="dashboard-page">
@@ -14,11 +108,23 @@
         <nav class="top-bar">
             <div class="container-fluid">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span class="navbar-brand mb-0">TeleFlow</span>
-                    <div class="d-flex align-items-center">
-                        <span class="me-3">Bienvenido, {{ user.nombre }}</span>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="logo-icon"><i class="fas fa-network-wired text-white"></i></div>
+                        <div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">TeleFlow</div>
+                            <small style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Network Orchestration</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="user-badge d-flex align-items-center gap-2">
+                            <div class="user-avatar"><i class="fas fa-user text-white" style="font-size: 0.75rem;"></i></div>
+                            <div>
+                                <div style="font-size: 0.875rem; font-weight: 600; color: #0f172a;">{{ user.nombre }}</div>
+                                <div style="font-size: 0.7rem; color: #64748b;">Administrador</div>
+                            </div>
+                        </div>
                         <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
-                            <i class="fas fa-sign-out-alt me-1"></i>Logout
+                            <i class="fas fa-sign-out-alt me-1"></i>Salir
                         </a>
                     </div>
                 </div>
@@ -30,8 +136,8 @@
             <div class="page-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h1 class="page-title">TeleFlow - Slices</h1>
-                        <p class="page-subtitle">Información general sobre los slices existentes</p>
+                        <h1 class="page-title">Network Slices</h1>
+                        <p class="page-subtitle">Gestiona y monitorea tus topologías de red virtualizadas</p>
                     </div>
                     <div>
                         <a href="{{ url_for('create_slice') }}" class="btn btn-success">
@@ -41,19 +147,20 @@
                 </div>
             </div>
 
+            <!-- Alertas de Flask -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
                         <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-triangle' if category == 'warning' else 'times-circle' }} me-2"></i>
                             {{ message }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     {% endfor %}
                 {% endif %}
             {% endwith %}
-
+            
             <div class="content-card">
-                <!-- Tabla de Slices -->
                 <table class="table data-table">
                     <thead>
                         <tr>
@@ -68,12 +175,34 @@
                     <tbody>
                         {% for slice in slices %}
                         <tr>
-                            <!-- ✅ CORREGIDO: Usar consistentemente slice.idslice -->
-                            <td><a href="#" class="text-decoration-none slice-link" data-slice-id="{{ slice.idslice }}" onclick="selectSlice({{ slice.idslice }})">Slice #{{ slice.idslice }}</a></td>
-                            <td>{{ slice.nombre or 'Slice sin nombre' }}</td>
-                            <td>{{ slice.instancias|length }} VMs</td>
-                            <!-- ✅ CORREGIDO: Manejo seguro de fechas -->
-                            <td>{{ slice.fecha_creacion.strftime('%Y-%m-%d') if slice.fecha_creacion else 'N/A' }}</td>
+                            <td>
+                                <a href="#" class="slice-link" data-slice-id="{{ slice.idslice }}" onclick="selectSlice({{ slice.idslice }}); return false;">
+                                    Slice #{{ slice.idslice }}
+                                </a>
+                            </td>
+                            <td class="name-cell">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="icon-wrapper name-icon">
+                                        <i class="fas fa-layer-group text-white"></i>
+                                    </div>
+                                    <div class="name-text">
+                                        <div class="slice-title">{{ slice.nombre or 'Slice sin nombre' }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span style="font-weight: 500; color: #0f172a; font-size: 0.875rem;">
+                                        {{ slice.instancias|length }} VMs
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2" style="color: #64748b; font-size: 0.875rem;">
+                                    <i class="fas fa-calendar" style="font-size: 0.75rem;"></i>
+                                    <span>{{ slice.fecha_creacion.strftime('%Y-%m-%d') if slice.fecha_creacion else 'N/A' }}</span>
+                                </div>
+                            </td>
                             <td>
                                 <span class="badge 
                                     {% if slice.estado == 'RUNNING' %}bg-success
@@ -82,51 +211,71 @@
                                     {% elif slice.estado == 'DEPLOYING' %}bg-info
                                     {% else %}bg-secondary{% endif %}" 
                                     id="slice-status-{{ slice.idslice }}">
-                                    {{ slice.estado }}
+                                    <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>{{ slice.estado }}
                                 </span>
                             </td>
                             <td>
-                                <!-- ✅ CORREGIDO: IDs consistentes -->
-                                <a href="{{ url_for('slice_topology', slice_id=slice.idslice) }}" class="btn btn-sm btn-outline-primary me-1">
-                                    <i class="fas fa-project-diagram me-1"></i>Ver Topología
-                                </a>
-                                
-                                {% if slice.estado in ['STOPPED', 'DRAW'] %}
-                                    <a href="{{ url_for('edit_slice', slice_id=slice.idslice) }}" 
-                                    class="btn btn-sm btn-outline-warning btn-sm me-1">
-                                        <i class="fas fa-edit me-1"></i> Editar
+                                <div class="d-flex gap-2">
+                                    <a href="{{ url_for('slice_topology', slice_id=slice.idslice) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-project-diagram me-1"></i>Topología
                                     </a>
-                                {% endif %}
-                                
-                                 {% if slice.estado in ['DRAW', 'STOPPED'] %}
-                                    <button class="btn btn-sm btn-outline-danger" 
-                                            onclick="deleteSlice({{ slice.idslice }}, '{{ slice.nombre or 'Slice #' + slice.idslice|string }}', '{{ slice.estado }}')"
-                                            id="delete-btn-{{ slice.idslice }}"
-                                            title="Eliminar Slice">
-                                        <i class="fas fa-trash me-1"></i>Eliminar
-                                    </button>
-                                {% endif %}
-                                {% if slice.estado == 'DRAW' %}
-                                    <button class="btn btn-sm btn-success me-1" 
-                                            onclick="deploySlice({{ slice.idslice }}, '{{ slice.nombre }}')"
-                                            id="deploy-btn-{{ slice.idslice }}">
-                                        <i class="fas fa-rocket me-1"></i> Desplegar
-                                    </button>
-                                {% endif %}
+                                    
+                                    {% if slice.estado in ['STOPPED', 'DRAW'] %}
+                                        <a href="{{ url_for('edit_slice', slice_id=slice.idslice) }}" class="btn btn-sm btn-outline-warning">
+                                            <i class="fas fa-edit me-1"></i>Editar
+                                        </a>
+                                    {% endif %}
+                                    
+                                    {% if slice.estado in ['DRAW', 'STOPPED'] %}
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="deleteSlice({{ slice.idslice }}, '{{ slice.nombre or 'Slice #' + slice.idslice|string }}', '{{ slice.estado }}')"
+                                                id="delete-btn-{{ slice.idslice }}">
+                                            <i class="fas fa-trash me-1"></i>Eliminar
+                                        </button>
+                                    {% endif %}
+                                    
+                                    {% if slice.estado == 'DRAW' %}
+                                        <button class="btn btn-sm btn-success" 
+                                                onclick="deploySlice({{ slice.idslice }}, '{{ slice.nombre }}')"
+                                                id="deploy-btn-{{ slice.idslice }}">
+                                            <i class="fas fa-rocket me-1"></i>Desplegar
+                                        </button>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
+                        
                         {% if not slices %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No hay slices disponibles</td>
+                            <td colspan="6" class="empty-state">
+                                <div class="d-flex flex-column align-items-center gap-3">
+                                    <div class="empty-state-icon">
+                                        <i class="fas fa-inbox" style="font-size: 2rem; color: #94a3b8;"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 600; color: #475569; font-size: 1rem; margin-bottom: 0.25rem;">
+                                            No hay slices disponibles
+                                        </div>
+                                        <div style="color: #94a3b8; font-size: 0.875rem;">
+                                            Crea tu primer slice para comenzar
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
                         </tr>
                         {% endif %}
                     </tbody>
                 </table>
-
+                
                 <!-- Panel de detalles del slice -->
-                <div id="sliceDetails" class="slice-details mt-4" style="display: none;">
-                    <h4>Detalles del Slice</h4>
+                <div id="sliceDetails" class="slice-details" style="display: none;">
+                    <div class="d-flex align-items-center gap-3 pb-3 mb-4 border-bottom">
+                        <div class="icon-wrapper" style="background: #f0f9ff; border: 1px solid #bae6fd;">
+                            <i class="fas fa-info-circle" style="color: #0ea5e9;"></i>
+                        </div>
+                        <h4 style="margin: 0; font-weight: 700; color: #0f172a; font-size: 1.25rem;">Detalles del Slice</h4>
+                    </div>
                     <div class="card">
                         <div class="card-body">
                             <div class="row">
@@ -139,34 +288,28 @@
                                     <p><strong>Instancias:</strong> <span id="detailInstances"></span></p>
                                     <p><strong>Propietario:</strong> <span id="detailOwner"></span></p>
                                     <div id="detailActions">
-                                        <a href="#" id="viewTopologyLink" class="btn btn-primary btn-sm">
+                                        <a href="#" id="viewTopologyLink" class="btn btn-outline-primary btn-sm">
                                             <i class="fas fa-project-diagram me-1"></i>Ver Topología
                                         </a>
                                     </div>
                                 </div>
                             </div>
-                            <div class="row mt-3" id="instancesList">
-                                <!-- Instances will be loaded here -->
-                            </div>
+                            <div class="row mt-3" id="instancesList"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
     // 🟢 FUNCIÓN PARA DESPLEGAR SLICE
     function deploySlice(sliceId, sliceName) {
-        // Confirmar acción
         if (!confirm(`¿Estás seguro de que quieres desplegar el slice "${sliceName}"?\n\nEsto enviará el slice al orquestador para su implementación.`)) {
             return;
         }
         
-        // Deshabilitar botón y mostrar loading
         const deployBtn = document.getElementById(`deploy-btn-${sliceId}`);
         if (!deployBtn) {
             console.error(`No se encontró el botón deploy-btn-${sliceId}`);
@@ -177,7 +320,6 @@
         deployBtn.disabled = true;
         deployBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Desplegando...';
         
-        // Enviar solicitud
         fetch(`/deploy_slice/${sliceId}`, {
             method: 'POST',
             headers: {
@@ -187,35 +329,17 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Éxito
                 showAlert('success', `¡Slice "${sliceName}" enviado a despliegue exitosamente!`);
-                
-                // Actualizar interfaz
                 deployBtn.innerHTML = '<i class="fas fa-cogs"></i> Desplegando';
-                deployBtn.className = 'btn btn-info btn-sm me-1';
+                deployBtn.className = 'btn btn-info btn-sm';
                 deployBtn.disabled = true;
-                
-                // Actualizar estado en la tabla
                 updateSliceStatus(sliceId, data.new_status);
                 
-                // Mostrar detalles del plan de despliegue
-                if (data.deployment_plan) {
-                    showDeploymentDetails(data.deployment_plan, data.workers_status);
-                }
-                
-                // Recargar página después de 3 segundos
                 setTimeout(() => {
                     location.reload();
                 }, 3000);
-                
             } else {
-                // Error
                 showAlert('error', `Error desplegando slice: ${data.error}`);
-                if (data.details) {
-                    console.error('Detalles del error:', data.details);
-                }
-                
-                // Restaurar botón
                 deployBtn.disabled = false;
                 deployBtn.innerHTML = originalHtml;
             }
@@ -223,121 +347,40 @@
         .catch(error => {
             console.error('Error:', error);
             showAlert('error', 'Error de comunicación con el servidor');
-            
-            // Restaurar botón
             deployBtn.disabled = false;
             deployBtn.innerHTML = originalHtml;
         });
     }
 
-    // 🟢 FUNCIÓN PARA MOSTRAR ALERTAS
-    function showAlert(type, message) {
-        // Remover alertas anteriores
-        const existingAlerts = document.querySelectorAll('.alert');
-        existingAlerts.forEach(alert => alert.remove());
-        
-        // Crear alerta Bootstrap
-        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
-        const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle';
-        
-        const alertHtml = `
-            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
-                <i class="fas ${iconClass} me-2"></i>${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        
-        // Insertar al inicio del contenido principal
-        const mainContent = document.querySelector('.main-content');
-        if (mainContent) {
-            mainContent.insertAdjacentHTML('afterbegin', alertHtml);
-            
-            // Auto-hide después de 5 segundos
-            setTimeout(() => {
-                const alert = mainContent.querySelector('.alert');
-                if (alert) {
-                    alert.remove();
-                }
-            }, 5000);
-        }
-    }
-
-    // 🟢 FUNCIÓN PARA ACTUALIZAR ESTADO DEL SLICE EN LA TABLA
-    function updateSliceStatus(sliceId, newStatus) {
-        const statusCell = document.querySelector(`#slice-status-${sliceId}`);
-        if (statusCell) {
-            let badgeClass = 'bg-secondary';
-            if (newStatus === 'DEPLOYING') badgeClass = 'bg-info';
-            else if (newStatus === 'RUNNING') badgeClass = 'bg-success';
-            else if (newStatus === 'STOPPED') badgeClass = 'bg-danger';
-            else if (newStatus === 'DRAW') badgeClass = 'bg-warning';
-            
-            statusCell.className = `badge ${badgeClass}`;
-            statusCell.textContent = newStatus;
-        }
-    }
-
-    // 🟢 FUNCIÓN PARA MOSTRAR DETALLES DEL DESPLIEGUE
-    function showDeploymentDetails(deploymentPlan, workersStatus) {
-        let detailsHtml = '<div class="mt-3"><h6>Plan de Despliegue:</h6><ul>';
-        
-        deploymentPlan.forEach(vm => {
-            const vlansText = vm.vlans && vm.vlans.length > 0 ? vm.vlans.join(', ') : 'Sin VLANs';
-            detailsHtml += `
-                <li><strong>${vm.nombre_vm}</strong>: 
-                    Worker ${vm.worker}, 
-                    VLANs: ${vlansText}, 
-                    VNC: ${vm.puerto_vnc || 'N/A'}
-                </li>
-            `;
-        });
-        
-        detailsHtml += '</ul></div>';
-        
-        // Mostrar en consola por ahora (puedes implementar modal después)
-        console.log('Detalles del despliegue:', deploymentPlan);
-    }
-
-    // ✅ PLACEHOLDER: Función deleteSlice (implementar según necesites)
-    // 🟢 FUNCIÓN MEJORADA - Recibe estado como parámetro
+    // 🟢 FUNCIÓN PARA ELIMINAR SLICE
     function deleteSlice(sliceId, sliceName, sliceStatus) {
-        // Verificar que el estado permite eliminación
         if (!['DRAW', 'STOPPED'].includes(sliceStatus)) {
-            showAlert('error', ` No se puede eliminar slice en estado "${sliceStatus}". Solo se permiten estados DRAW o STOPPED.`);
+            showAlert('error', `No se puede eliminar slice en estado "${sliceStatus}". Solo se permiten estados DRAW o STOPPED.`);
             return;
         }
         
-        // Mensajes específicos por estado
         let confirmMessage;
         if (sliceStatus === 'DRAW') {
-            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\n Estado: DRAW\n El slice será eliminado de la base de datos únicamente.\n\nEsta acción no se puede deshacer.`;
+            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\nEstado: DRAW\nEl slice será eliminado de la base de datos únicamente.\n\nEsta acción no se puede deshacer.`;
         } else if (sliceStatus === 'STOPPED') {
-            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\n Estado: STOPPED\n ADVERTENCIA: Esto eliminará TODA la infraestructura desplegada:\n\n• Máquinas virtuales\n• Recursos de red (VLANs, puertos VNC)\n• Configuraciones de red\n• Procesos del sistema\n\nEsta acción no se puede deshacer.`;
+            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\nEstado: STOPPED\nADVERTENCIA: Esto eliminará TODA la infraestructura desplegada:\n\n• Máquinas virtuales\n• Recursos de red (VLANs, puertos VNC)\n• Configuraciones de red\n• Procesos del sistema\n\nEsta acción no se puede deshacer.`;
         }
         
         if (!confirm(confirmMessage)) {
             return;
         }
         
-        // Obtener botón de eliminación
         const deleteBtn = document.getElementById(`delete-btn-${sliceId}`);
         if (!deleteBtn) {
-            showAlert('error', '❌ Error: No se encontró el botón de eliminación');
+            showAlert('error', 'Error: No se encontró el botón de eliminación');
             return;
         }
         
         const originalHtml = deleteBtn.innerHTML;
         deleteBtn.disabled = true;
-        
-        // Loading diferente según estado
-        if (sliceStatus === 'DRAW') {
-            deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Eliminando...';
-        } else {
-            deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Limpiando infraestructura...';
-        }
-        
-        // Timestamp para tracking
-        const startTime = Date.now();
+        deleteBtn.innerHTML = sliceStatus === 'DRAW' ? 
+            '<i class="fas fa-spinner fa-spin"></i> Eliminando...' : 
+            '<i class="fas fa-spinner fa-spin"></i> Limpiando infraestructura...';
         
         fetch(`/delete_slice/${sliceId}`, {
             method: 'POST',
@@ -345,102 +388,27 @@
                 'Content-Type': 'application/json',
             }
         })
-        .then(response => {
-            const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-            return response.json().then(data => ({
-                status: response.status,
-                data: data,
-                duration: duration
-            }));
-        })
-        .then(({status, data, duration}) => {
+        .then(response => response.json())
+        .then(data => {
             if (data.success) {
-                // ✅ ÉXITO
-                const deleteType = data.type || 'unknown';
-                let successMessage = ` Slice "${sliceName}" eliminado exitosamente (${duration}s)`;
-                
-                if (deleteType === 'simple_delete') {
-                    successMessage += '\n Eliminado de la base de datos';
-                    if (data.details) {
-                        successMessage += `\n• Instancias: ${data.details.instancias_eliminadas}`;
-                        successMessage += `\n• Enlaces: ${data.details.enlaces_eliminados}`;
-                    }
-                } else if (deleteType === 'infrastructure_delete') {
-                    successMessage += '\n Infraestructura completamente limpiada';
-                    if (data.details) {
-                        successMessage += `\n• VMs eliminadas: ${data.details.vms_eliminadas || 0}`;
-                        successMessage += `\n• VLANs liberadas: ${data.details.vlans_liberadas || 0}`;
-                        successMessage += `\n• Puertos VNC liberados: ${data.details.vncs_liberados || 0}`;
-                    }
-                }
-                
-                showAlert('success', successMessage);
-                
-                // Remover fila con animación
+                showAlert('success', `Slice "${sliceName}" eliminado exitosamente`);
                 removeSliceRow(sliceId);
-                
             } else {
-                // ❌ ERROR O ELIMINACIÓN PARCIAL
-                handleDeleteError(data, sliceName, deleteBtn, originalHtml);
+                showAlert('error', data.error || 'Error eliminando slice');
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalHtml;
             }
         })
         .catch(error => {
-            console.error('Delete error:', error);
-            showAlert('error', ` Error de comunicación eliminando slice "${sliceName}"`);
-            
-            // Restaurar botón
+            console.error('Error:', error);
+            showAlert('error', 'Error de comunicación con el servidor');
             deleteBtn.disabled = false;
             deleteBtn.innerHTML = originalHtml;
         });
     }
-
-    // 🟢 FUNCIÓN PARA MANEJAR ERRORES DE ELIMINACIÓN
-    function handleDeleteError(data, sliceName, deleteBtn, originalHtml) {
-        const errorType = data.type || 'unknown_error';
-        let errorMessage = data.error || 'Error desconocido eliminando slice';
-        
-        if (errorType === 'partial_delete') {
-            errorMessage = ` Eliminación parcial del slice "${sliceName}"\n\n${data.message || 'Algunos recursos pueden no haberse liberado.'}\n\nVerifica manualmente el estado de la infraestructura.`;
-            showAlert('warning', errorMessage);
-        } else if (errorType === 'timeout_error') {
-            errorMessage = ` Timeout eliminando slice "${sliceName}"\n\nLa operación puede estar aún en progreso.\nVerifica el estado del slice en unos minutos.`;
-            showAlert('warning', errorMessage);
-        } else if (errorType === 'communication_error') {
-            errorMessage = ` Error de comunicación con Slice Manager\n\n${data.message || errorMessage}\n\nIntenta nuevamente en unos momentos.`;
-            showAlert('error', errorMessage);
-        } else {
-            showAlert('error', ` ${errorMessage}`);
-        }
-        
-        // Restaurar botón
-        deleteBtn.disabled = false;
-        deleteBtn.innerHTML = originalHtml;
-    }
-
-    // 🟢 FUNCIÓN PARA REMOVER FILA DE LA TABLA
-    function removeSliceRow(sliceId) {
-        const row = document.querySelector(`[data-slice-id="${sliceId}"]`)?.closest('tr');
-        if (row) {
-            row.style.transition = 'opacity 0.5s, transform 0.5s';
-            row.style.opacity = '0';
-            row.style.transform = 'translateX(-20px)';
-            
-            setTimeout(() => {
-                row.remove();
-                
-                // Verificar si quedan slices
-                const remainingRows = document.querySelectorAll('.data-table tbody tr:not([style*="opacity: 0"])');
-                if (remainingRows.length === 0) {
-                    const tbody = document.querySelector('.data-table tbody');
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="fas fa-inbox me-2"></i>No hay slices disponibles</td></tr>';
-                }
-            }, 500);
-        }
-    }
-
-    // 🟢 FUNCIÓN MEJORADA PARA ALERTAS
+    
+    // 🟢 FUNCIÓN PARA MOSTRAR ALERTAS
     function showAlert(type, message) {
-        // Remover alertas anteriores
         const existingAlerts = document.querySelectorAll('.alert');
         existingAlerts.forEach(alert => {
             alert.style.transition = 'opacity 0.3s';
@@ -448,20 +416,8 @@
             setTimeout(() => alert.remove(), 300);
         });
         
-        // Determinar clase y icono
-        let alertClass, iconClass;
-        if (type === 'success') {
-            alertClass = 'alert-success';
-            iconClass = 'fa-check-circle';
-        } else if (type === 'warning') {
-            alertClass = 'alert-warning';
-            iconClass = 'fa-exclamation-triangle';
-        } else {
-            alertClass = 'alert-danger';
-            iconClass = 'fa-times-circle';
-        }
-        
-        // Formatear mensaje multilínea
+        const alertClass = type === 'success' ? 'alert-success' : type === 'warning' ? 'alert-warning' : 'alert-danger';
+        const iconClass = type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-times-circle';
         const formattedMessage = message.replace(/\n/g, '<br>');
         
         const alertHtml = `
@@ -474,16 +430,14 @@
         
         const mainContent = document.querySelector('.main-content');
         if (mainContent) {
-            mainContent.insertAdjacentHTML('afterbegin', alertHtml);
-            
-            // Animar entrada
+            const pageHeader = mainContent.querySelector('.page-header');
+            pageHeader.insertAdjacentHTML('afterend', alertHtml);
             const newAlert = mainContent.querySelector('.alert');
             setTimeout(() => {
                 newAlert.style.transition = 'opacity 0.3s';
                 newAlert.style.opacity = '1';
             }, 10);
             
-            // Auto-hide según tipo
             const hideDelay = type === 'success' ? 5000 : 10000;
             setTimeout(() => {
                 if (newAlert && newAlert.parentNode) {
@@ -493,11 +447,66 @@
             }, hideDelay);
         }
     }
-
-    // ✅ PLACEHOLDER: Función selectSlice (implementar según necesites)
+    
+    // 🟢 FUNCIÓN PARA ACTUALIZAR ESTADO
+    function updateSliceStatus(sliceId, newStatus) {
+        const statusCell = document.querySelector(`#slice-status-${sliceId}`);
+        if (statusCell) {
+            let badgeClass = 'bg-secondary';
+            if (newStatus === 'DEPLOYING') badgeClass = 'bg-info';
+            else if (newStatus === 'RUNNING') badgeClass = 'bg-success';
+            else if (newStatus === 'STOPPED') badgeClass = 'bg-danger';
+            else if (newStatus === 'DRAW') badgeClass = 'bg-warning';
+            
+            statusCell.className = `badge ${badgeClass}`;
+            statusCell.innerHTML = `<i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>${newStatus}`;
+        }
+    }
+    
+    // 🟢 FUNCIÓN PARA REMOVER FILA
+    function removeSliceRow(sliceId) {
+        const row = document.querySelector(`[data-slice-id="${sliceId}"]`)?.closest('tr');
+        if (row) {
+            row.style.transition = 'opacity 0.5s, transform 0.5s';
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-20px)';
+            
+            setTimeout(() => {
+                row.remove();
+                const remainingRows = document.querySelectorAll('.data-table tbody tr:not([style*="opacity: 0"])');
+                if (remainingRows.length === 0) {
+                    const tbody = document.querySelector('.data-table tbody');
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="empty-state">
+                                <div class="d-flex flex-column align-items-center gap-3">
+                                    <div class="empty-state-icon">
+                                        <i class="fas fa-inbox" style="font-size: 2rem; color: #94a3b8;"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 600; color: #475569; font-size: 1rem; margin-bottom: 0.25rem;">
+                                            No hay slices disponibles
+                                        </div>
+                                        <div style="color: #94a3b8; font-size: 0.875rem;">
+                                            Crea tu primer slice para comenzar
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }
+            }, 500);
+        }
+    }
+    
+    // 🟢 FUNCIÓN PARA SELECCIONAR SLICE
     function selectSlice(sliceId) {
-        console.log(`Slice seleccionado: ${sliceId}`);
-        // Implementar lógica de selección si es necesaria
+        console.log('Slice seleccionado: ' + sliceId);
+        const detailsPanel = document.getElementById('sliceDetails');
+        if (detailsPanel) {
+            detailsPanel.style.display = 'block';
+        }
     }
     </script>
 </body>
