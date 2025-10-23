@@ -1219,6 +1219,111 @@ def check_slice_status(slice_id):
         'total_vms': len(slice_obj.instancias)
     })
 
+# ==========================================
+# RUTAS DE GESTIÓN DE USUARIOS
+# ==========================================
+
+@app.route('/users')
+def list_users():
+    """Lista de usuarios - solo para administradores"""
+    if 'user_id' not in session:
+        flash('Por favor inicia sesión para acceder a esta página', 'error')
+        return redirect(url_for('login'))
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('Usuario no encontrado', 'error')
+        return redirect(url_for('login'))
+    
+    # Verificar que sea administrador
+    if not is_admin_user(user):
+        flash('Acceso denegado - Se requieren privilegios de administrador', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Obtener todos los usuarios con sus roles
+    all_users = User.query.join(Rol).all()
+    
+    return render_template('users.html', users=all_users, current_user=user)
+
+
+@app.route('/delete_user/<int:user_id>', methods=['POST'])
+def delete_user(user_id):
+    """Eliminar un usuario - solo administradores"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autenticado'}), 401
+    
+    current_user = User.query.get(session['user_id'])
+    if not current_user or not is_admin_user(current_user):
+        return jsonify({'error': 'Acceso denegado'}), 403
+    
+    # No permitir auto-eliminación
+    if user_id == current_user.idusuario:
+        return jsonify({
+            'success': False,
+            'error': 'No puedes eliminar tu propio usuario'
+        }), 400
+    
+    user_to_delete = User.query.get_or_404(user_id)
+    username = user_to_delete.nombre
+    
+    try:
+        # Verificar si el usuario tiene slices asociados
+        slices_count = len(user_to_delete.slices)
+        
+        if slices_count > 0:
+            return jsonify({
+                'success': False,
+                'error': f'El usuario tiene {slices_count} slice(s) asociado(s). Elimina o reasigna los slices primero.'
+            }), 400
+        
+        # Eliminar usuario
+        db.session.delete(user_to_delete)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Usuario "{username}" eliminado exitosamente'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Error eliminando usuario: {str(e)}'
+        }), 500
+
+
+@app.route('/user_details/<int:user_id>')
+def user_details(user_id):
+    """Obtener detalles de un usuario - para modal o AJAX"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autenticado'}), 401
+    
+    current_user = User.query.get(session['user_id'])
+    if not current_user or not is_admin_user(current_user):
+        return jsonify({'error': 'Acceso denegado'}), 403
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Obtener información de los slices del usuario
+    slices_info = []
+    for slice_obj in user.slices:
+        slices_info.append({
+            'id': slice_obj.idslice,
+            'nombre': slice_obj.nombre,
+            'estado': slice_obj.estado,
+            'instancias_count': len(slice_obj.instancias)
+        })
+    
+    return jsonify({
+        'id': user.idusuario,
+        'nombre': user.nombre,
+        'rol': user.rol.nombre_rol if user.rol else 'N/A',
+        'rol_id': user.rol_idrol,
+        'slices_count': len(user.slices),
+        'slices': slices_info
+    })
+
 if __name__ == '__main__':
     initialize_database()
     app.run(debug=True, host='0.0.0.0', port=5000)

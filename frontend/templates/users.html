@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeleFlow - Gestión de Usuarios</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f8fafc; min-height: 100vh; }
+        .top-bar { 
+            background: #ffffff; 
+            border-bottom: 1px solid #e2e8f0; 
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); 
+            padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        .users-page { padding-top: 80px; }
+        .logo-icon { 
+            width: 40px; 
+            height: 40px; 
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); 
+            border-radius: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25); 
+        }
+        .main-content { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 2rem 1.5rem; 
+        }
+        .page-header { 
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); 
+            border-radius: 12px; 
+            padding: 2rem; 
+            margin-bottom: 2rem; 
+            box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15); 
+        }
+        .page-title { 
+            font-size: 2rem; 
+            font-weight: 700; 
+            color: white; 
+            margin-bottom: 0.5rem; 
+        }
+        .page-subtitle { 
+            color: rgba(255, 255, 255, 0.9); 
+            font-size: 0.95rem; 
+            margin: 0; 
+        }
+        .content-card { 
+            background: white; 
+            border-radius: 12px; 
+            border: 1px solid #e2e8f0; 
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); 
+            overflow: hidden; 
+        }
+        .data-table { margin: 0; }
+        .data-table thead { 
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); 
+        }
+        .data-table thead th { 
+            padding: 1rem 1.5rem; 
+            font-size: 0.75rem; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+            color: #475569; 
+            border-bottom: 2px solid #e2e8f0; 
+        }
+        .data-table tbody tr { 
+            transition: all 0.15s ease; 
+            border-bottom: 1px solid #f1f5f9; 
+        }
+        .data-table tbody tr:hover { background: #f8fafc; }
+        .data-table tbody td { 
+            padding: 1rem 1.5rem; 
+            vertical-align: middle; 
+        }
+        .user-avatar { 
+            width: 40px; 
+            height: 40px; 
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); 
+            border-radius: 50%; 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+        }
+        .user-info { margin-left: 1rem; }
+        .user-name { 
+            font-weight: 600; 
+            color: #0f172a; 
+            font-size: 0.95rem; 
+        }
+        .user-id { 
+            font-size: 0.8rem; 
+            color: #94a3b8; 
+        }
+        .badge { 
+            padding: 0.35rem 0.85rem; 
+            border-radius: 16px; 
+            font-size: 0.7rem; 
+            font-weight: 600; 
+            letter-spacing: 0.3px; 
+            text-transform: uppercase; 
+            border: 1px solid; 
+        }
+        .bg-success { 
+            background-color: #dcfce7 !important; 
+            color: #166534 !important; 
+            border-color: #86efac !important; 
+        }
+        .bg-warning { 
+            background-color: #fef3c7 !important; 
+            color: #92400e !important; 
+            border-color: #fcd34d !important; 
+        }
+        .bg-info { 
+            background-color: #dbeafe !important; 
+            color: #1e40af !important; 
+            border-color: #93c5fd !important; 
+        }
+        .bg-danger { 
+            background-color: #fee2e2 !important; 
+            color: #991b1b !important; 
+            border-color: #fca5a5 !important; 
+        }
+        .btn { 
+            font-weight: 500; 
+            border-radius: 8px; 
+            padding: 0.5rem 1rem; 
+            font-size: 0.875rem; 
+            transition: all 0.2s ease; 
+        }
+        .btn:hover { 
+            transform: translateY(-1px); 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); 
+        }
+        .btn-sm { 
+            padding: 0.4rem 0.85rem; 
+            font-size: 0.8rem; 
+        }
+        .btn-outline-danger { 
+            color: #ef4444; 
+            border-color: #fecaca; 
+            background: #fef2f2; 
+        }
+        .btn-outline-danger:hover { 
+            background: #fee2e2; 
+            border-color: #fca5a5; 
+            color: #dc2626; 
+        }
+        .btn-outline-light { 
+            color: #64748b; 
+            border-color: #cbd5e1; 
+            background: #f8fafc; 
+        }
+        .btn-outline-light:hover { 
+            background: #e2e8f0; 
+            border-color: #94a3b8; 
+            color: #475569; 
+        }
+        .btn-outline-primary { 
+            color: #0ea5e9; 
+            border-color: #bae6fd; 
+            background: #f0f9ff; 
+        }
+        .btn-outline-primary:hover { 
+            background: #e0f2fe; 
+            border-color: #7dd3fc; 
+            color: #0284c7; 
+        }
+        .alert { 
+            border-radius: 10px; 
+            border: 1px solid; 
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); 
+            padding: 1rem 1.25rem; 
+            margin-bottom: 1.5rem; 
+        }
+        .alert-success { 
+            background-color: #dcfce7; 
+            border-color: #86efac; 
+            color: #166534; 
+        }
+        .alert-danger { 
+            background-color: #fee2e2; 
+            border-color: #fca5a5; 
+            color: #991b1b; 
+        }
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+        .empty-state-icon {
+            width: 64px;
+            height: 64px;
+            background: #f1f5f9;
+            border-radius: 16px;
+            border: 2px solid #cbd5e1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #bae6fd;
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-right: 2rem;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #0284c7;
+        }
+        .stat-label {
+            font-size: 0.875rem;
+            color: #475569;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="users-page">
+        <!-- Barra Superior -->
+        <nav class="top-bar">
+            <div class="container-fluid">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="logo-icon">
+                            <i class="fas fa-network-wired text-white"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">TeleFlow</div>
+                            <small style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Network Orchestration</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-arrow-left me-1"></i>Volver al Dashboard
+                        </a>
+                        <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-sign-out-alt me-1"></i>Salir
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Contenido Principal -->
+        <div class="main-content">
+            <div class="page-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="page-title">Gestión de Usuarios</h1>
+                        <p class="page-subtitle">Administra los usuarios del sistema TeleFlow</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alertas -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            <i class="fas fa-{{ 'check-circle' if category == 'success' else 'times-circle' }} me-2"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Estadísticas -->
+            <div class="stats-card">
+                <div class="stat-item">
+                    <i class="fas fa-users" style="color: #0284c7; font-size: 1.5rem;"></i>
+                    <div>
+                        <div class="stat-value">{{ users|length }}</div>
+                        <div class="stat-label">Usuarios Totales</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-user-shield" style="color: #059669; font-size: 1.5rem;"></i>
+                    <div>
+                        <div class="stat-value">{{ users|selectattr('rol.nombre_rol', 'in', ['administrador', 'superadmin'])|list|length }}</div>
+                        <div class="stat-label">Administradores</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-user" style="color: #7c3aed; font-size: 1.5rem;"></i>
+                    <div>
+                        <div class="stat-value">{{ users|rejectattr('rol.nombre_rol', 'in', ['administrador', 'superadmin'])|list|length }}</div>
+                        <div class="stat-label">Usuarios Regulares</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabla de Usuarios -->
+            <div class="content-card">
+                <table class="table data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Slices Asociados</th>
+                            <th>Fecha Creación</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr id="user-row-{{ user.idusuario }}">
+                            <td>
+                                <span style="font-weight: 600; color: #475569;">#{{ user.idusuario }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="user-avatar">
+                                        <i class="fas fa-user text-white"></i>
+                                    </div>
+                                    <div class="user-info">
+                                        <div class="user-name">{{ user.nombre }}</div>
+                                        <div class="user-id">ID: {{ user.idusuario }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge 
+                                    {% if user.rol.nombre_rol == 'superadmin' %}bg-danger
+                                    {% elif user.rol.nombre_rol == 'administrador' %}bg-warning
+                                    {% elif user.rol.nombre_rol == 'investigador' %}bg-info
+                                    {% else %}bg-success{% endif %}">
+                                    <i class="fas fa-shield-alt me-1" style="font-size: 0.6rem;"></i>
+                                    {{ user.rol.nombre_rol }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas fa-layer-group" style="color: #64748b; font-size: 0.875rem;"></i>
+                                    <span style="font-weight: 500; color: #0f172a;">{{ user.slices|length }} slices</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2" style="color: #64748b; font-size: 0.875rem;">
+                                    <i class="fas fa-calendar"></i>
+                                    <span>N/A</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    {% if user.idusuario != current_user.idusuario %}
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="deleteUser({{ user.idusuario }}, '{{ user.nombre }}')"
+                                                id="delete-user-btn-{{ user.idusuario }}">
+                                            <i class="fas fa-trash me-1"></i>Eliminar
+                                        </button>
+                                    {% else %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-user-circle me-1"></i>Tú
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        
+                        {% if not users %}
+                        <tr>
+                            <td colspan="6" class="empty-state">
+                                <div class="empty-state-icon">
+                                    <i class="fas fa-users" style="font-size: 2rem; color: #94a3b8;"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600; color: #475569; font-size: 1rem;">
+                                        No hay usuarios registrados
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function deleteUser(userId, userName) {
+        if (!confirm(`¿Estás seguro de eliminar al usuario "${userName}"?\n\nEsta acción no se puede deshacer.`)) {
+            return;
+        }
+        
+        const deleteBtn = document.getElementById(`delete-user-btn-${userId}`);
+        const originalHtml = deleteBtn.innerHTML;
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Eliminando...';
+        
+        fetch(`/delete_user/${userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', data.message);
+                removeUserRow(userId);
+            } else {
+                showAlert('error', data.error || 'Error eliminando usuario');
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalHtml;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('error', 'Error de comunicación con el servidor');
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = originalHtml;
+        });
+    }
+    
+    function removeUserRow(userId) {
+        const row = document.getElementById(`user-row-${userId}`);
+        if (row) {
+            row.style.transition = 'opacity 0.5s, transform 0.5s';
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-20px)';
+            
+            setTimeout(() => {
+                row.remove();
+                updateStats();
+            }, 500);
+        }
+    }
+    
+    function updateStats() {
+        const remainingRows = document.querySelectorAll('.data-table tbody tr:not([style*="opacity: 0"])').length;
+        const totalValue = document.querySelector('.stat-value');
+        if (totalValue) {
+            totalValue.textContent = remainingRows;
+        }
+    }
+    
+    function showAlert(type, message) {
+        const existingAlerts = document.querySelectorAll('.alert');
+        existingAlerts.forEach(alert => alert.remove());
+        
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-times-circle';
+        
+        const alertHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="fas ${iconClass} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        const mainContent = document.querySelector('.main-content');
+        const pageHeader = mainContent.querySelector('.page-header');
+        pageHeader.insertAdjacentHTML('afterend', alertHtml);
+        
+        setTimeout(() => {
+            const newAlert = mainContent.querySelector('.alert');
+            if (newAlert) newAlert.remove();
+        }, 5000);
+    }
+    </script>
+</body>
+</html>

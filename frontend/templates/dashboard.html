@@ -143,6 +143,12 @@
                         <a href="{{ url_for('create_slice') }}" class="btn btn-success">
                             <i class="fas fa-plus me-2"></i>Crear Slice
                         </a>
+
+                        {% if is_admin %}
+                        <a href="{{ url_for('list_users') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-users me-2"></i>Gestionar Usuarios
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
