@@ -184,7 +184,9 @@ def generar_plan_deploy(id_slice: int,metrics_json: dict, instancias: list):
         if vm.get("salidainternet"):
             vlan_int = solicitar_vlan_internet()
             if vlan_int and vlan_int.get("numero"):
-                vlans_vm.append(vlan_int["numero"])
+                vlan_internet_num = vlan_int["numero"]
+                # Ponerla al inicio para que quede como eth0
+                vlans_vm = [vlan_internet_num] + [v for v in vlans_vm if v != vlan_internet_num]
         
         # Solicitar VNC
         vnc_info = solicitar_vnc()
@@ -193,7 +195,7 @@ def generar_plan_deploy(id_slice: int,metrics_json: dict, instancias: list):
         plan.append({
             "nombre_vm": vm["nombre"],
             "worker": w["ip"],
-            "vlans": vlans_vm,  # 🟢 Ahora debería tener VLANs
+            "vlans": vlans_vm,  
             "puerto_vnc": puerto_vnc,
             "imagen": vm["imagen"],
             "ram_gb": ram_value,
