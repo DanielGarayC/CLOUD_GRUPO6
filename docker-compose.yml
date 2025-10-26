@@ -5,7 +5,8 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - slice_db
+      slice_db:
+        condition: service_healthy
     environment:
       DB_HOST: slice_db
       DB_USER: root
@@ -70,8 +71,10 @@ services:
       - FLASK_ENV=development
       - IN_DOCKER=true
     depends_on:
-      - slice_db
-      - grafana
+      slice_db:
+        condition: service_healthy
+      grafana:
+        condition: service_started
     volumes:
       - ./frontend:/app
     networks:
@@ -91,6 +94,11 @@ services:
       - ./db/slice_db.sql:/docker-entrypoint-initdb.d/slice_db.sql
     networks:
       - cloudnet
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -proot --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
   test_service:
     build: ./backend/test_service
     container_name: test_service
@@ -185,8 +193,10 @@ services:
       MONITORING_URL: "http://monitoring_service:5010/metrics"
       LINUX_DRIVER_URL: http://linux-driver:9100
     depends_on:
-      - slice_db
-      - monitoring_service
+      slice_db:
+        condition: service_healthy
+      monitoring_service:
+        condition: service_started
     networks:
       - cloudnet
 
@@ -215,7 +225,8 @@ services:
     ports:
       - "8100:8100"
     depends_on:
-      - slice_db
+      slice_db:
+        condition: service_healthy
     environment:
       DB_HOST: slice_db
       DB_USER: root
