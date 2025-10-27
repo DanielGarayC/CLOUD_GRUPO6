@@ -461,13 +461,7 @@ def deploy_slice(data: dict = Body(...)):
                                     WHERE puerto = :puerto
                                 """), {"puerto": vm["puerto_vnc"]})
                             
-                            # 🟢 MARCAR VLANs COMO OCUPADAS
-                            for vlan_numero in vm["vlans"]:
-                                conn.execute(text("""
-                                    UPDATE vlan
-                                    SET estado = 'ocupada'
-                                    WHERE numero = :vlan_numero
-                                """), {"vlan_numero": str(vlan_numero)})
+                            
                         
                         vms_exitosas.append(vm_name)
                         
