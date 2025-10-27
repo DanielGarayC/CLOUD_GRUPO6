@@ -11,8 +11,7 @@ def listar_vlans(db: Session):
 def obtener_vlan_internet(db: Session):
     vlan = db.execute(text("""
         SELECT idvlan, numero FROM vlan
-        WHERE estado='reservada'
-        ORDER BY idvlan LIMIT 1
+        WHERE numero=11
     """)).fetchone()
 
     if not vlan:
@@ -33,7 +32,7 @@ def asignar_vlan(db: Session):
 
     db.execute(text("""
         UPDATE vlan
-        SET estado='ocupada'
+        SET estado='reservada'
         WHERE idvlan=:idvlan
     """), {"idvlan": vlan.idvlan})
     db.commit()
@@ -73,7 +72,7 @@ def asignar_vnc(db: Session):
 
     db.execute(text("""
         UPDATE vnc
-        SET estado='ocupado'
+        SET estado='reservado'
         WHERE idvnc=:idvnc
     """), {"idvnc": vnc.idvnc})
     db.commit()
