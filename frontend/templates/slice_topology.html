@@ -87,7 +87,7 @@
         .btn-outline-secondary:hover { background: #e2e8f0; border-color: #94a3b8; color: #475569; }
         
         .user-badge { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border: 1px solid #cbd5e1; border-radius: 10px; padding: 0.5rem 1rem; }
-        .user-avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+        .user-avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: 600; }
         
         #topology-viewer {
             height: 500px;
@@ -266,8 +266,8 @@
                         <div class="user-badge d-flex align-items-center gap-2">
                             <div class="user-avatar"><i class="fas fa-user text-white" style="font-size: 0.75rem;"></i></div>
                             <div>
-                                <div style="font-size: 0.875rem; font-weight: 600; color: #0f172a;">Usuario</div>
-                                <div style="font-size: 0.7rem; color: #64748b;">Administrador</div>
+                                <div style="font-size: 0.875rem; font-weight: 600; color: #0f172a;">{{ user.nombre }}</div>
+                                <div style="font-size: 0.7rem; color: #64748b;">{{ user.rol.nombre_rol if user.rol else 'Usuario' }}</div>
                             </div>
                         </div>
                         <a href="/logout" class="btn btn-outline-secondary btn-sm">
@@ -283,16 +283,18 @@
             <div class="page-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h1 class="page-title">Slice #123 - Topología de Red</h1>
+                        <h1 class="page-title">Slice #{{ slice.idslice }} - {{ slice.nombre }}</h1>
                         <p class="page-subtitle">Visualiza y gestiona la topología de tu slice</p>
                     </div>
                     <div class="d-flex gap-2">
                         <a href="/dashboard" class="btn btn-outline-secondary" style="background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
                             <i class="fas fa-arrow-left me-2"></i>Dashboard
                         </a>
-                        <a href="#" class="btn btn-success">
+                        {% if slice.estado in ['STOPPED', 'DRAW'] %}
+                        <a href="/edit_slice/{{ slice.idslice }}" class="btn btn-success">
                             <i class="fas fa-edit me-2"></i>Editar Slice
                         </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -300,23 +302,41 @@
             <!-- Información del Slice -->
             <div class="info-cards-row">
                 <div class="info-card">
-                    <div class="value">5</div>
+                    <div class="value">{{ slice.instancias|length }}</div>
                     <div class="label">Máquinas Virtuales</div>
                 </div>
                 <div class="info-card">
                     <div class="value">
-                        <span class="badge bg-success">
-                            <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>RUNNING
-                        </span>
+                        {% if slice.estado == 'RUNNING' %}
+                            <span class="badge bg-success">
+                                <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>{{ slice.estado }}
+                            </span>
+                        {% elif slice.estado == 'STOPPED' %}
+                            <span class="badge bg-danger">
+                                <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>{{ slice.estado }}
+                            </span>
+                        {% elif slice.estado == 'DRAW' %}
+                            <span class="badge bg-info">
+                                <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>{{ slice.estado }}
+                            </span>
+                        {% elif slice.estado == 'DEPLOYING' %}
+                            <span class="badge bg-warning">
+                                <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>{{ slice.estado }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>{{ slice.estado }}
+                            </span>
+                        {% endif %}
                     </div>
                     <div class="label">Estado del Slice</div>
                 </div>
                 <div class="info-card">
-                    <div class="value">22/10/2025</div>
+                    <div class="value">{{ slice.fecha_creacion.strftime('%d/%m/%Y') if slice.fecha_creacion else 'N/A' }}</div>
                     <div class="label">Fecha de Creación</div>
                 </div>
                 <div class="info-card">
-                    <div class="value">Default</div>
+                    <div class="value">{{ slice.zonadisponibilidad or 'default' }}</div>
                     <div class="label">Zona Disponibilidad</div>
                 </div>
             </div>
@@ -334,7 +354,7 @@
                     <div id="topology-viewer">
                         <!-- Información de topología -->
                         <div class="topology-info">
-                            <div><i class="fas fa-circle me-1"></i>Nodos: <span id="node-count">5</span></div>
+                            <div><i class="fas fa-circle me-1"></i>Nodos: <span id="node-count">{{ slice.instancias|length }}</span></div>
                             <div><i class="fas fa-link me-1"></i>Conexiones: <span id="edge-count">0</span></div>
                         </div>
                         
@@ -389,152 +409,75 @@
                 </div>
                 
                 <div class="row">
+                    {% for instancia in slice.instancias %}
                     <div class="col-lg-6 col-xl-4">
                         <div class="vm-card">
                             <h5>
-                                <span><i class="fas fa-desktop me-2"></i>VM-Web-Server</span>
-                                <span class="badge bg-success">RUNNING</span>
+                                <span><i class="fas fa-desktop me-2"></i>{{ instancia.nombre }}</span>
+                                {% if instancia.estado == 'RUNNING' %}
+                                    <span class="badge bg-success">{{ instancia.estado }}</span>
+                                {% elif instancia.estado == 'STOPPED' %}
+                                    <span class="badge bg-danger">{{ instancia.estado }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ instancia.estado or 'N/A' }}</span>
+                                {% endif %}
                             </h5>
                             
                             <div class="vm-detail">
                                 <span class="label"><i class="fas fa-microchip me-1"></i>CPU:</span>
-                                <span class="value">4 core(s)</span>
+                                <span class="value">{{ instancia.cpu }} core(s)</span>
                             </div>
                             
                             <div class="vm-detail">
                                 <span class="label"><i class="fas fa-memory me-1"></i>RAM:</span>
-                                <span class="value">8 GB</span>
+                                <span class="value">{{ instancia.ram }}</span>
                             </div>
                             
                             <div class="vm-detail">
                                 <span class="label"><i class="fas fa-hdd me-1"></i>Storage:</span>
-                                <span class="value">50 GB</span>
+                                <span class="value">{{ instancia.storage }}</span>
                             </div>
                             
                             <div class="vm-detail">
                                 <span class="label"><i class="fas fa-compact-disc me-1"></i>Imagen:</span>
-                                <span class="value">Ubuntu 22.04</span>
+                                <span class="value">{{ instancia.imagen.nombre if instancia.imagen else 'N/A' }}</span>
                             </div>
                             
                             <div class="vm-detail">
                                 <span class="label"><i class="fas fa-network-wired me-1"></i>IP:</span>
-                                <span class="value">192.168.1.10</span>
+                                <span class="value">{{ instancia.ip or 'No asignada' }}</span>
                             </div>
                             
                             <div class="vm-detail">
                                 <span class="label"><i class="fas fa-globe me-1"></i>Internet:</span>
-                                <span class="internet-badge internet-yes">Sí</span>
+                                {% if instancia.salidainternet %}
+                                    <span class="internet-badge internet-yes">Sí</span>
+                                {% else %}
+                                    <span class="internet-badge internet-no">No</span>
+                                {% endif %}
                             </div>
                             
                             <div class="vm-detail">
                                 <span class="label"><i class="fas fa-desktop me-1"></i>VNC:</span>
-                                <span class="value">5900</span>
+                                <span class="value">{{ instancia.vnc.puerto if instancia.vnc else 'N/A' }}</span>
                             </div>
                             
                             <div class="vm-detail">
                                 <span class="label"><i class="fas fa-server me-1"></i>Worker:</span>
-                                <span class="value">Worker-01</span>
+                                <span class="value">{{ instancia.worker.nombre if instancia.worker else 'No asignado' }}</span>
                             </div>
                         </div>
                     </div>
-
-                    <div class="col-lg-6 col-xl-4">
-                        <div class="vm-card">
-                            <h5>
-                                <span><i class="fas fa-desktop me-2"></i>VM-Database</span>
-                                <span class="badge bg-success">RUNNING</span>
-                            </h5>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-microchip me-1"></i>CPU:</span>
-                                <span class="value">8 core(s)</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-memory me-1"></i>RAM:</span>
-                                <span class="value">16 GB</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-hdd me-1"></i>Storage:</span>
-                                <span class="value">200 GB</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-compact-disc me-1"></i>Imagen:</span>
-                                <span class="value">CentOS 8</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-network-wired me-1"></i>IP:</span>
-                                <span class="value">192.168.1.20</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-globe me-1"></i>Internet:</span>
-                                <span class="internet-badge internet-no">No</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-desktop me-1"></i>VNC:</span>
-                                <span class="value">5901</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-server me-1"></i>Worker:</span>
-                                <span class="value">Worker-02</span>
-                            </div>
+                    {% endfor %}
+                    
+                    {% if slice.instancias|length == 0 %}
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Este slice no tiene instancias configuradas todavía.
                         </div>
                     </div>
-
-                    <div class="col-lg-6 col-xl-4">
-                        <div class="vm-card">
-                            <h5>
-                                <span><i class="fas fa-desktop me-2"></i>VM-Cache</span>
-                                <span class="badge bg-danger">STOPPED</span>
-                            </h5>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-microchip me-1"></i>CPU:</span>
-                                <span class="value">2 core(s)</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-memory me-1"></i>RAM:</span>
-                                <span class="value">4 GB</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-hdd me-1"></i>Storage:</span>
-                                <span class="value">30 GB</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-compact-disc me-1"></i>Imagen:</span>
-                                <span class="value">Debian 11</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-network-wired me-1"></i>IP:</span>
-                                <span class="value">192.168.1.30</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-globe me-1"></i>Internet:</span>
-                                <span class="internet-badge internet-yes">Sí</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-desktop me-1"></i>VNC:</span>
-                                <span class="value">N/A</span>
-                            </div>
-                            
-                            <div class="vm-detail">
-                                <span class="label"><i class="fas fa-server me-1"></i>Worker:</span>
-                                <span class="value">Worker-01</span>
-                            </div>
-                        </div>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -549,25 +492,30 @@
         document.addEventListener('DOMContentLoaded', function() {
             const container = document.getElementById('topology-viewer');
             
-            // Datos de ejemplo
-            const topologyData = {
-                nodes: [
-                    { id: 1, label: "VM-Web-Server", x: -200, y: -100 },
-                    { id: 2, label: "VM-Database", x: 0, y: -100 },
-                    { id: 3, label: "VM-Cache", x: 200, y: -100 },
-                    { id: 4, label: "VM-LoadBalancer", x: -100, y: 100 },
-                    { id: 5, label: "VM-Monitoring", x: 100, y: 100 }
-                ],
-                edges: [
-                    { from: 1, to: 2 },
-                    { from: 1, to: 4 },
-                    { from: 2, to: 3 },
-                    { from: 4, to: 5 }
-                ]
-            };
+            // 🟢 DATOS REALES DESDE LA BASE DE DATOS
+            const topologyData = {{ slice.get_topology_data()|tojson|safe }};
+            
+            console.log('Topología cargada:', topologyData);
+            
+            // Si no hay topología, crear una básica
+            if (!topologyData || !topologyData.nodes || topologyData.nodes.length === 0) {
+                topologyData = {
+                    nodes: [],
+                    edges: []
+                };
+                
+                // Crear nodos basados en las instancias
+                {% for instancia in slice.instancias %}
+                topologyData.nodes.push({
+                    id: {{ loop.index }},
+                    label: "{{ instancia.nombre }}",
+                    color: '{% if instancia.estado == "RUNNING" %}#10b981{% elif instancia.estado == "STOPPED" %}#ef4444{% else %}#64748b{% endif %}'
+                });
+                {% endfor %}
+            }
             
             const nodes = new vis.DataSet(topologyData.nodes);
-            const edges = new vis.DataSet(topologyData.edges);
+            const edges = new vis.DataSet(topologyData.edges || []);
             
             edgeCount = edges.length;
             document.getElementById('edge-count').textContent = edgeCount;
@@ -640,73 +588,39 @@
                 currentScale = params.scale;
             });
             
+            // 🟢 DATOS REALES DE INSTANCIAS PARA EL CLICK
+            const instanceData = [
+                {% for instancia in slice.instancias %}
+                {
+                    nombre: "{{ instancia.nombre }}",
+                    cpu: "{{ instancia.cpu }}",
+                    ram: "{{ instancia.ram }}",
+                    storage: "{{ instancia.storage }}",
+                    imagen: "{{ instancia.imagen.nombre if instancia.imagen else 'N/A' }}",
+                    estado: "{{ instancia.estado or 'N/A' }}",
+                    internet: {{ 'true' if instancia.salidainternet else 'false' }},
+                    ip: "{{ instancia.ip or 'No asignada' }}",
+                    vnc: "{{ instancia.vnc.puerto if instancia.vnc else 'N/A' }}",
+                    worker: "{{ instancia.worker.nombre if instancia.worker else 'No asignado' }}"
+                }{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+            
             network.on('click', function(params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
-                    const node = nodes.get(nodeId);
-                    
-                    const instanceData = [
-                        {
-                            nombre: "VM-Web-Server",
-                            cpu: "4",
-                            ram: "8 GB",
-                            storage: "50 GB",
-                            imagen: "Ubuntu 22.04",
-                            estado: "RUNNING",
-                            internet: true,
-                            ip: "192.168.1.10"
-                        },
-                        {
-                            nombre: "VM-Database",
-                            cpu: "8",
-                            ram: "16 GB",
-                            storage: "200 GB",
-                            imagen: "CentOS 8",
-                            estado: "RUNNING",
-                            internet: false,
-                            ip: "192.168.1.20"
-                        },
-                        {
-                            nombre: "VM-Cache",
-                            cpu: "2",
-                            ram: "4 GB",
-                            storage: "30 GB",
-                            imagen: "Debian 11",
-                            estado: "STOPPED",
-                            internet: true,
-                            ip: "192.168.1.30"
-                        },
-                        {
-                            nombre: "VM-LoadBalancer",
-                            cpu: "2",
-                            ram: "4 GB",
-                            storage: "20 GB",
-                            imagen: "Ubuntu 22.04",
-                            estado: "RUNNING",
-                            internet: true,
-                            ip: "192.168.1.40"
-                        },
-                        {
-                            nombre: "VM-Monitoring",
-                            cpu: "2",
-                            ram: "4 GB",
-                            storage: "40 GB",
-                            imagen: "Ubuntu 22.04",
-                            estado: "RUNNING",
-                            internet: true,
-                            ip: "192.168.1.50"
-                        }
-                    ];
                     
                     if (instanceData[nodeId - 1]) {
                         const instance = instanceData[nodeId - 1];
                         alert(`🖥️ ${instance.nombre}\n\n` +
-                              `💻 CPU: ${instance.cpu}\n` +
+                              `💻 CPU: ${instance.cpu} core(s)\n` +
                               `🧠 RAM: ${instance.ram}\n` +
                               `💾 Storage: ${instance.storage}\n` +
                               `💿 Imagen: ${instance.imagen}\n` +
                               `🌐 Internet: ${instance.internet ? 'Sí' : 'No'}\n` +
                               `📡 IP: ${instance.ip}\n` +
+                              `🖥️ VNC: ${instance.vnc}\n` +
+                              `🏢 Worker: ${instance.worker}\n` +
                               `📊 Estado: ${instance.estado}`);
                     }
                 }

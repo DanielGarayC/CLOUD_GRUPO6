@@ -9,7 +9,7 @@ from datetime import datetime
 # ===========================
 # CONFIGURACIÓN
 # ===========================
-HEADNODE_URL = "http://10.0.10.1:5000/metrics"  # IP del Headnode
+HEADNODE_URL = "http://192.168.201.1:5000/metrics"  # IP del Headnode
 INTERVAL = 10  # segundos entre envíos (igual en todos los workers)
 
 # ===========================

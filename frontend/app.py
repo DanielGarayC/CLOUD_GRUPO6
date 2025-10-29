@@ -910,7 +910,7 @@ def update_slice(slice_id):
     if not can_access_slice(user, slice_obj):
         return jsonify({'error': 'Access denied'}), 403
     
-    if slice_obj.estado != 'STOPPED':
+    if slice_obj.estado not in ['STOPPED', 'DRAW']:
         return jsonify({'error': 'El slice debe estar en estado STOPPED para editarlo'}), 400
     
     try:
