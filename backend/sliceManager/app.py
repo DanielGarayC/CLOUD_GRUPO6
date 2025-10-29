@@ -441,27 +441,49 @@ def deploy_slice(data: dict = Body(...)):
                         
                         # 🟢 ACTUALIZAR BASE DE DATOS
                         with engine.begin() as conn:
-                            # Actualizar instancia
+                            # 1️⃣ Obtener ID del VNC desde la tabla vnc
+                            vnc_id = None
+                            if vm.get("puerto_vnc"):
+                                vnc_query = conn.execute(text("""
+                                    SELECT idvnc FROM vnc WHERE puerto = :puerto
+                                """), {"puerto": vm["puerto_vnc"]})
+                                vnc_row = vnc_query.fetchone()
+                                vnc_id = vnc_row[0] if vnc_row else None
+                            
+                            # 2️⃣ Obtener ID del worker desde la tabla worker
+                            worker_id = None
+                            if vm.get("worker"):
+                                worker_query = conn.execute(text("""
+                                    SELECT idworker FROM worker WHERE ip = :worker_ip
+                                """), {"worker_ip": vm["worker"]})
+                                worker_row = worker_query.fetchone()
+                                worker_id = worker_row[0] if worker_row else None
+                            
+                            # 3️⃣ Actualizar instancia con TODOS los campos necesarios
                             conn.execute(text("""
                                 UPDATE instancia
                                 SET estado = 'RUNNING',
-                                    ip = :ip
+                                    ip = :ip,
+                                    vnc_idvnc = :vnc_id,
+                                    worker_idworker = :worker_id
                                 WHERE nombre = :vm_name AND slice_idslice = :sid
                             """), {
-                                "ip": vm.get("ip_asignada"),  # Si tienes asignación de IP
+                                "ip": vm.get("ip_asignada"),
+                                "vnc_id": vnc_id,
+                                "worker_id": worker_id,
                                 "vm_name": vm_name,
                                 "sid": id_slice
                             })
                             
-                            # Actualizar VNC como ocupado
-                            if vm.get("puerto_vnc"):
+                            # 4️⃣ Actualizar VNC como ocupado
+                            if vnc_id:
                                 conn.execute(text("""
                                     UPDATE vnc 
                                     SET estado = 'ocupada'
-                                    WHERE puerto = :puerto
-                                """), {"puerto": vm["puerto_vnc"]})
+                                    WHERE idvnc = :vnc_id
+                                """), {"vnc_id": vnc_id})
                             
-                            # 🟢 MARCAR VLANs COMO OCUPADAS
+                            # 5️⃣ MARCAR VLANs COMO OCUPADAS
                             for vlan_numero in vm["vlans"]:
                                 conn.execute(text("""
                                     UPDATE vlan
