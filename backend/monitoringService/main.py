@@ -32,7 +32,7 @@ def get_latest_metrics():
     """
     Devuelve la última métrica conocida de cada worker.
     Ejemplo:
-    curl http://10.0.10.1:5010/metrics
+    curl http://192.168.201.1:5010/metrics
     """
     if not latest_metrics:
         return {"status": "no_data", "message": "Aún no se han recibido métricas."}

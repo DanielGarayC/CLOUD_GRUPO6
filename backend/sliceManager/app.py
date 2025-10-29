@@ -23,9 +23,9 @@ NETWORK_BASE = "http://network_manager:8100"
 
 # Mapeo estático de workers
 WORKER_IPS = {
-    "server2": "10.0.10.2",
-    "server3": "10.0.10.3",
-    "server4": "10.0.10.4"
+    "server2": "192.168.201.2",
+    "server3": "192.168.201.3",
+    "server4": "192.168.201.4"
 }
 
 
