@@ -217,7 +217,7 @@ def grafana_dashboard():
         grafana_url = "http://grafana:3000/d/d99c29a1-a13e-4b98-87cb-1d1601a129d6/dashboard-logs-teleflow?orgId=1&from=now-6h&to=now&kiosk"
 
     app.logger.info(f"🌀 Grafana URL usada: {grafana_url}")
-    return render_template('grafana_embed.html', grafana_url=grafana_url)
+    return render_template('grafana_embed.html', grafana_url=grafana_url, user=user)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
