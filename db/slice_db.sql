@@ -248,7 +248,7 @@ CREATE TABLE `vlan` (
 LOCK TABLES `vlan` WRITE;
 /*!40000 ALTER TABLE `vlan` DISABLE KEYS */;
 
-INSERT INTO `vlan` VALUES (1,'100','ocupada'),(2,'101','ocupada'),(3,'102','ocupada'),(4,'103','ocupada'),(5,'104','disponible'),(6,'105','disponible'),(7,'106','disponible'),(8,'107','disponible'),(9,'108','disponible'),(10,'109','disponible'),(11,'110','disponible');
+INSERT INTO `vlan` VALUES (1,'100','ocupada'),(2,'101','ocupada'),(3,'102','ocupada'),(4,'103','ocupada'),(5,'104','disponible'),(6,'105','disponible'),(7,'106','disponible'),(8,'107','disponible'),(9,'108','disponible'),(10,'109','disponible'),(11,'110','disponible'), (12,'11','reservada');
 /*!40000 ALTER TABLE `vlan` ENABLE KEYS */;
 UNLOCK TABLES;
 
