@@ -449,6 +449,7 @@ def deploy_slice(data: dict = Body(...)):
                                 """), {"puerto": vm["puerto_vnc"]})
                                 vnc_row = vnc_query.fetchone()
                                 vnc_id = vnc_row[0] if vnc_row else None
+                                print(f"   VNC: puerto={vm['puerto_vnc']} → ID={vnc_id}")
                             
                             # 2️⃣ Obtener ID del worker desde la tabla worker
                             worker_id = None
@@ -458,6 +459,21 @@ def deploy_slice(data: dict = Body(...)):
                                 """), {"worker_ip": vm["worker"]})
                                 worker_row = worker_query.fetchone()
                                 worker_id = worker_row[0] if worker_row else None
+                                
+                                # Si no existe el worker, agregarlo automáticamente
+                                if not worker_id:
+                                    print(f"⚠️ Worker {vm['worker']} no encontrado, creándolo...")
+                                    insert_result = conn.execute(text("""
+                                        INSERT INTO worker (nombre, ip, cpu, ram, storage)
+                                        VALUES (:nombre, :ip, '4', '8GB', '100GB')
+                                    """), {
+                                        "nombre": next((k for k, v in WORKER_IPS.items() if v == vm['worker']), f"worker_{vm['worker']}"),
+                                        "ip": vm['worker']
+                                    })
+                                    worker_id = insert_result.lastrowid
+                                    print(f"✅ Worker creado con ID={worker_id}")
+                                else:
+                                    print(f"   Worker: IP={vm['worker']} → ID={worker_id}")
                             
                             # 3️⃣ Actualizar instancia con TODOS los campos necesarios
                             conn.execute(text("""
