@@ -122,6 +122,10 @@ CREATE TABLE `worker` (
 
 LOCK TABLES `worker` WRITE;
 /*!40000 ALTER TABLE `worker` DISABLE KEYS */;
+INSERT INTO worker (nombre, ip, cpu, ram, storage) VALUES
+('server2', '192.168.201.2', '4', '8GB', '100GB'),
+('server3', '192.168.201.3', '4', '8GB', '100GB'),
+('server4', '192.168.201.4', '4', '8GB', '100GB');
 /*!40000 ALTER TABLE `worker` ENABLE KEYS */;
 UNLOCK TABLES;
 
