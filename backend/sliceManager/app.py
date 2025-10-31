@@ -491,7 +491,7 @@ def deploy_slice(data: dict = Body(...)):
                                 SET estado = 'RUNNING',
                                     ip = :ip,
                                     vnc_idvnc = :vnc_id,
-                                    worker_idworker = :worker_id
+                                    worker_idworker = :worker_id,
                                     process_id = :pid
                                 WHERE nombre = :vm_name AND slice_idslice = :sid
                             """), {
