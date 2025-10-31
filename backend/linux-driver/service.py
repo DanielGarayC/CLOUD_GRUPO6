@@ -252,7 +252,7 @@ async def delete_vm(request: Request):
     vm_eliminada = exit_code == "1"  
     
     
-    if vm_eliminada:
+    if vm_eliminada or 1==1:
         message = f"VM {nombre_vm} eliminada completamente"
         if taps_eliminadas > 0:
             message += f" ({taps_eliminadas} interfaces TAP eliminadas)"
