@@ -832,17 +832,34 @@ def eliminar_vm_individual(instancia: dict):
     LINUX_DRIVER_URL = os.getenv("LINUX_DRIVER_URL", "http://linux-driver:9100")
     url = f"{LINUX_DRIVER_URL}/delete_vm"
     
+    # 🟢 OBTENER INTERFACES TAP DE LA BASE DE DATOS
+    interfaces_tap = []
+    try:
+        with engine.connect() as conn:
+            tap_query = text("""
+                SELECT nombre_interfaz 
+                FROM interfaces_tap 
+                WHERE instancia_idinstancia = :inst_id
+            """)
+            result = conn.execute(tap_query, {"inst_id": instancia["idinstancia"]})
+            interfaces_tap = [row[0] for row in result]
+            print(f"🔌 Interfaces TAP para {instancia['nombre']}: {interfaces_tap}")
+    except Exception as e:
+        print(f"⚠️ Error obteniendo interfaces TAP: {e}")
+    
     # Preparar payload para eliminación
     vm_data = {
         "nombre_vm": instancia["nombre"],
         "worker_ip": instancia["worker_ip"],
         "vm_id": instancia["idinstancia"],
         "vnc_puerto": instancia.get("vnc_puerto"),
-        "pid": None  # Se puede obtener de una tabla de procesos si se mantiene
+        "process_id": instancia.get("process_id"),  # 🟢 Enviar PID para matar proceso
+        "interfaces_tap": interfaces_tap  # 🟢 Enviar interfaces TAP para eliminar
     }
     
     try:
         print(f"[HTTP] → POST {url} (Eliminar {instancia['nombre']})")
+        print(f"[HTTP] PID: {vm_data.get('process_id')}, TAPs: {vm_data['interfaces_tap']}")
         
         resp = requests.post(url, json=vm_data, timeout=60)
         raw = resp.text
@@ -1188,6 +1205,7 @@ def limpiar_registros_bd(id_slice: int):
     """
     results = {
         "enlaces_eliminados": 0,
+        "interfaces_tap_eliminadas": 0,  # 🟢 NUEVO
         "instancias_eliminadas": 0,
         "relaciones_eliminadas": 0,
         "slice_eliminado": False,
@@ -1203,29 +1221,36 @@ def limpiar_registros_bd(id_slice: int):
             results["enlaces_eliminados"] = enlaces_result.rowcount
             print(f"🗑️ {results['enlaces_eliminados']} enlaces eliminados")
             
-            # 2️⃣ LIMPIAR INSTANCIAS
-            # Primero desasignar VNCs y Workers para no perder la referencia
+            # 🟢 2️⃣ LIMPIAR INTERFACES TAP
+            tap_result = conn.execute(text("""
+                DELETE it FROM interfaces_tap it
+                JOIN instancia i ON it.instancia_idinstancia = i.idinstancia
+                WHERE i.slice_idslice = :slice_id
+            """), {"slice_id": id_slice})
+            results["interfaces_tap_eliminadas"] = tap_result.rowcount
+            print(f"🗑️ {results['interfaces_tap_eliminadas']} interfaces TAP eliminadas")
+            
+            # 3️⃣ LIMPIAR INSTANCIAS
             conn.execute(text("""
                 UPDATE instancia 
                 SET vnc_idvnc = NULL, worker_idworker = NULL 
                 WHERE slice_idslice = :slice_id
             """), {"slice_id": id_slice})
             
-            # Eliminar instancias
             instancias_result = conn.execute(text("""
                 DELETE FROM instancia WHERE slice_idslice = :slice_id
             """), {"slice_id": id_slice})
             results["instancias_eliminadas"] = instancias_result.rowcount
             print(f"🗑️ {results['instancias_eliminadas']} instancias eliminadas")
             
-            # 3️⃣ LIMPIAR RELACIONES USUARIO-SLICE
+            # 4️⃣ LIMPIAR RELACIONES USUARIO-SLICE
             relaciones_result = conn.execute(text("""
                 DELETE FROM usuario_has_slice WHERE slice_idslice = :slice_id
             """), {"slice_id": id_slice})
             results["relaciones_eliminadas"] = relaciones_result.rowcount
             print(f"🗑️ {results['relaciones_eliminadas']} relaciones usuario-slice eliminadas")
             
-            # 4️⃣ ELIMINAR SLICE
+            # 5️⃣ ELIMINAR SLICE
             slice_result = conn.execute(text("""
                 DELETE FROM slice WHERE idslice = :slice_id
             """), {"slice_id": id_slice})
@@ -1249,6 +1274,7 @@ def generar_reporte_eliminacion(id_slice: int, vm_results: dict, network_results
         network_results["vlans_liberadas"] + 
         network_results["vncs_liberados"] +
         db_results["enlaces_eliminados"] +
+        db_results["interfaces_tap_eliminadas"] +  # 🟢 NUEVO
         db_results["instancias_eliminadas"]
     )
     
@@ -1282,6 +1308,7 @@ def generar_reporte_eliminacion(id_slice: int, vm_results: dict, network_results
         },
         "base_datos": {
             "enlaces_eliminados": db_results["enlaces_eliminados"],
+            "interfaces_tap_eliminadas": db_results["interfaces_tap_eliminadas"],  # 🟢 NUEVO
             "instancias_eliminadas": db_results["instancias_eliminadas"],
             "relaciones_eliminadas": db_results["relaciones_eliminadas"],
             "slice_eliminado": db_results["slice_eliminado"],

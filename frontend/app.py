@@ -622,6 +622,7 @@ def stop_slice(slice_id):
     })
 """
 @app.route('/delete_slice/<int:slice_id>', methods=['POST'])
+@app.route('/delete_slice/<int:slice_id>', methods=['POST'])
 def delete_slice(slice_id):
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
@@ -632,48 +633,40 @@ def delete_slice(slice_id):
     
     slice_obj = Slice.query.get_or_404(slice_id)
     
-    # Check if user can access this slice
     if not can_access_slice(user, slice_obj):
         return jsonify({'error': 'Access denied'}), 403
     
     slice_name = slice_obj.nombre or f'Slice #{slice_id}'
     current_estado = slice_obj.estado
     
-    # 🚫 VALIDAR QUE SOLO SE PUEDA ELIMINAR EN ESTADOS PERMITIDOS
-    if current_estado not in ['DRAW', 'STOPPED']:
+    # 🟢 AHORA PERMITE DRAW, STOPPED Y RUNNING
+    if current_estado not in ['DRAW', 'STOPPED', 'RUNNING']:
         return jsonify({
             'success': False,
             'error': f'No se puede eliminar slice en estado "{current_estado}"',
-            'message': 'Solo se pueden eliminar slices en estado DRAW o STOPPED'
+            'message': 'Solo se pueden eliminar slices en estado DRAW, STOPPED o RUNNING'
         }), 400
     
     print(f"🗑️ Iniciando eliminación del slice {slice_id} en estado '{current_estado}'")
     
     try:
-        # 🎯 LÓGICA SEGÚN ESTADO
         if current_estado == 'DRAW':
-            # ✅ ELIMINACIÓN SIMPLE: Solo BD
+            # ✅ ELIMINACIÓN SIMPLE: Solo BD (código existente)
             print(f"📝 Slice en estado DRAW - Eliminación simple de BD")
             
-            # Contar elementos antes de eliminar
             enlaces_count = Enlace.query.filter_by(slice_idslice=slice_id).count()
             instancias_count = len(slice_obj.instancias)
             
-            # Eliminar enlaces (sin VLANs asignadas en estado DRAW)
             enlaces_del = Enlace.query.filter_by(slice_idslice=slice_id)
             for enlace in enlaces_del:
                 db.session.delete(enlace)
             
-            # Eliminar instancias 
             for instancia in slice_obj.instancias:
                 db.session.delete(instancia)
             
-            # Eliminar relaciones usuario-slice
-            # Usar SQLAlchemy ORM en lugar de raw SQL
             for usuario in slice_obj.usuarios:
                 slice_obj.usuarios.remove(usuario)
             
-            # Eliminar slice
             db.session.delete(slice_obj)
             db.session.commit()
             
@@ -689,11 +682,12 @@ def delete_slice(slice_id):
                 }
             })
             
-        elif current_estado == 'STOPPED':
-            # 🚀 ELIMINACIÓN COMPLETA: Llamar al Slice Manager
-            print(f"🏗️ Slice en estado STOPPED - Eliminación completa vía Slice Manager")
+        elif current_estado in ['STOPPED', 'RUNNING']:
+            # 🟢 ELIMINACIÓN COMPLETA: Llamar al Slice Manager
+            action_type = 'parada_y_eliminacion' if current_estado == 'RUNNING' else 'eliminacion_completa'
+            print(f"🏗️ Slice en estado {current_estado} - {action_type} vía Slice Manager")
             
-            SLICE_MANAGER_URL = os.getenv("SLICE_MANAGER_URL", "http://localhost:8000")
+            SLICE_MANAGER_URL = os.getenv("SLICE_MANAGER_URL", "http://slice-manager:8000")
             payload = {"id_slice": slice_id}
             
             try:
@@ -709,13 +703,14 @@ def delete_slice(slice_id):
                     if deletion_result.get('success', False):
                         return jsonify({
                             'success': True,
-                            'type': 'infrastructure_delete',
-                            'message': f'Slice "{slice_name}" eliminado completamente de la infraestructura',
+                            'type': action_type,
+                            'message': f'Slice "{slice_name}" {"detenido y " if current_estado == "RUNNING" else ""}eliminado completamente',
                             'details': {
                                 'slice_estado': current_estado,
                                 'vms_eliminadas': deletion_result.get('vms', {}).get('eliminadas', 0),
                                 'vlans_liberadas': deletion_result.get('recursos_red', {}).get('vlans_liberadas', 0),
                                 'vncs_liberados': deletion_result.get('recursos_red', {}).get('vncs_liberados', 0),
+                                'interfaces_tap_eliminadas': deletion_result.get('interfaces_tap_eliminadas', 0),
                                 'infraestructura_limpiada': True,
                                 'slice_manager_response': deletion_result.get('resumen', {})
                             }
