@@ -292,9 +292,12 @@ CREATE TABLE `interfaces_tap` (
   `id_tap` int NOT NULL AUTO_INCREMENT,
   `nombre_interfaz` varchar(45) NOT NULL,
   `instancia_idinstancia` int NOT NULL,
+  `worker_idworker` int NOT NULL,
   PRIMARY KEY (`id_tap`),
   KEY `fk_interfaces_tap_instancia1_idx` (`instancia_idinstancia`),
-  CONSTRAINT `fk_interfaces_tap_instancia1` FOREIGN KEY (`instancia_idinstancia`) REFERENCES `instancia` (`idinstancia`)
+  KEY `fk_interfaces_tap_worker1_idx` (`worker_idworker`),
+  CONSTRAINT `fk_interfaces_tap_instancia1` FOREIGN KEY (`instancia_idinstancia`) REFERENCES `instancia` (`idinstancia`),
+  CONSTRAINT `fk_interfaces_tap_worker1` FOREIGN KEY (`worker_idworker`) REFERENCES `worker` (`idworker`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

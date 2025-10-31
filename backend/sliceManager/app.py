@@ -951,13 +951,13 @@ def extraer_interfaces_tap(stdout: str, nombre_vm: str):
 
 def guardar_interfaces_tap(nombre_vm: str, interfaces: list, id_slice: int):
     """
-    Guarda las interfaces TAP en la base de datos
+    Guarda las interfaces TAP en la base de datos con su worker asociado
     """
     try:
         with engine.begin() as conn:
-            # Obtener el ID de la instancia
+            # Obtener el ID de la instancia Y el worker
             instancia_query = text("""
-                SELECT idinstancia 
+                SELECT idinstancia, worker_idworker
                 FROM instancia 
                 WHERE nombre = :vm_name AND slice_idslice = :sid
             """)
@@ -969,19 +969,25 @@ def guardar_interfaces_tap(nombre_vm: str, interfaces: list, id_slice: int):
                 return 0
             
             instancia_id = instancia_row[0]
+            worker_id = instancia_row[1]
+            
+            if not worker_id:
+                print(f"⚠️ La instancia {nombre_vm} no tiene worker asignado")
+                return 0
             
             # Insertar cada interfaz TAP
             interfaces_guardadas = 0
             for nombre_interfaz in interfaces:
                 conn.execute(text("""
-                    INSERT INTO interfaces_tap (nombre_interfaz, instancia_idinstancia)
-                    VALUES (:nombre_interfaz, :instancia_id)
+                    INSERT INTO interfaces_tap (nombre_interfaz, instancia_idinstancia, worker_idworker)
+                    VALUES (:nombre_interfaz, :instancia_id, :worker_id)
                 """), {
                     "nombre_interfaz": nombre_interfaz,
-                    "instancia_id": instancia_id
+                    "instancia_id": instancia_id,
+                    "worker_id": worker_id
                 })
                 interfaces_guardadas += 1
-                print(f"💾 Interfaz TAP {nombre_interfaz} guardada para VM {nombre_vm} (ID:{instancia_id})")
+                print(f"💾 Interfaz TAP {nombre_interfaz} guardada para VM {nombre_vm} (Instancia:{instancia_id}, Worker:{worker_id})")
             
             return interfaces_guardadas
             
