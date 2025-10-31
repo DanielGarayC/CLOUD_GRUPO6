@@ -622,7 +622,6 @@ def stop_slice(slice_id):
     })
 """
 @app.route('/delete_slice/<int:slice_id>', methods=['POST'])
-@app.route('/delete_slice/<int:slice_id>', methods=['POST'])
 def delete_slice(slice_id):
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401

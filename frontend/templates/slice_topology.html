@@ -290,7 +290,7 @@
                         <a href="/dashboard" class="btn btn-outline-secondary" style="background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
                             <i class="fas fa-arrow-left me-2"></i>Dashboard
                         </a>
-                        {% if slice.estado in ['STOPPED', 'DRAW'] %}
+                        {% if slice.estado in ['STOPPED', 'DRAW', 'RUNNING'] %}
                         <a href="/edit_slice/{{ slice.idslice }}" class="btn btn-success">
                             <i class="fas fa-edit me-2"></i>Editar Slice
                         </a>
