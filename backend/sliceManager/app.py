@@ -438,18 +438,8 @@ def deploy_slice(data: dict = Body(...)):
                     if result["status"]:
                         # ✅ VM DESPLEGADA EXITOSAMENTE
                         print(f"✅ VM {vm_name}: PID {result.get('pid', 'N/A')}")
-
-                        stdout = result.get("raw", {}).get("stdout", "")
-                        interfaces_tap = extraer_interfaces_tap(stdout, vm_name)
                         
-                        if interfaces_tap:
-                            print(f"🔌 Interfaces TAP detectadas para {vm_name}: {interfaces_tap}")
-                            interfaces_guardadas = guardar_interfaces_tap(vm_name, interfaces_tap, id_slice)
-                            print(f"💾 {interfaces_guardadas} interfaces TAP guardadas para {vm_name}")
-                        else:
-                            print(f"⚠️ No se detectaron interfaces TAP para {vm_name}")                        
-                        
-                        # 🟢 ACTUALIZAR BASE DE DATOS
+                        # 🟢 ACTUALIZAR BASE DE DATOS PRIMERO (antes de guardar interfaces TAP)
                         with engine.begin() as conn:
                             # 1️⃣ Obtener ID del VNC desde la tabla vnc
                             vnc_id = None
@@ -518,6 +508,17 @@ def deploy_slice(data: dict = Body(...)):
                                     SET estado = 'ocupada'
                                     WHERE numero = :vlan_numero
                                 """), {"vlan_numero": str(vlan_numero)})
+                        
+                        # 🟢 AHORA SÍ GUARDAR INTERFACES TAP (después de actualizar worker_idworker)
+                        stdout = result.get("raw", {}).get("stdout", "")
+                        interfaces_tap = extraer_interfaces_tap(stdout, vm_name)
+                        
+                        if interfaces_tap:
+                            print(f"🔌 Interfaces TAP detectadas para {vm_name}: {interfaces_tap}")
+                            interfaces_guardadas = guardar_interfaces_tap(vm_name, interfaces_tap, id_slice)
+                            print(f"💾 {interfaces_guardadas} interfaces TAP guardadas para {vm_name}")
+                        else:
+                            print(f"⚠️ No se detectaron interfaces TAP para {vm_name}")
                         
                         vms_exitosas.append(vm_name)
                         
