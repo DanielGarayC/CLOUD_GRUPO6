@@ -360,7 +360,7 @@
 
     // 🟢 FUNCIÓN PARA ELIMINAR SLICE
     function deleteSlice(sliceId, sliceName, sliceStatus) {
-        if (!['DRAW', 'STOPPED'].includes(sliceStatus)) {
+        if (!['DRAW', 'STOPPED', 'RUNNING'].includes(sliceStatus)) {
             showAlert('error', `No se puede eliminar slice en estado "${sliceStatus}". Solo se permiten estados DRAW o STOPPED.`);
             return;
         }
