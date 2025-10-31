@@ -232,7 +232,7 @@
                                         </a>
                                     {% endif %}
                                     
-                                    {% if slice.estado in ['DRAW', 'STOPPED'] %}
+                                    {% if slice.estado in ['DRAW', 'STOPPED', 'RUNNING'] %}
                                         <button class="btn btn-sm btn-outline-danger" 
                                                 onclick="deleteSlice({{ slice.idslice }}, '{{ slice.nombre or 'Slice #' + slice.idslice|string }}', '{{ slice.estado }}')"
                                                 id="delete-btn-{{ slice.idslice }}">
