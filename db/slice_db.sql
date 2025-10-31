@@ -178,6 +178,7 @@ CREATE TABLE `instancia` (
   `ip` varchar(45) DEFAULT NULL,
   `vnc_idvnc` int DEFAULT NULL,
   `worker_idworker` int DEFAULT NULL,
+  `process_id` int DEFAULT NULL,
   PRIMARY KEY (`idinstancia`,`slice_idslice`),
   KEY `fk_instancia_slice1_idx` (`slice_idslice`),
   KEY `fk_instancia_imagen1_idx` (`imagen_idimagen`),
