@@ -85,22 +85,17 @@ async def create_vm(request: Request):
 async def delete_vm(request: Request):
     """
     Elimina una VM del worker especificado
-    Parámetros esperados:
-    - nombre_vm: nombre de la VM
-    - worker_ip: IP del worker donde está la VM
-    - process_id: PID del proceso QEMU (opcional)
-    - interfaces_tap: lista de interfaces TAP a eliminar (opcional)
-    - delete_disk: si eliminar el disco o no (opcional, default: False)
+    Orden correcto: 1) Matar QEMU, 2) Eliminar TAPs, 3) Limpiar disco
     """
     data = await request.json()
     
     nombre_vm = data.get("nombre_vm")
-    worker_ip = data.get("worker_ip") or data.get("worker")  # Acepta ambos nombres
+    worker_ip = data.get("worker_ip") or data.get("worker")
     process_id = data.get("process_id")
     interfaces_tap = data.get("interfaces_tap", [])
     delete_disk = data.get("delete_disk", False)
     
-    # Validación
+    
     if not all([nombre_vm, worker_ip]):
         return {
             "success": False,
@@ -108,45 +103,65 @@ async def delete_vm(request: Request):
             "error": "Faltan parámetros obligatorios: nombre_vm, worker_ip"
         }
     
-    print(f"🗑️ Eliminando VM {nombre_vm} en worker {worker_ip}")
-    print(f"   PID: {process_id}, TAPs: {interfaces_tap}, Delete disk: {delete_disk}")
+    print(f"Eliminando VM {nombre_vm} en worker {worker_ip}")
+    print(f"PID: {process_id}, TAPs: {interfaces_tap}, Delete disk: {delete_disk}")
     
-    errores = []
     warnings = []
     
-    # 1️⃣ MATAR PROCESO QEMU
+    proceso_eliminado = False
+    
     if process_id:
-        kill_cmd = f"sudo kill -9 {process_id} 2>/dev/null || echo 'Proceso no encontrado'"
+        
+        print(f"Matando proceso QEMU con PID {process_id}...")
+        kill_cmd = f"sudo kill -9 {process_id} 2>&1"
         cmd_ssh = (
             f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
             f"{USER}@{worker_ip} \"{kill_cmd}\""
         )
         result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
         
-        if result.returncode == 0:
-            print(f"✅ Proceso QEMU {process_id} eliminado")
+        if result.returncode == 0 or "No such process" in result.stderr:
+            print(f"Proceso QEMU {process_id} eliminado")
+            proceso_eliminado = True
         else:
-            warning = f"No se pudo eliminar proceso {process_id}"
-            print(f"⚠️ {warning}")
+            warning = f"Error matando PID {process_id}: {result.stderr}"
+            print(f"{warning}")
             warnings.append(warning)
     else:
-        # Buscar proceso por nombre
-        find_kill = f"sudo pkill -9 -f 'qemu.*{nombre_vm}' || echo 'Proceso no encontrado'"
+        
+        print(f"🔍 Buscando proceso QEMU por nombre '{nombre_vm}'...")
+        find_kill = f"sudo pkill -9 -f 'qemu.*{nombre_vm}' 2>&1; echo $?"
         cmd_ssh = (
             f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
             f"{USER}@{worker_ip} \"{find_kill}\""
         )
         result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
-        print(f"🔍 Búsqueda de proceso: {result.stdout}")
+        exit_code = result.stdout.strip().split('\n')[-1]
+        
+        if exit_code == "0":
+            print(f"Proceso QEMU eliminado por nombre")
+            proceso_eliminado = True
+        else:
+            warning = f"No se encontró proceso QEMU para {nombre_vm}"
+            print(f"{warning}")
+            warnings.append(warning)
     
-    # 2️⃣ ELIMINAR INTERFACES TAP
+    
+    if proceso_eliminado:
+        import time
+        time.sleep(1)  
+    
+
     taps_eliminadas = 0
+    
     if interfaces_tap:
+        print(f"🔌 Eliminando {len(interfaces_tap)} interfaces TAP...")
         for tap_name in interfaces_tap:
+            
             tap_cmd = (
-                f"sudo ovs-vsctl del-port {OVS_BRIDGE} {tap_name} 2>/dev/null || true; "
+                f"sudo ovs-vsctl --if-exists del-port {OVS_BRIDGE} {tap_name}; "
                 f"sudo ip link delete {tap_name} 2>/dev/null || true; "
-                f"echo 'TAP {tap_name} eliminada'"
+                f"echo 'OK'"
             )
             cmd_ssh = (
                 f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
@@ -154,16 +169,16 @@ async def delete_vm(request: Request):
             )
             result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
             
-            if "eliminada" in result.stdout or result.returncode == 0:
-                print(f"✅ Interfaz TAP {tap_name} eliminada")
+            if result.returncode == 0:
+                print(f"Interfaz TAP {tap_name} eliminada")
                 taps_eliminadas += 1
             else:
                 warning = f"Error eliminando TAP {tap_name}: {result.stderr}"
-                print(f"⚠️ {warning}")
+                print(f"{warning}")
                 warnings.append(warning)
     else:
-        # Buscar TAPs por nombre de VM
-        find_taps = f"ip link show | grep '{nombre_vm}-tap' | awk '{{print $2}}' | sed 's/:$//'"
+        print(f"🔍 Buscando interfaces TAP por nombre '{nombre_vm}'...")
+        find_taps = f"ip link show | grep -oP '{nombre_vm}-tap[0-9]+' || true"
         cmd_ssh = (
             f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
             f"{USER}@{worker_ip} \"{find_taps}\""
@@ -172,10 +187,12 @@ async def delete_vm(request: Request):
         
         if result.stdout.strip():
             tap_names = result.stdout.strip().split('\n')
+            print(f"🔍 TAPs encontradas: {tap_names}")
+            
             for tap_name in tap_names:
                 if tap_name:
                     tap_cmd = (
-                        f"sudo ovs-vsctl del-port {OVS_BRIDGE} {tap_name} 2>/dev/null || true; "
+                        f"sudo ovs-vsctl --if-exists del-port {OVS_BRIDGE} {tap_name}; "
                         f"sudo ip link delete {tap_name} 2>/dev/null || true"
                     )
                     cmd_ssh = (
@@ -185,29 +202,30 @@ async def delete_vm(request: Request):
                     subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
                     taps_eliminadas += 1
                     print(f"✅ TAP autodescubierta {tap_name} eliminada")
+        else:
+            print(f"ℹ️ No se encontraron TAPs para {nombre_vm}")
     
-    # 3️⃣ ELIMINAR DISCO (OPCIONAL)
     disco_eliminado = False
     disco_path = f"/var/lib/libvirt/images/{nombre_vm}.qcow2"
     
     if delete_disk:
-        print(f"🗑️ Eliminando disco {disco_path}...")
-        delete_disk_cmd = f"sudo rm -f {disco_path} && echo 'Disco eliminado' || echo 'Disco no encontrado'"
+        print(f"Eliminando disco {disco_path}...")
+        delete_disk_cmd = f"sudo rm -f {disco_path} && echo 'OK' || echo 'FAIL'"
         cmd_ssh = (
             f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
             f"{USER}@{worker_ip} \"{delete_disk_cmd}\""
         )
         result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
         
-        if "eliminado" in result.stdout:
-            print(f"✅ Disco {disco_path} eliminado")
+        if "OK" in result.stdout:
+            print(f"Disco {disco_path} eliminado")
             disco_eliminado = True
         else:
-            print(f"ℹ️ Disco no encontrado")
+            print(f"ℹDisco no encontrado o ya eliminado")
     else:
-        print(f"💾 Disco preservado en {disco_path}")
+        print(f"Disco preservado en {disco_path}")
     
-    # 4️⃣ LIMPIAR ARCHIVO PID
+    
     pid_file = f"/var/run/qemu-{nombre_vm}.pid"
     clean_pid_cmd = f"sudo rm -f {pid_file}"
     cmd_ssh = (
@@ -216,17 +234,24 @@ async def delete_vm(request: Request):
     )
     subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
     
-    # 5️⃣ VERIFICAR ELIMINACIÓN
-    verify_cmd = f"pgrep -f 'qemu.*{nombre_vm}' || echo 'VM no encontrada'"
+    print(f"🔍 Verificando eliminación de {nombre_vm}...")
+    verify_cmd = f"pgrep -f 'qemu.*{nombre_vm}' 2>&1; echo 'EXIT:'$?"
     cmd_ssh = (
         f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
         f"{USER}@{worker_ip} \"{verify_cmd}\""
     )
     result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
     
-    vm_eliminada = "VM no encontrada" in result.stdout or result.returncode != 0
+   
+    exit_code = None
+    for line in result.stdout.strip().split('\n'):
+        if line.startswith('EXIT:'):
+            exit_code = line.split(':')[1]
+            break
     
-    # 6️⃣ CONSTRUIR RESPUESTA
+    vm_eliminada = exit_code == "1"  
+    
+    
     if vm_eliminada:
         message = f"VM {nombre_vm} eliminada completamente"
         if taps_eliminadas > 0:
@@ -243,7 +268,7 @@ async def delete_vm(request: Request):
             "message": message,
             "worker": worker_ip,
             "details": {
-                "proceso_eliminado": bool(process_id),
+                "proceso_eliminado": proceso_eliminado,
                 "taps_eliminadas": taps_eliminadas,
                 "disco_eliminado": disco_eliminado,
                 "disco_path": disco_path if not disco_eliminado else None
@@ -253,17 +278,23 @@ async def delete_vm(request: Request):
         if warnings:
             response["warnings"] = warnings
         
-        print(f"✅ {message}")
+        print(f"{message}")
         return response
     else:
-        error_msg = f"La VM {nombre_vm} todavía tiene procesos activos"
-        print(f"❌ {error_msg}")
+        error_msg = f"La VM {nombre_vm} todavía tiene procesos activos (exit_code: {exit_code})"
+        print(f"{error_msg}")
+        print(f"Salida de verificación: {result.stdout}")
+        
         return {
             "success": False,
             "status": False,
             "error": error_msg,
             "mensaje": error_msg,
-            "warnings": warnings
+            "warnings": warnings,
+            "debug": {
+                "verify_stdout": result.stdout,
+                "exit_code": exit_code
+            }
         }
 
 @app.get("/")
