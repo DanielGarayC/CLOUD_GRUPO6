@@ -438,6 +438,16 @@ def deploy_slice(data: dict = Body(...)):
                     if result["status"]:
                         # ✅ VM DESPLEGADA EXITOSAMENTE
                         print(f"✅ VM {vm_name}: PID {result.get('pid', 'N/A')}")
+
+                        stdout = result.get("raw", {}).get("stdout", "")
+                        interfaces_tap = extraer_interfaces_tap(stdout, vm_name)
+                        
+                        if interfaces_tap:
+                            print(f"🔌 Interfaces TAP detectadas para {vm_name}: {interfaces_tap}")
+                            interfaces_guardadas = guardar_interfaces_tap(vm_name, interfaces_tap, id_slice)
+                            print(f"💾 {interfaces_guardadas} interfaces TAP guardadas para {vm_name}")
+                        else:
+                            print(f"⚠️ No se detectaron interfaces TAP para {vm_name}")                        
                         
                         # 🟢 ACTUALIZAR BASE DE DATOS
                         with engine.begin() as conn:
@@ -482,11 +492,13 @@ def deploy_slice(data: dict = Body(...)):
                                     ip = :ip,
                                     vnc_idvnc = :vnc_id,
                                     worker_idworker = :worker_id
+                                    process_id = :pid
                                 WHERE nombre = :vm_name AND slice_idslice = :sid
                             """), {
                                 "ip": vm.get("ip_asignada"),
                                 "vnc_id": vnc_id,
                                 "worker_id": worker_id,
+                                "pid": result.get("pid"),
                                 "vm_name": vm_name,
                                 "sid": id_slice
                             })
@@ -913,6 +925,69 @@ def eliminar_vms_paralelo(instancias: list):
         "total": len(instancias),
         "detalles": results
     }
+
+def extraer_interfaces_tap(stdout: str, nombre_vm: str):
+    """
+    Extrae las interfaces TAP creadas del stdout del Linux Driver
+    Ejemplo de stdout: "Interfaz TAP VM2-tap0 creada.\nInterfaz TAP VM2-tap1 creada."
+    """
+    interfaces = []
+    if not stdout:
+        return interfaces
+    
+    # Buscar líneas que contengan "Interfaz TAP" y "creada"
+    lineas = stdout.split('\n')
+    for linea in lineas:
+        if 'Interfaz TAP' in linea and 'creada' in linea:
+            # Extraer el nombre de la interfaz (ej: "VM2-tap0")
+            partes = linea.split()
+            for i, parte in enumerate(partes):
+                if parte == 'TAP' and i + 1 < len(partes):
+                    nombre_interfaz = partes[i + 1]
+                    interfaces.append(nombre_interfaz)
+                    break
+    
+    return interfaces
+
+def guardar_interfaces_tap(nombre_vm: str, interfaces: list, id_slice: int):
+    """
+    Guarda las interfaces TAP en la base de datos
+    """
+    try:
+        with engine.begin() as conn:
+            # Obtener el ID de la instancia
+            instancia_query = text("""
+                SELECT idinstancia 
+                FROM instancia 
+                WHERE nombre = :vm_name AND slice_idslice = :sid
+            """)
+            result = conn.execute(instancia_query, {"vm_name": nombre_vm, "sid": id_slice})
+            instancia_row = result.fetchone()
+            
+            if not instancia_row:
+                print(f"⚠️ No se encontró instancia {nombre_vm} para guardar interfaces TAP")
+                return 0
+            
+            instancia_id = instancia_row[0]
+            
+            # Insertar cada interfaz TAP
+            interfaces_guardadas = 0
+            for nombre_interfaz in interfaces:
+                conn.execute(text("""
+                    INSERT INTO interfaces_tap (nombre_interfaz, instancia_idinstancia)
+                    VALUES (:nombre_interfaz, :instancia_id)
+                """), {
+                    "nombre_interfaz": nombre_interfaz,
+                    "instancia_id": instancia_id
+                })
+                interfaces_guardadas += 1
+                print(f"💾 Interfaz TAP {nombre_interfaz} guardada para VM {nombre_vm} (ID:{instancia_id})")
+            
+            return interfaces_guardadas
+            
+    except Exception as e:
+        print(f"❌ Error guardando interfaces TAP para {nombre_vm}: {e}")
+        return 0
 
 def eliminar_vm_individual(instancia: dict):
     """

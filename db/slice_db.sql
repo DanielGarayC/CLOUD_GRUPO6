@@ -283,4 +283,19 @@ LOCK TABLES `enlace` WRITE;
 INSERT INTO `enlace` VALUES (1,1,2,NULL,NULL,19),(2,2,3,NULL,NULL,19),(3,3,1,NULL,NULL,19);
 UNLOCK TABLES;
 
+-- Table structure for table `interfaces_tap`
+
+DROP TABLE IF EXISTS `interfaces_tap`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `interfaces_tap` (
+  `id_tap` int NOT NULL AUTO_INCREMENT,
+  `nombre_interfaz` varchar(45) NOT NULL,
+  `instancia_idinstancia` int NOT NULL,
+  PRIMARY KEY (`id_tap`),
+  KEY `fk_interfaces_tap_instancia1_idx` (`instancia_idinstancia`),
+  CONSTRAINT `fk_interfaces_tap_instancia1` FOREIGN KEY (`instancia_idinstancia`) REFERENCES `instancia` (`idinstancia`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
 -- Dump completed on 2025-10-12  7:01:41
