@@ -1254,7 +1254,7 @@ def vnc_console(instance_id):
     
     
     vnc_display_port = vnc_obj.puerto  
-    vnc_real_port = vnc_display_port + 5900  
+    vnc_real_port = int(vnc_display_port) + 5900
     
     
     vnc_host = worker_obj.ip if worker_obj else 'localhost'
