@@ -236,16 +236,12 @@ services:
       - cloudnet 
   
   novnc:
-    image: theasp/novnc:latest
+    build:
+      context: ./novnc
+      dockerfile: Dockerfile
     container_name: teleflow-novnc
-    environment:
-      - DISPLAY_WIDTH=1280
-      - DISPLAY_HEIGHT=720
-      - RUN_XTERM=no
-    ports:
-      - "6080:8080"
-    restart: unless-stopped
     network_mode: "host"
+    restart: unless-stopped
   
   
       
