@@ -247,6 +247,41 @@
             color: #0f172a;
             margin: 0;
         }
+        
+        /* 🟢 ESTILOS PARA MENÚ CONTEXTUAL VNC */
+        .context-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            color: #0f172a;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+        
+        .context-menu-item:hover:not(.disabled) {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            transform: translateX(4px);
+        }
+        
+        .context-menu-item i {
+            color: #0ea5e9;
+            width: 20px;
+            text-align: center;
+            font-size: 1rem;
+        }
+        
+        .context-menu-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .context-menu-item.disabled i {
+            color: #94a3b8;
+        }
     </style>
 </head>
 <body>
@@ -284,7 +319,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h1 class="page-title">Slice #{{ slice.idslice }} - {{ slice.nombre }}</h1>
-                        <p class="page-subtitle">Visualiza y gestiona la topología de tu slice</p>
+                        <p class="page-subtitle">Visualiza y gestiona la topología de tu slice. <strong>Haz click derecho en una VM para abrir su consola VNC</strong></p>
                     </div>
                     <div class="d-flex gap-2">
                         <a href="/dashboard" class="btn btn-outline-secondary" style="background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
@@ -347,7 +382,13 @@
                     <div class="section-icon">
                         <i class="fas fa-project-diagram text-white"></i>
                     </div>
-                    <h3 class="section-title">Topología de Red</h3>
+                    <div>
+                        <h3 class="section-title">Topología de Red</h3>
+                        <p style="color: #64748b; font-size: 0.875rem; margin: 0;">
+                            <i class="fas fa-mouse-pointer me-1"></i>
+                            <strong>Click derecho</strong> en un nodo para abrir la consola VNC
+                        </p>
+                    </div>
                 </div>
                 
                 <div class="position-relative">
@@ -466,6 +507,15 @@
                                 <span class="label"><i class="fas fa-server me-1"></i>Worker:</span>
                                 <span class="value">{{ instancia.worker.nombre if instancia.worker else 'No asignado' }}</span>
                             </div>
+                            
+                            <!-- 🟢 BOTÓN PARA ABRIR CONSOLA VNC -->
+                            {% if instancia.estado == 'RUNNING' and instancia.vnc %}
+                            <div class="mt-3">
+                                <button onclick="openVNCConsole({{ instancia.idinstancia }})" class="btn btn-success w-100">
+                                    <i class="fas fa-desktop me-2"></i>Abrir Consola VNC
+                                </button>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                     {% endfor %}
@@ -588,10 +638,11 @@
                 currentScale = params.scale;
             });
             
-            // 🟢 DATOS REALES DE INSTANCIAS PARA EL CLICK
+            // 🟢 DATOS REALES DE INSTANCIAS PARA EL CLICK Y MENÚ CONTEXTUAL
             const instanceData = [
                 {% for instancia in slice.instancias %}
                 {
+                    instance_id: {{ instancia.idinstancia }},
                     nombre: "{{ instancia.nombre }}",
                     cpu: "{{ instancia.cpu }}",
                     ram: "{{ instancia.ram }}",
@@ -606,23 +657,116 @@
                 {% endfor %}
             ];
             
+            // 🟢 EVENTO DE CLICK SIMPLE (MANTENER FUNCIONALIDAD ORIGINAL)
             network.on('click', function(params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
                     
                     if (instanceData[nodeId - 1]) {
                         const instance = instanceData[nodeId - 1];
-                        alert(`🖥️ ${instance.nombre}\n\n` +
-                              `💻 CPU: ${instance.cpu} core(s)\n` +
-                              `🧠 RAM: ${instance.ram}\n` +
-                              `💾 Storage: ${instance.storage}\n` +
-                              `💿 Imagen: ${instance.imagen}\n` +
-                              `🌐 Internet: ${instance.internet ? 'Sí' : 'No'}\n` +
-                              `📡 IP: ${instance.ip}\n` +
-                              `🖥️ VNC: ${instance.vnc}\n` +
-                              `🏢 Worker: ${instance.worker}\n` +
-                              `📊 Estado: ${instance.estado}`);
+                        showVMDetails(nodeId);
                     }
+                }
+            });
+            
+            // 🟢 EVENTO DE CLICK DERECHO PARA MENÚ CONTEXTUAL VNC
+            network.on('oncontext', function(params) {
+                params.event.preventDefault();
+                
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const instance = instanceData[nodeId - 1];
+                    
+                    if (!instance) {
+                        console.error('No se encontró información de la instancia');
+                        return;
+                    }
+                    
+                    // Crear/actualizar menú contextual
+                    const menu = createContextMenu();
+                    
+                    // Construir contenido del menú
+                    let menuHTML = `
+                        <div style="
+                            padding: 0.75rem;
+                            border-bottom: 2px solid #e2e8f0;
+                            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                            border-radius: 10px 10px 0 0;
+                            margin-bottom: 0.5rem;
+                        ">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-desktop" style="color: #0ea5e9; font-size: 1.25rem;"></i>
+                                <div>
+                                    <div style="font-weight: 700; color: #0f172a; font-size: 1rem;">
+                                        ${instance.nombre}
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: #64748b;">
+                                        Estado: <span style="
+                                            color: ${instance.estado === 'RUNNING' ? '#10b981' : '#ef4444'};
+                                            font-weight: 600;
+                                        ">${instance.estado}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Opciones del menú
+                    if (instance.estado === 'RUNNING' && instance.vnc !== 'N/A') {
+                        menuHTML += `
+                            <div class="context-menu-item" onclick="openVNCConsole(${instance.instance_id})">
+                                <i class="fas fa-desktop"></i>
+                                <span>Abrir Consola VNC</span>
+                            </div>
+                        `;
+                    } else if (instance.estado !== 'RUNNING') {
+                        menuHTML += `
+                            <div class="context-menu-item disabled">
+                                <i class="fas fa-power-off"></i>
+                                <span>VM no está en ejecución</span>
+                            </div>
+                        `;
+                    } else {
+                        menuHTML += `
+                            <div class="context-menu-item disabled">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span>VNC no disponible</span>
+                            </div>
+                        `;
+                    }
+                    
+                    menuHTML += `
+                        <div class="context-menu-item" onclick="showVMDetails(${nodeId})">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Ver Detalles Completos</span>
+                        </div>
+                        <div style="height: 1px; background: #e2e8f0; margin: 0.5rem 0;"></div>
+                        <div class="context-menu-item" onclick="closeContextMenu()">
+                            <i class="fas fa-times"></i>
+                            <span>Cerrar Menú</span>
+                        </div>
+                    `;
+                    
+                    menu.innerHTML = menuHTML;
+                    
+                    // Posicionar el menú
+                    const x = params.event.center.x;
+                    const y = params.event.center.y;
+                    
+                    menu.style.left = x + 'px';
+                    menu.style.top = y + 'px';
+                    menu.style.display = 'block';
+                    
+                    // Ajustar posición si se sale de la pantalla
+                    setTimeout(() => {
+                        const rect = menu.getBoundingClientRect();
+                        if (rect.right > window.innerWidth) {
+                            menu.style.left = (window.innerWidth - rect.width - 20) + 'px';
+                        }
+                        if (rect.bottom > window.innerHeight) {
+                            menu.style.top = (window.innerHeight - rect.height - 20) + 'px';
+                        }
+                    }, 0);
                 }
             });
             
@@ -631,6 +775,260 @@
             }, 1000);
         });
 
+        // 🟢 FUNCIONES PARA MENÚ CONTEXTUAL
+        let contextMenu = null;
+
+        function createContextMenu() {
+            if (contextMenu) return contextMenu;
+            
+            contextMenu = document.createElement('div');
+            contextMenu.id = 'vm-context-menu';
+            contextMenu.style.cssText = `
+                position: fixed;
+                background: white;
+                border: 2px solid #e2e8f0;
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+                padding: 0.5rem;
+                z-index: 10000;
+                display: none;
+                min-width: 220px;
+            `;
+            
+            document.body.appendChild(contextMenu);
+            return contextMenu;
+        }
+
+        // Cerrar menú al hacer click fuera
+        document.addEventListener('click', () => {
+            if (contextMenu) {
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        function closeContextMenu() {
+            if (contextMenu) {
+                contextMenu.style.display = 'none';
+            }
+        }
+
+        // 🟢 FUNCIÓN PARA ABRIR CONSOLA VNC
+        function openVNCConsole(instanceId) {
+            console.log('Abriendo consola VNC para instancia:', instanceId);
+            
+            // Abrir en nueva pestaña
+            window.open(`/vnc_console/${instanceId}`, '_blank', 'width=1200,height=800');
+            
+            closeContextMenu();
+        }
+
+        // 🟢 FUNCIÓN PARA MOSTRAR DETALLES DE VM (MEJORADA)
+        function showVMDetails(nodeId) {
+            const instanceData = [
+                {% for instancia in slice.instancias %}
+                {
+                    instance_id: {{ instancia.idinstancia }},
+                    nombre: "{{ instancia.nombre }}",
+                    cpu: "{{ instancia.cpu }}",
+                    ram: "{{ instancia.ram }}",
+                    storage: "{{ instancia.storage }}",
+                    imagen: "{{ instancia.imagen.nombre if instancia.imagen else 'N/A' }}",
+                    estado: "{{ instancia.estado or 'N/A' }}",
+                    internet: {{ 'true' if instancia.salidainternet else 'false' }},
+                    ip: "{{ instancia.ip or 'No asignada' }}",
+                    vnc: "{{ instancia.vnc.puerto if instancia.vnc else 'N/A' }}",
+                    worker: "{{ instancia.worker.nombre if instancia.worker else 'No asignado' }}"
+                }{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+            
+            const instance = instanceData[nodeId - 1];
+            
+            if (!instance) {
+                alert('❌ No se encontró información de la instancia');
+                return;
+            }
+            
+            // Crear modal con detalles
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.6);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10001;
+                backdrop-filter: blur(4px);
+            `;
+            
+            modal.innerHTML = `
+                <div style="
+                    background: white;
+                    border-radius: 16px;
+                    padding: 2rem;
+                    max-width: 500px;
+                    width: 90%;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                ">
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 1rem;
+                        margin-bottom: 1.5rem;
+                        padding-bottom: 1rem;
+                        border-bottom: 2px solid #e2e8f0;
+                    ">
+                        <div style="
+                            width: 64px;
+                            height: 64px;
+                            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+                            border-radius: 16px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+                        ">
+                            <i class="fas fa-desktop" style="color: white; font-size: 2rem;"></i>
+                        </div>
+                        <div>
+                            <h3 style="
+                                font-size: 1.5rem;
+                                font-weight: 700;
+                                color: #0f172a;
+                                margin: 0;
+                            ">${instance.nombre}</h3>
+                            <span style="
+                                display: inline-block;
+                                padding: 0.25rem 0.75rem;
+                                border-radius: 12px;
+                                font-size: 0.75rem;
+                                font-weight: 600;
+                                background: ${instance.estado === 'RUNNING' ? '#dcfce7' : '#fee2e2'};
+                                color: ${instance.estado === 'RUNNING' ? '#166534' : '#991b1b'};
+                                border: 1px solid ${instance.estado === 'RUNNING' ? '#86efac' : '#fca5a5'};
+                                margin-top: 0.5rem;
+                            ">${instance.estado}</span>
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; gap: 1rem;">
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8fafc; border-radius: 8px;">
+                            <span style="color: #64748b; font-weight: 500;">
+                                <i class="fas fa-microchip" style="margin-right: 0.5rem; color: #0ea5e9;"></i>
+                                CPU:
+                            </span>
+                            <span style="color: #0f172a; font-weight: 600;">${instance.cpu} core(s)</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8fafc; border-radius: 8px;">
+                            <span style="color: #64748b; font-weight: 500;">
+                                <i class="fas fa-memory" style="margin-right: 0.5rem; color: #10b981;"></i>
+                                RAM:
+                            </span>
+                            <span style="color: #0f172a; font-weight: 600;">${instance.ram}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8fafc; border-radius: 8px;">
+                            <span style="color: #64748b; font-weight: 500;">
+                                <i class="fas fa-hdd" style="margin-right: 0.5rem; color: #f59e0b;"></i>
+                                Storage:
+                            </span>
+                            <span style="color: #0f172a; font-weight: 600;">${instance.storage}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8fafc; border-radius: 8px;">
+                            <span style="color: #64748b; font-weight: 500;">
+                                <i class="fas fa-compact-disc" style="margin-right: 0.5rem; color: #8b5cf6;"></i>
+                                Imagen:
+                            </span>
+                            <span style="color: #0f172a; font-weight: 600;">${instance.imagen}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8fafc; border-radius: 8px;">
+                            <span style="color: #64748b; font-weight: 500;">
+                                <i class="fas fa-network-wired" style="margin-right: 0.5rem; color: #06b6d4;"></i>
+                                IP:
+                            </span>
+                            <span style="color: #0f172a; font-weight: 600; font-family: monospace;">${instance.ip}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8fafc; border-radius: 8px;">
+                            <span style="color: #64748b; font-weight: 500;">
+                                <i class="fas fa-desktop" style="margin-right: 0.5rem; color: #ec4899;"></i>
+                                VNC:
+                            </span>
+                            <span style="color: #0f172a; font-weight: 600;">${instance.vnc}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8fafc; border-radius: 8px;">
+                            <span style="color: #64748b; font-weight: 500;">
+                                <i class="fas fa-server" style="margin-right: 0.5rem; color: #6366f1;"></i>
+                                Worker:
+                            </span>
+                            <span style="color: #0f172a; font-weight: 600;">${instance.worker}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8fafc; border-radius: 8px;">
+                            <span style="color: #64748b; font-weight: 500;">
+                                <i class="fas fa-globe" style="margin-right: 0.5rem; color: #14b8a6;"></i>
+                                Internet:
+                            </span>
+                            <span style="font-weight: 600; color: ${instance.internet ? '#10b981' : '#ef4444'};">
+                                ${instance.internet ? 'Sí' : 'No'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 2px solid #e2e8f0;">
+                        ${instance.estado === 'RUNNING' && instance.vnc !== 'N/A' ? `
+                            <button onclick="openVNCConsole(${instance.instance_id}); document.body.removeChild(this.closest('[style*=fixed]'))" style="
+                                flex: 1;
+                                background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+                                color: white;
+                                border: none;
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 10px;
+                                font-weight: 600;
+                                cursor: pointer;
+                                box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+                                transition: all 0.2s;
+                            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(14, 165, 233, 0.4)'" onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 8px rgba(14, 165, 233, 0.3)'">
+                                <i class="fas fa-desktop" style="margin-right: 0.5rem;"></i>
+                                Abrir Consola VNC
+                            </button>
+                        ` : ''}
+                        <button onclick="document.body.removeChild(this.closest('[style*=fixed]'))" style="
+                            flex: 1;
+                            background: #f1f5f9;
+                            color: #475569;
+                            border: 1px solid #cbd5e1;
+                            padding: 0.75rem 1.5rem;
+                            border-radius: 10px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                        " onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
+            
+            closeContextMenu();
+        }
+
+        // FUNCIONES DE NAVEGACIÓN (YA EXISTENTES)
         function centerView() {
             if (network) {
                 network.fit({

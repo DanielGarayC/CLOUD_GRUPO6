@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ instance.nombre }} - Consola VNC</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f172a; overflow: hidden; }
+        
+        .vnc-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .vnc-header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 2px solid #334155;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .vnc-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: white;
+        }
+        
+        .vnc-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .status-connected {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid #10b981;
+            color: #6ee7b7;
+        }
+        
+        .status-connecting {
+            background: rgba(251, 191, 36, 0.2);
+            border: 2px solid #fbbf24;
+            color: #fcd34d;
+        }
+        
+        .status-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .vnc-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        .control-btn.danger {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+        }
+        
+        .control-btn.danger:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+        
+        .vnc-viewer {
+            flex: 1;
+            background: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .vnc-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .connection-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        
+        .spinner {
+            width: 64px;
+            height: 64px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #0ea5e9;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .vnc-footer {
+            background: #1e293b;
+            border-top: 2px solid #334155;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+        
+        .info-group {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .info-label {
+            color: #64748b;
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: #e2e8f0;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="vnc-container">
+        <!-- Header -->
+        <div class="vnc-header">
+            <div class="vnc-title">
+                <div class="vnc-icon">
+                    <i class="fas fa-desktop text-white" style="font-size: 1.5rem;"></i>
+                </div>
+                <div>
+                    <h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">
+                        {{ instance.nombre }} - Consola VNC
+                    </h1>
+                    <div style="font-size: 0.875rem; color: #94a3b8;">
+                        Slice: {{ slice.nombre }} | Worker: {{ instance.worker.nombre if instance.worker else 'N/A' }}
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div id="connection-status" class="status-badge status-connecting">
+                    <div class="status-pulse" style="background: #fcd34d;"></div>
+                    <span>Conectando...</span>
+                </div>
+                
+                <div class="vnc-controls">
+                    <button class="control-btn" onclick="sendCtrlAltDel()">
+                        <i class="fas fa-keyboard"></i>
+                        Ctrl+Alt+Del
+                    </button>
+                    <button class="control-btn" onclick="toggleFullscreen()">
+                        <i class="fas fa-expand"></i>
+                        Pantalla Completa
+                    </button>
+                    <button class="control-btn danger" onclick="closeConsole()">
+                        <i class="fas fa-times"></i>
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Visor VNC -->
+        <div class="vnc-viewer">
+            <div id="connection-overlay" class="connection-overlay">
+                <div class="spinner"></div>
+                <p style="color: white; margin-top: 1.5rem; font-size: 1.125rem;">
+                    Conectando a {{ instance.nombre }}...
+                </p>
+                <p style="color: #94a3b8; margin-top: 0.5rem; font-size: 0.875rem;">
+                    Puerto VNC: {{ vnc_port }} | Host: {{ vnc_host }}
+                </p>
+            </div>
+            
+            <!-- 
+                🔴 IMPORTANTE: Aquí va el iframe de noVNC
+                Debes tener noVNC instalado y configurado en tu infraestructura
+            -->
+            <iframe 
+                id="vnc-frame"
+                class="vnc-iframe"
+                src="{{ novnc_url }}"
+                style="display: none;"
+                onload="handleFrameLoad()"
+            ></iframe>
+        </div>
+        
+        <!-- Footer con información -->
+        <div class="vnc-footer">
+            <div class="info-group">
+                <div class="info-item">
+                    <i class="fas fa-server" style="color: #0ea5e9;"></i>
+                    <span class="info-label">Instancia:</span>
+                    <span class="info-value">{{ instance.nombre }}</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-network-wired" style="color: #10b981;"></i>
+                    <span class="info-label">VNC Puerto:</span>
+                    <span class="info-value">{{ vnc_port }}</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-microchip" style="color: #f59e0b;"></i>
+                    <span class="info-label">Recursos:</span>
+                    <span class="info-value">{{ instance.cpu }} CPU | {{ instance.ram }} RAM</span>
+                </div>
+            </div>
+            
+            <div style="color: #64748b;">
+                <i class="fas fa-info-circle"></i>
+                Usa click derecho en la topología para abrir otras consolas
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let connectionTimeout;
+        
+        function handleFrameLoad() {
+            // Ocultar overlay de conexión después de 2 segundos
+            setTimeout(() => {
+                document.getElementById('connection-overlay').style.display = 'none';
+                document.getElementById('vnc-frame').style.display = 'block';
+                
+                // Actualizar estado a conectado
+                const statusBadge = document.getElementById('connection-status');
+                statusBadge.className = 'status-badge status-connected';
+                statusBadge.innerHTML = `
+                    <div class="status-pulse" style="background: #6ee7b7;"></div>
+                    <span>Conectado</span>
+                `;
+            }, 2000);
+        }
+        
+        function sendCtrlAltDel() {
+            fetch('/api/vnc/send_keys/{{ instance.idinstancia }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ keys: 'ctrl_alt_del' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Ctrl+Alt+Del enviado:', data);
+                // Mostrar notificación temporal
+                showNotification('Ctrl+Alt+Del enviado');
+            })
+            .catch(error => {
+                console.error('Error enviando teclas:', error);
+                showNotification('Error enviando comando', true);
+            });
+        }
+        
+        function toggleFullscreen() {
+            const viewer = document.querySelector('.vnc-viewer');
+            if (!document.fullscreenElement) {
+                viewer.requestFullscreen().catch(err => {
+                    console.error('Error intentando pantalla completa:', err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        function closeConsole() {
+            if (confirm('¿Estás seguro de que quieres cerrar la consola VNC?')) {
+                window.location.href = '/slice/{{ slice.idslice }}/topology';
+            }
+        }
+        
+        function showNotification(message, isError = false) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${isError ? '#ef4444' : '#10b981'};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 1000;
+                animation: slideIn 0.3s ease-out;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        // Verificar estado de conexión periódicamente
+        setInterval(() => {
+            fetch('/api/vnc/status/{{ instance.idinstancia }}')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.can_connect) {
+                        showNotification('La VM ya no está disponible', true);
+                        setTimeout(() => closeConsole(), 3000);
+                    }
+                });
+        }, 30000); // Cada 30 segundos
+        
+        // Timeout de conexión inicial
+        connectionTimeout = setTimeout(() => {
+            const overlay = document.getElementById('connection-overlay');
+            if (overlay && overlay.style.display !== 'none') {
+                overlay.innerHTML = `
+                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #ef4444;"></i>
+                    <p style="color: white; margin-top: 1.5rem; font-size: 1.125rem;">
+                        No se pudo conectar a la consola VNC
+                    </p>
+                    <p style="color: #94a3b8; margin-top: 0.5rem; font-size: 0.875rem;">
+                        Verifica que noVNC esté correctamente configurado
+                    </p>
+                    <button class="control-btn" onclick="closeConsole()" style="margin-top: 2rem;">
+                        <i class="fas fa-arrow-left"></i>
+                        Volver a la topología
+                    </button>
+                `;
+            }
+        }, 15000); // 15 segundos timeout
+    </script>
+</body>
+</html>

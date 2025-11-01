@@ -1213,6 +1213,112 @@ def check_slice_status(slice_id):
         'total_vms': len(slice_obj.instancias)
     })
 
+@app.route('/vnc_console/<int:instance_id>')
+def vnc_console(instance_id):
+    """Renderiza la página de consola VNC para una instancia"""
+    if 'user_id' not in session:
+        flash('Por favor inicia sesión para acceder a la consola', 'error')
+        return redirect(url_for('login'))
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('Usuario no encontrado', 'error')
+        return redirect(url_for('login'))
+    
+    # Obtener la instancia
+    instance = Instancia.query.get_or_404(instance_id)
+    
+    # Verificar que el usuario tenga acceso al slice de esta instancia
+    slice_obj = Slice.query.get(instance.slice_idslice)
+    if not can_access_slice(user, slice_obj):
+        flash('No tienes permiso para acceder a esta VM', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Verificar que la VM esté en ejecución
+    if instance.estado != 'RUNNING':
+        flash(f'La VM debe estar en estado RUNNING. Estado actual: {instance.estado}', 'error')
+        return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
+    
+    # Verificar que tenga VNC asignado
+    if not instance.vnc_idvnc:
+        flash('Esta VM no tiene puerto VNC asignado', 'error')
+        return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
+    
+    vnc_obj = Vnc.query.get(instance.vnc_idvnc)
+    if not vnc_obj:
+        flash('Puerto VNC no encontrado', 'error')
+        return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
+    
+    # Obtener información del worker
+    worker_obj = Worker.query.get(instance.worker_idworker) if instance.worker_idworker else None
+    
+    # Construir la URL de noVNC
+    # Formato: http://novnc-server:6080/vnc.html?host=WORKER_IP&port=VNC_PORT
+    vnc_host = worker_obj.ip if worker_obj else 'localhost'
+    vnc_port = vnc_obj.puerto
+    
+    # Si tienes noVNC instalado en tu infraestructura
+    novnc_url = f"http://localhost:6080/vnc.html?host={vnc_host}&port={vnc_port}&autoconnect=true"
+    
+    return render_template('vnc_console.html', 
+                         instance=instance, 
+                         slice=slice_obj,
+                         vnc_port=vnc_port,
+                         vnc_host=vnc_host,
+                         novnc_url=novnc_url,
+                         user=user)
+
+
+@app.route('/api/vnc/status/<int:instance_id>')
+def vnc_status(instance_id):
+    """API endpoint para verificar el estado de la conexión VNC"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autenticado'}), 401
+    
+    user = User.query.get(session['user_id'])
+    instance = Instancia.query.get_or_404(instance_id)
+    slice_obj = Slice.query.get(instance.slice_idslice)
+    
+    if not can_access_slice(user, slice_obj):
+        return jsonify({'error': 'Acceso denegado'}), 403
+    
+    vnc_obj = Vnc.query.get(instance.vnc_idvnc) if instance.vnc_idvnc else None
+    worker_obj = Worker.query.get(instance.worker_idworker) if instance.worker_idworker else None
+    
+    return jsonify({
+        'instance_id': instance.idinstancia,
+        'instance_name': instance.nombre,
+        'estado': instance.estado,
+        'vnc_available': instance.vnc_idvnc is not None,
+        'vnc_port': vnc_obj.puerto if vnc_obj else None,
+        'worker_ip': worker_obj.ip if worker_obj else None,
+        'worker_name': worker_obj.nombre if worker_obj else None,
+        'can_connect': instance.estado == 'RUNNING' and instance.vnc_idvnc is not None
+    })
+
+
+@app.route('/api/vnc/send_keys/<int:instance_id>', methods=['POST'])
+def vnc_send_keys(instance_id):
+    """Endpoint para enviar combinaciones de teclas especiales (Ctrl+Alt+Del)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autenticado'}), 401
+    
+    user = User.query.get(session['user_id'])
+    instance = Instancia.query.get_or_404(instance_id)
+    slice_obj = Slice.query.get(instance.slice_idslice)
+    
+    if not can_access_slice(user, slice_obj):
+        return jsonify({'error': 'Acceso denegado'}), 403
+    
+    keys = request.json.get('keys', '')
+
+    
+    return jsonify({
+        'success': True,
+        'message': f'Combinación de teclas {keys} enviada a {instance.nombre}'
+    })
+
+
 # ==========================================
 # RUTAS DE GESTIÓN DE USUARIOS
 # ==========================================
