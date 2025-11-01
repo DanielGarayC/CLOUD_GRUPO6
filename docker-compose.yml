@@ -235,18 +235,17 @@ services:
     networks:
       - cloudnet 
   
-  novnc:
-    image: theasp/novnc:latest
-    container_name: teleflow-novnc
-    environment:
-      - DISPLAY_WIDTH=1280
-      - DISPLAY_HEIGHT=720
-      - RUN_XTERM=no
-    ports:
-      - "6080:8080"
-    restart: unless-stopped
-    networks:
-      - cloudnet
+novnc:
+  image: theasp/novnc:latest
+  container_name: teleflow-novnc
+  environment:
+    - DISPLAY_WIDTH=1280
+    - DISPLAY_HEIGHT=720
+    - RUN_XTERM=no
+  ports:
+    - "6080:8080"
+  restart: unless-stopped
+  network_mode: "host"  
       
 networks:
   cloudnet:

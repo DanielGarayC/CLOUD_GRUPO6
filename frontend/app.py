@@ -1225,21 +1225,17 @@ def vnc_console(instance_id):
         flash('Usuario no encontrado', 'error')
         return redirect(url_for('login'))
     
-    # Obtener la instancia
     instance = Instancia.query.get_or_404(instance_id)
-    
-    # Verificar que el usuario tenga acceso al slice de esta instancia
     slice_obj = Slice.query.get(instance.slice_idslice)
+    
     if not can_access_slice(user, slice_obj):
         flash('No tienes permiso para acceder a esta VM', 'error')
         return redirect(url_for('dashboard'))
     
-    # Verificar que la VM esté en ejecución
     if instance.estado != 'RUNNING':
         flash(f'La VM debe estar en estado RUNNING. Estado actual: {instance.estado}', 'error')
         return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
     
-    # Verificar que tenga VNC asignado
     if not instance.vnc_idvnc:
         flash('Esta VM no tiene puerto VNC asignado', 'error')
         return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
@@ -1249,20 +1245,16 @@ def vnc_console(instance_id):
         flash('Puerto VNC no encontrado', 'error')
         return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
     
-    
     worker_obj = Worker.query.get(instance.worker_idworker) if instance.worker_idworker else None
-    
     
     vnc_display_port = vnc_obj.puerto  
     vnc_real_port = int(vnc_display_port) + 5900
     
-    
+    # 🟢 CAMBIO CLAVE: Usar IP del worker directamente
     vnc_host = worker_obj.ip if worker_obj else 'localhost'
     
-   
-    novnc_url = f"http://localhost:6080/vnc.html?host={vnc_host}&port={vnc_real_port}&autoconnect=true"
-    
-    
+    # 🟢 URL corregida: noVNC debe conectarse al worker:puerto
+    novnc_url = f"http://localhost:6080/vnc.html?host={vnc_host}&port={vnc_real_port}&autoconnect=true&resize=scale"
     
     app.logger.info(f"🖥️ VNC Console - VM: {instance.nombre}")
     app.logger.info(f"   Worker IP: {vnc_host}")
@@ -1273,8 +1265,8 @@ def vnc_console(instance_id):
     return render_template('vnc_console.html', 
                          instance=instance, 
                          slice=slice_obj,
-                         vnc_display_port=vnc_display_port,  
-                         vnc_real_port=vnc_real_port,        
+                         vnc_display_port=vnc_display_port,
+                         vnc_real_port=vnc_real_port,
                          vnc_host=vnc_host,
                          novnc_url=novnc_url,
                          user=user)
