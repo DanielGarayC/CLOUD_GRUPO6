@@ -1225,45 +1225,40 @@ def vnc_console(instance_id):
         flash('Usuario no encontrado', 'error')
         return redirect(url_for('login'))
     
-    # Obtener la instancia
     instance = Instancia.query.get_or_404(instance_id)
-    
-    # Verificar que el usuario tenga acceso al slice de esta instancia
     slice_obj = Slice.query.get(instance.slice_idslice)
+    
     if not can_access_slice(user, slice_obj):
         flash('No tienes permiso para acceder a esta VM', 'error')
         return redirect(url_for('dashboard'))
     
-    # Verificar que la VM esté en ejecución
     if instance.estado != 'RUNNING':
         flash(f'La VM debe estar en estado RUNNING. Estado actual: {instance.estado}', 'error')
         return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
     
-    # Verificar que tenga VNC asignado
     if not instance.vnc_idvnc:
         flash('Esta VM no tiene puerto VNC asignado', 'error')
         return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
     
-    vnc_obj = Vnc.query.get(instance.vnc_idvnc)
-    if not vnc_obj:
-        flash('Puerto VNC no encontrado', 'error')
-        return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
+    # 🟢 SOLUCIÓN RÁPIDA: Sumar 5900 al vnc_idvnc
+    vnc_port = 5900 + instance.vnc_idvnc
     
-    # Obtener información del worker
     worker_obj = Worker.query.get(instance.worker_idworker) if instance.worker_idworker else None
-    
-    # Construir la URL de noVNC
-    # Formato: http://novnc-server:6080/vnc.html?host=WORKER_IP&port=VNC_PORT
     vnc_host = worker_obj.ip if worker_obj else 'localhost'
-    vnc_port = vnc_obj.puerto
     
-    # Si tienes noVNC instalado en tu infraestructura
     novnc_url = f"http://localhost:6080/vnc.html?host={vnc_host}&port={vnc_port}&autoconnect=true"
+    
+    print(f"🎯 DEBUG VNC Console:")
+    print(f"   Instance ID: {instance_id}")
+    print(f"   VNC ID FK: {instance.vnc_idvnc}")
+    print(f"   VNC Puerto Calculado: {vnc_port} (5900 + {instance.vnc_idvnc})")
+    print(f"   Worker Host: {vnc_host}")
+    print(f"   noVNC URL: {novnc_url}")
     
     return render_template('vnc_console.html', 
                          instance=instance, 
                          slice=slice_obj,
-                         vnc_port=vnc_port,
+                         vnc_port=vnc_port, 
                          vnc_host=vnc_host,
                          novnc_url=novnc_url,
                          user=user)
@@ -1282,7 +1277,8 @@ def vnc_status(instance_id):
     if not can_access_slice(user, slice_obj):
         return jsonify({'error': 'Acceso denegado'}), 403
     
-    vnc_obj = Vnc.query.get(instance.vnc_idvnc) if instance.vnc_idvnc else None
+    vnc_port = 5900 + instance.vnc_idvnc if instance.vnc_idvnc else None
+    
     worker_obj = Worker.query.get(instance.worker_idworker) if instance.worker_idworker else None
     
     return jsonify({
@@ -1290,7 +1286,7 @@ def vnc_status(instance_id):
         'instance_name': instance.nombre,
         'estado': instance.estado,
         'vnc_available': instance.vnc_idvnc is not None,
-        'vnc_port': vnc_obj.puerto if vnc_obj else None,
+        'vnc_port': vnc_port,  
         'worker_ip': worker_obj.ip if worker_obj else None,
         'worker_name': worker_obj.nombre if worker_obj else None,
         'can_connect': instance.estado == 'RUNNING' and instance.vnc_idvnc is not None

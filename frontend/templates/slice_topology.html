@@ -500,7 +500,7 @@
                             
                             <div class="vm-detail">
                                 <span class="label"><i class="fas fa-desktop me-1"></i>VNC:</span>
-                                <span class="value">{{ instancia.vnc.puerto if instancia.vnc else 'N/A' }}</span>
+                                <span class="value">{{5900 + instancia.vnc.puerto if instancia.vnc else 'N/A' }}</span>
                             </div>
                             
                             <div class="vm-detail">
@@ -651,7 +651,7 @@
                     estado: "{{ instancia.estado or 'N/A' }}",
                     internet: {{ 'true' if instancia.salidainternet else 'false' }},
                     ip: "{{ instancia.ip or 'No asignada' }}",
-                    vnc: "{{ instancia.vnc.puerto if instancia.vnc else 'N/A' }}",
+                    vnc: "{{5900 + instancia.vnc.puerto if instancia.vnc else 'N/A' }}",
                     worker: "{{ instancia.worker.nombre if instancia.worker else 'No asignado' }}"
                 }{% if not loop.last %},{% endif %}
                 {% endfor %}
