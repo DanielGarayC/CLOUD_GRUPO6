@@ -1247,21 +1247,21 @@ def vnc_console(instance_id):
     
     worker_obj = Worker.query.get(instance.worker_idworker) if instance.worker_idworker else None
     
+    
     vnc_display_port = vnc_obj.puerto  
     vnc_real_port = int(vnc_display_port) + 5900
-    
-    # 🟢 CAMBIO CLAVE: Usar IP del worker directamente
     vnc_host = worker_obj.ip if worker_obj else 'localhost'
     
-    # 🟢 URL corregida: noVNC debe conectarse al worker:puerto
-    novnc_url = f"http://localhost:6080/vnc.html?host={vnc_host}&port={vnc_real_port}&autoconnect=true&resize=scale"
+    
+    # Formato: http://localhost:6080/vnc.html?host=WORKER_IP&port=VNC_PORT
+    novnc_url = f"http://localhost:6080/vnc.html?host={vnc_host}&port={vnc_real_port}&autoconnect=true&resize=scale&reconnect=true"
     
     app.logger.info(f"🖥️ VNC Console - VM: {instance.nombre}")
     app.logger.info(f"   Worker IP: {vnc_host}")
     app.logger.info(f"   Display Port (BD): {vnc_display_port}")
     app.logger.info(f"   Real VNC Port: {vnc_real_port}")
     app.logger.info(f"   noVNC URL: {novnc_url}")
-    
+
     return render_template('vnc_console.html', 
                          instance=instance, 
                          slice=slice_obj,
