@@ -62,7 +62,7 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
         raise
 
     # 3️⃣ Generar URL para el navegador
-    headnode_ip = "192.168.201.1"  # 🔧 reemplázalo si tu headnode tiene otra IP
+    headnode_ip = "127.0.0.1"  # 🔧 reemplázalo si tu headnode tiene otra IP
     novnc_url = (
         f"http://{headnode_ip}:6080/vnc.html"
         f"?path=websockify?token={token}"
