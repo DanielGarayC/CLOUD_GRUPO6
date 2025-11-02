@@ -1,28 +1,29 @@
 FROM python:3.11-slim
 
-# Variables de entorno para evitar archivos .pyc y mejorar logs
+# Variables de entorno
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# Instalar herramientas del sistema necesarias
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends openssh-client procps && \
+    apt-get install -y --no-install-recommends openssh-client iproute2 && \
     rm -rf /var/lib/apt/lists/*
 
-# Crear directorio de trabajo dentro del contenedor
+# Crear directorio de trabajo
 WORKDIR /app
 
-# Copiar las dependencias
+# Copiar dependencias
 COPY requirements.txt .
 
-# Instalar dependencias
-
+# Instalar dependencias de Python
 RUN pip install --no-cache-dir -r requirements.txt \
-&& pip install cryptography PyMySQL flask_sqlalchemy
-# Copiar el resto de la aplicación
+ && pip install cryptography PyMySQL flask_sqlalchemy
+
+# Copiar el resto de la app
 COPY . .
 
-# Exponer el puerto 5000 (por defecto Flask)
+# Exponer puerto Flask
 EXPOSE 5000
 
-# Comando para ejecutar la aplicación
+# Comando por defecto
 CMD ["python", "app.py"]
