@@ -64,8 +64,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: web_app
-    network_mode: "host"
     command: python app.py
+    ports:
+      - "5000:5000"
     environment:
       - FLASK_ENV=development
       - IN_DOCKER=true
@@ -78,7 +79,8 @@ services:
       - ./frontend:/app
       - /home/ubuntu/.ssh:/root/.ssh:ro
       - ./novnc/tokens:/opt/novnc/tokens
-    
+    networks:
+      - cloudnet
 
   slice_db:
     image: mysql:8.0
@@ -241,9 +243,13 @@ services:
       dockerfile: Dockerfile
     container_name: teleflow-novnc
     network_mode: "host"
+    ports:
+      - "6080:6080"   
     restart: unless-stopped
     volumes:
       - ./novnc/tokens:/opt/novnc/tokens
+    networks:
+      - cloudnet
   
   
       
