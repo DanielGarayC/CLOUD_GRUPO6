@@ -6,6 +6,6 @@ WORKDIR /opt/novnc
 EXPOSE 6080
 CMD ["/opt/novnc/utils/novnc_proxy", \
      "--listen", "0.0.0.0:6080", \
-     "--token-plugin", "TokenFile", \
-     "--token-source", "/opt/novnc/tokens", \
+     "--auth-plugin", "TokenFile", \
+     "--auth-source", "/opt/novnc/tokens", \
      "--web", "/opt/novnc"]

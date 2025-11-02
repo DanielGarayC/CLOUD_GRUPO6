@@ -19,8 +19,11 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
     # 1️⃣ Crear el túnel SSH
     try:
         subprocess.run([
-            "ssh", "-f", "-N",
-            "-L", f"{local_port}:127.0.0.1:{vnc_port}",
+            "ssh",
+            "-i", "/root/.ssh/id_rsa_orch",
+            "-o", "StrictHostKeyChecking=no",
+            "-N", "-f",
+            "-L", f"{local_port}:{worker_ip}:{vnc_port}",
             f"ubuntu@{worker_ip}"
         ], check=True)
         logger.info(f"✅ Túnel SSH creado: localhost:{local_port} → {worker_ip}:{vnc_port}")
