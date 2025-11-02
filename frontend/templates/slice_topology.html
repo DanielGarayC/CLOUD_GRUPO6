@@ -817,8 +817,7 @@
             console.log('Abriendo consola VNC para instancia:', instanceId);
             
             // Abrir en nueva pestaña
-            window.open(`/vnc_console/${instanceId}`, '_blank', 'width=1200,height=800');
-            
+            window.open(`/vnc_console/${instanceId}`, '_self');            
             closeContextMenu();
         }
 

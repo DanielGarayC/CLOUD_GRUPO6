@@ -50,7 +50,8 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
                     if not line.startswith(token + " "):
                         lines.append(line.strip())
 
-        lines.append(f"{token} web_app:{local_port}")
+        lines = [line for line in lines if not line.startswith(token + ":")]
+        lines.append(f"{token}: web_app:{local_port}")
 
         os.makedirs(os.path.dirname(TOKENS_FILE), exist_ok=True)
         with open(TOKENS_FILE, "w") as f:
