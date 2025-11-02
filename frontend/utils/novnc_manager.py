@@ -30,7 +30,7 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
                 "-o", "StrictHostKeyChecking=no",
                 "-o", "ExitOnForwardFailure=yes",
                 "-N", "-f",
-                "-L", f"{local_port}:{worker_ip}:{vnc_port}",
+                "-L", f"0.0.0.0:{local_port}:{worker_ip}:{vnc_port}",
                 f"ubuntu@{worker_ip}"
             ], check=True)
             logger.info(f"✅ Túnel SSH creado: localhost:{local_port} → {worker_ip}:{vnc_port}")
@@ -50,7 +50,7 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
                     if not line.startswith(token + " "):
                         lines.append(line.strip())
 
-        lines.append(f"{token}: web_app:{local_port}")
+        lines.append(f"{token} web_app:{local_port}")
 
         os.makedirs(os.path.dirname(TOKENS_FILE), exist_ok=True)
         with open(TOKENS_FILE, "w") as f:
