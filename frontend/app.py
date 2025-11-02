@@ -6,6 +6,7 @@ from datetime import datetime
 import logging
 import sys
 import requests
+from utils.novnc_manager import ensure_tunnel_and_token
 
 AUTH_SERVICE_URL = "http://auth:8080/login"
 VERIFY_URL = "http://auth:8080/verify"
@@ -1247,14 +1248,24 @@ def vnc_console(instance_id):
     
     worker_obj = Worker.query.get(instance.worker_idworker) if instance.worker_idworker else None
     
-    
+    #Puerto VNC real dentro del worker
+    vnc_real_port = int(vnc_obj.puerto)
+
+    # IP del worker (192.168.201.x) :D ola Roberto
+    vnc_host = worker_obj.ip if worker_obj else 'localhost'
     vnc_display_port = vnc_obj.puerto  
     vnc_real_port = int(vnc_display_port) + 5900
     vnc_host = worker_obj.ip if worker_obj else 'localhost'
     
+    novnc_url = ensure_tunnel_and_token(
+        slice_obj.idslice,
+        instance.idinstancia,
+        vnc_host,
+        vnc_real_port
+    )
     
     # Formato: http://localhost:6080/vnc.html?host=WORKER_IP&port=VNC_PORT
-    novnc_url = f"http://localhost:6080/vnc.html?host={vnc_host}&port={vnc_real_port}&autoconnect=true&resize=scale&reconnect=true"
+    #novnc_url = f"http://localhost:6080/vnc.html?host={vnc_host}&port={vnc_real_port}&autoconnect=true&resize=scale&reconnect=true"
     
     app.logger.info(f"🖥️ VNC Console - VM: {instance.nombre}")
     app.logger.info(f"   Worker IP: {vnc_host}")
@@ -1265,7 +1276,7 @@ def vnc_console(instance_id):
     return render_template('vnc_console.html', 
                          instance=instance, 
                          slice=slice_obj,
-                         vnc_display_port=vnc_display_port,
+                         vnc_display_port=vnc_obj.puerto,  # esto es solo para mostrar
                          vnc_real_port=vnc_real_port,
                          vnc_host=vnc_host,
                          novnc_url=novnc_url,
