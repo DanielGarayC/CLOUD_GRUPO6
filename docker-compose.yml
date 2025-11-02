@@ -66,8 +66,6 @@ services:
     container_name: web_app
     network_mode: "host"
     command: python app.py
-    ports:
-      - "5000:5000"
     environment:
       - FLASK_ENV=development
       - IN_DOCKER=true
