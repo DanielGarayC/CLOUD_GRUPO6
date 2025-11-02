@@ -78,8 +78,7 @@ services:
       - ./frontend:/app
       - /home/ubuntu/.ssh:/root/.ssh:ro
       - ./novnc/tokens:/opt/novnc/tokens
-    networks:
-      - cloudnet
+    
 
   slice_db:
     image: mysql:8.0
