@@ -242,7 +242,6 @@ services:
       context: ./novnc
       dockerfile: Dockerfile
     container_name: teleflow-novnc
-    network_mode: "host"
     ports:
       - "6080:6080"   
     restart: unless-stopped
