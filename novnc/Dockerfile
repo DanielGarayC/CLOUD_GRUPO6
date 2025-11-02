@@ -13,4 +13,4 @@ WORKDIR /opt/novnc
 EXPOSE 6080
 
 # 🔹 Arranque con soporte de tokens
-CMD ["/opt/novnc/utils/novnc_proxy", "--listen", "6080", "--vnc", "localhost:5900", "--token-plugin", "TokenFile", "--token-source", "/opt/novnc/tokens"]
+CMD ["/opt/novnc/utils/novnc_proxy", "--listen", "6080","--vnc", "localhost:5900","--token-plugin", "websockify.token_plugins.TokenFile","--token-source", "/opt/novnc/tokens"]
