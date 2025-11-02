@@ -78,6 +78,7 @@ services:
     volumes:
       - ./frontend:/app
       - /home/ubuntu/.ssh:/root/.ssh:ro
+      - ./novnc/tokens:/opt/novnc/tokens
     networks:
       - cloudnet
 
