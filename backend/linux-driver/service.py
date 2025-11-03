@@ -206,7 +206,7 @@ async def delete_vm(request: Request):
             print(f"ℹ️ No se encontraron TAPs para {nombre_vm}")
     
     disco_eliminado = False
-    disco_path = f"/var/lib/libvirt/images/{nombre_vm}.qcow2"
+    disco_path = f"/var/lib/qemu-images/vms-disk/{nombre_vm}.qcow2"
     
     if delete_disk:
         print(f"Eliminando disco {disco_path}...")
