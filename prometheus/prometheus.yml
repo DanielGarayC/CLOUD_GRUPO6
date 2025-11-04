@@ -3,35 +3,32 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  # Workers - Node Exporters
   - job_name: 'workers'
     static_configs:
       - targets: 
-          - '192.168.201.2:9100'
-          - '192.168.201.3:9100'
-          - '192.168.201.4:9100'
+        - '192.168.201.2:9100'
+        - '192.168.201.3:9100'
+        - '192.168.201.4:9100'
         labels:
           group: 'workers'
-      relabel_configs:
-        - source_labels: [__address__]
-          regex: '192.168.201.2:9100'
-          target_label: worker
-          replacement: 'worker1'
-        - source_labels: [__address__]
-          regex: '192.168.201.3:9100'
-          target_label: worker
-          replacement: 'worker2'
-        - source_labels: [__address__]
-          regex: '192.168.201.4:9100'
-          target_label: worker
-          replacement: 'worker3'
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '192.168.201.2:9100'
+        target_label: worker
+        replacement: 'worker1'
+      - source_labels: [__address__]
+        regex: '192.168.201.3:9100'
+        target_label: worker
+        replacement: 'worker2'
+      - source_labels: [__address__]
+        regex: '192.168.201.4:9100'
+        target_label: worker
+        replacement: 'worker3'
 
-  # Tu monitoring service existente (si aplica)
   - job_name: 'monitoring_service'
     static_configs:
       - targets: ['monitoring_service:5010']
