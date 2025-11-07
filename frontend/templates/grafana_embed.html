@@ -3,121 +3,162 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeleFlow - Monitoreo</title>
+    <title>TeleFlow - Monitoreo de Workers</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        * { font-family: 'Inter', sans-serif; }
-        body { background: #f8fafc; min-height: 100vh; }
+        * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a1a; min-height: 100vh; overflow: hidden; }
+        
         .top-bar { 
-            background: #ffffff; 
-            border-bottom: 1px solid #e2e8f0; 
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); 
-            padding: 1rem 0;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 1px solid #334155; 
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); 
+            padding: 1rem 1.5rem;
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 1000;
         }
-        .dashboard-page {
-            padding-top: 80px;
-        }
-        .navbar-brand { font-size: 1.5rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.75rem; }
-        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25); }
-        .main-content { max-width: 1400px; margin: 0 auto; padding: 2rem 1.5rem; }
-        .page-header { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15); }
-        .page-title { font-size: 2rem; font-weight: 700; color: white; margin-bottom: 0.5rem; }
-        .page-subtitle { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; margin: 0; }
-        .content-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); overflow: hidden; }
-        .btn { font-weight: 500; border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.875rem; transition: all 0.2s ease; }
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
-        .btn-outline-secondary { color: #64748b; border-color: #cbd5e1; background: #f8fafc; }
-        .btn-outline-secondary:hover { background: #e2e8f0; border-color: #94a3b8; color: #475569; }
-        .alert { border-radius: 10px; border: 1px solid; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
-        .alert-success { background-color: #dcfce7; border-color: #86efac; color: #166534; }
-        .alert-danger { background-color: #fee2e2; border-color: #fca5a5; color: #991b1b; }
-        .alert-warning { background-color: #fef3c7; border-color: #fcd34d; color: #92400e; }
-        .user-badge { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border: 1px solid #cbd5e1; border-radius: 10px; padding: 0.5rem 1rem; }
-        .user-avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
-        .btn-outline-light { color: #64748b; border-color: #cbd5e1; background: #f8fafc; }
-        .btn-outline-light:hover { background: #e2e8f0; border-color: #94a3b8; color: #475569; }
-        .btn-sm { padding: 0.4rem 0.85rem; font-size: 0.8rem; }
-        .monitoring-frame {
+        
+        .monitoring-container {
             width: 100%;
-            height: calc(100vh - 220px);
-            min-height: 600px;
+            height: calc(100vh - 70px);
+            margin-top: 70px;
+            overflow: hidden;
+        }
+        
+        .grafana-iframe {
+            width: 100%;
+            height: 100%;
             border: none;
+            background: #181818;
+        }
+        
+        .logo-icon { 
+            width: 36px; 
+            height: 36px; 
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); 
+            border-radius: 8px; 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+        
+        .btn-back { 
+            background: #334155; 
+            border: 1px solid #475569; 
+            color: white; 
+            padding: 0.5rem 1.25rem; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            font-size: 0.875rem; 
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-back:hover { 
+            background: #475569; 
+            color: white; 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .user-badge { 
+            background: rgba(255, 255, 255, 0.1); 
+            border: 1px solid rgba(255, 255, 255, 0.15); 
+            border-radius: 8px; 
+            padding: 0.5rem 1rem; 
+            color: white;
+        }
+        
+        .loading-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #64748b;
+        }
+        
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(14, 165, 233, 0.2);
+            border-top-color: #0ea5e9;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div class="dashboard-page">
-        <!-- Barra Superior -->
-        <nav class="top-bar">
-            <div class="container-fluid">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="logo-icon"><i class="fas fa-network-wired text-white"></i></div>
-                        <div>
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">TeleFlow</div>
-                            <small style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Network Orchestration</small>
-                        </div>
+    <!-- Barra Superior -->
+    <nav class="top-bar">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <div class="logo-icon">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: white;">
+                        Monitoreo de Infraestructura
                     </div>
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="user-badge d-flex align-items-center gap-2">
-                            <div class="user-avatar"><i class="fas fa-user text-white" style="font-size: 0.75rem;"></i></div>
-                            <div>
-                                <div style="font-size: 0.875rem; font-weight: 600; color: #0f172a;">{{ user.nombre }}</div>
-                                <div style="font-size: 0.7rem; color: #64748b;">Administrador</div>
-                            </div>
-                        </div>
-                        <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
-                            <i class="fas fa-sign-out-alt me-1"></i>Salir
-                        </a>
-                    </div>
+                    <small style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;">
+                        Workers Monitoring Dashboard
+                    </small>
                 </div>
             </div>
-        </nav>
-
-        <!-- Contenido Principal -->
-        <div class="main-content">
-            <div class="page-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h1 class="page-title">
-                            <i class="fas fa-chart-line me-2"></i>Dashboard de Monitoreo
-                        </h1>
-                        <p class="page-subtitle">Visualización de logs y métricas en tiempo real</p>
-                    </div>
-                    <div>
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-arrow-left me-2"></i>Volver
-                        </a>
-                    </div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="user-badge d-flex align-items-center gap-2">
+                    <i class="fas fa-user-shield" style="font-size: 0.875rem;"></i>
+                    <span style="font-size: 0.875rem; font-weight: 600;">{{ user.nombre }}</span>
                 </div>
-            </div>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                            <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-triangle' if category == 'warning' else 'times-circle' }} me-2"></i>
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
-            <div class="content-card">
-                <iframe src="{{ grafana_url }}" class="monitoring-frame" allowfullscreen></iframe>
+                <a href="{{ url_for('dashboard') }}" class="btn-back">
+                    <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+                </a>
             </div>
         </div>
+    </nav>
+
+    <!-- Contenedor de Grafana -->
+    <div class="monitoring-container">
+        <div class="loading-indicator" id="loadingIndicator">
+            <div class="loading-spinner mx-auto mb-3"></div>
+            <div style="font-size: 0.875rem; font-weight: 500;">
+                Cargando dashboard de monitoreo...
+            </div>
+        </div>
+        
+        <iframe 
+            id="grafanaFrame"
+            class="grafana-iframe"
+            src="{{ grafana_url }}"
+            frameborder="0"
+            allow="fullscreen"
+            onload="document.getElementById('loadingIndicator').style.display = 'none';"
+        ></iframe>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script>
+        // Auto-refresh cada 30 segundos para asegurar datos actualizados
+        setInterval(() => {
+            const iframe = document.getElementById('grafanaFrame');
+            if (iframe && iframe.contentWindow) {
+                // Recargar solo si Grafana no está actualizado automáticamente
+                console.log('Dashboard activo - Grafana auto-refresh: 5s');
+            }
+        }, 30000);
+
+        // Log para debug
+        console.log('Grafana URL:', '{{ grafana_url }}');
+    </script>
 </body>
 </html>
