@@ -33,10 +33,11 @@
             left: 0;
             right: 0;
             z-index: 1000;
+            height: 72px; /* Altura fija para cálculos precisos */
         }
         
         .monitoring-page {
-            padding-top: 80px;
+            padding-top: 88px; /* 🟢 Aumentado para dar más espacio */
             height: 100vh;
             display: flex;
             flex-direction: column;
@@ -108,21 +109,23 @@
             background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); 
             border-radius: 12px; 
             padding: 1.5rem 2rem; 
-            margin: 0 1.5rem 1.5rem 1.5rem; 
+            margin: 0 1.5rem 1rem 1.5rem; /* 🟢 Reducido margen inferior */
             box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15); 
         }
         
         .page-title { 
-            font-size: 1.75rem; 
+            font-size: 1.5rem; /* 🟢 Reducido ligeramente */
             font-weight: 700; 
             color: white; 
             margin-bottom: 0.25rem; 
+            line-height: 1.2; /* 🟢 Mejor altura de línea */
         }
         
         .page-subtitle { 
             color: rgba(255, 255, 255, 0.9); 
-            font-size: 0.9rem; 
+            font-size: 0.85rem; /* 🟢 Ligeramente más pequeño */
             margin: 0; 
+            line-height: 1.4;
         }
         
         /* Contenedor del iframe */
@@ -135,6 +138,7 @@
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
             overflow: hidden;
             position: relative;
+            min-height: 0; /* 🟢 Importante para flex */
         }
         
         .grafana-iframe {
@@ -208,6 +212,21 @@
             color: #0f172a;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        /* 🟢 Ajustes responsive */
+        @media (max-width: 768px) {
+            .page-header {
+                padding: 1rem 1.5rem;
+            }
+            
+            .page-title {
+                font-size: 1.25rem;
+            }
+            
+            .page-subtitle {
+                font-size: 0.75rem;
+            }
         }
     </style>
 </head>
@@ -312,7 +331,7 @@
                 }, 500);
             }
             
-            console.log(' Grafana dashboard cargado correctamente');
+            console.log('✅ Grafana dashboard cargado correctamente');
         }
 
         // Monitorear estado del iframe
@@ -334,13 +353,13 @@
         });
 
         // Log para debug
-        console.log(' Grafana URL:', '{{ grafana_url }}');
-        console.log(' Usuario:', '{{ user.nombre }}');
+        console.log('🌐 Grafana URL:', '{{ grafana_url }}');
+        console.log('👤 Usuario:', '{{ user.nombre }}');
         
         // Detectar cuando Grafana esté listo
         setTimeout(() => {
             if (document.getElementById('loadingIndicator').style.display !== 'none') {
-                console.log(' Grafana aún cargando...');
+                console.log('⏳ Grafana aún cargando...');
             }
         }, 3000);
     </script>
