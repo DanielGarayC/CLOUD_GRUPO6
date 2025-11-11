@@ -148,6 +148,10 @@
                         <a href="{{ url_for('list_users') }}" class="btn btn-outline-primary">
                             <i class="fas fa-users me-2"></i>Gestionar Usuarios
                         </a>
+                        <!-- 🟢 NUEVO: Botón para monitoreo -->
+                        <a href="{{ url_for('grafana_dashboard') }}" class="btn btn-outline-info">
+                            <i class="fas fa-chart-line me-2"></i>Monitoreo de Infraestructura
+                        </a>
                         {% endif %}
                     </div>
                 </div>
