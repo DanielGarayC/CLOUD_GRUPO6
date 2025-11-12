@@ -64,7 +64,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: web_app
-    command: python app.py
+    command: bash -c 'until (echo > /dev/tcp/slice_db/3306) 2>/dev/null; do echo "⏳ Esperando a slice_db..."; sleep 3; done; python app.py'
     ports:
       - "5000:5000"
     environment:
