@@ -206,9 +206,9 @@ async def delete_vm(request: Request):
             print(f"ℹ️ No se encontraron TAPs para {nombre_vm}")
     
     disco_eliminado = False
-    disco_path = f"/var/lib/libvirt/images/{nombre_vm}.qcow2"
+    disco_path = f"/var/lib/qemu-images/vms-disk/{nombre_vm}.qcow2"
     
-    if delete_disk:
+    if delete_disk or 1==1:
         print(f"Eliminando disco {disco_path}...")
         delete_disk_cmd = f"sudo rm -f {disco_path} && echo 'OK' || echo 'FAIL'"
         cmd_ssh = (
@@ -226,7 +226,7 @@ async def delete_vm(request: Request):
         print(f"Disco preservado en {disco_path}")
     
     
-    pid_file = f"/var/run/qemu-{nombre_vm}.pid"
+    pid_file = f"/var/run/{nombre_vm}.pid"
     clean_pid_cmd = f"sudo rm -f {pid_file}"
     cmd_ssh = (
         f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "

@@ -197,7 +197,7 @@ def test():
 
 @app.route('/grafana')
 def grafana_dashboard():
-    """Vista embebida de Grafana visible desde navegador y contenedor."""
+    """Vista embebida de Grafana - Workers Monitoring Dashboard"""
     if 'user_id' not in session:
         flash('Por favor inicia sesión para acceder al dashboard de monitoreo.', 'error')
         return redirect(url_for('login'))
@@ -208,16 +208,16 @@ def grafana_dashboard():
         session.clear()
         return redirect(url_for('login'))
 
-    if user.rol_idrol not in [1, 2]:
-        flash('No tienes los permisos necesarios para acceder a esta página.', 'error')
+    # Solo admin y superadmin pueden ver el monitoreo
+    if not is_admin_user(user):
+        flash('No tienes los permisos necesarios para acceder al monitoreo de infraestructura.', 'error')
         return redirect(url_for('dashboard'))
 
-    if os.environ.get("IN_DOCKER") == "true":
-        grafana_url = "http://localhost:3000/d/d99c29a1-a13e-4b98-87cb-1d1601a129d6/dashboard-logs-teleflow?orgId=1&from=now-6h&to=now&kiosk"
-    else:
-        grafana_url = "http://grafana:3000/d/d99c29a1-a13e-4b98-87cb-1d1601a129d6/dashboard-logs-teleflow?orgId=1&from=now-6h&to=now&kiosk"
+    # URL del dashboard de Workers Monitoring
+    # Modo kiosk para ocultar menús de Grafana
+    grafana_url = "http://localhost:3000/d/workers-monitoring-v2/workers-monitoring-dashboard-enhanced?orgId=1&refresh=5s&kiosk"
 
-    app.logger.info(f"🌀 Grafana URL usada: {grafana_url}")
+    app.logger.info(f"🌀 Admin {user.nombre} accediendo a monitoreo de workers")
     return render_template('grafana_embed.html', grafana_url=grafana_url, user=user)
 
 @app.route('/login', methods=['GET', 'POST'])

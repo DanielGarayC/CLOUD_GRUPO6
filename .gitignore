@@ -1,0 +1,12 @@
+# Grafana runtime data
+grafana_data/
+
+# Prometheus runtime data
+prometheus_data/
+
+# Loki data
+loki/data/
+
+# Databases
+*.db
+*.sqlite
