@@ -100,6 +100,53 @@
             justify-content: center;
             margin-bottom: 1rem;
         }
+
+        .btn-group {
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+        }
+
+        .dropdown-toggle-split {
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+
+        .dropdown-menu {
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            padding: 0.5rem 0;
+        }
+
+        .dropdown-item {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #475569;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .dropdown-item:hover {
+            background: #f0f9ff;
+            color: #0ea5e9;
+            transform: translateX(2px);
+        }
+
+        .dropdown-item i {
+            width: 20px;
+            font-size: 0.875rem;
+        }
+
+        /* Indicador visual de plataforma en el botón */
+        .btn-success[data-platform="openstack"] {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        }
+
+        .btn-success[data-platform="linux"] {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
     </style>
 </head>
 <body>
@@ -245,11 +292,43 @@
                                     {% endif %}
                                     
                                     {% if slice.estado == 'DRAW' %}
-                                        <button class="btn btn-sm btn-success" 
-                                                onclick="deploySlice({{ slice.idslice }}, '{{ slice.nombre }}')"
-                                                id="deploy-btn-{{ slice.idslice }}">
-                                            <i class="fas fa-rocket me-1"></i>Desplegar
-                                        </button>
+                                        {% if is_admin %}
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-success" 
+                                                        onclick="deploySlice({{ slice.idslice }}, '{{ slice.nombre }}', 'linux')"
+                                                        id="deploy-btn-{{ slice.idslice }}">
+                                                    <i class="fas fa-rocket me-1"></i>Desplegar
+                                                </button>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-success dropdown-toggle dropdown-toggle-split" 
+                                                        data-bs-toggle="dropdown" 
+                                                        aria-expanded="false"
+                                                        id="deploy-dropdown-{{ slice.idslice }}">
+                                                    <span class="visually-hidden">Opciones</span>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    <li>
+                                                        <a class="dropdown-item" href="#" 
+                                                        onclick="deploySlice({{ slice.idslice }}, '{{ slice.nombre }}', 'linux'); return false;">
+                                                            <i class="fas fa-server me-2"></i>Clúster Linux
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="#" 
+                                                        onclick="deploySlice({{ slice.idslice }}, '{{ slice.nombre }}', 'openstack'); return false;">
+                                                            <i class="fas fa-cloud me-2"></i>OpenStack
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        {% else %}
+                                            <!-- USUARIO REGULAR: Despliegue solo en Linux -->
+                                            <button class="btn btn-sm btn-success" 
+                                                    onclick="deploySlice({{ slice.idslice }}, '{{ slice.nombre }}', 'linux')"
+                                                    id="deploy-btn-{{ slice.idslice }}">
+                                                <i class="fas fa-rocket me-1"></i>Desplegar
+                                            </button>
+                                        {% endif %}
                                     {% endif %}
                                 </div>
                             </td>
@@ -315,12 +394,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
     // 🟢 FUNCIÓN PARA DESPLEGAR SLICE
-    function deploySlice(sliceId, sliceName) {
-        if (!confirm(`¿Estás seguro de que quieres desplegar el slice "${sliceName}"?\n\nEsto enviará el slice al orquestador para su implementación.`)) {
+    function deploySlice(sliceId, sliceName, platform = 'linux') {
+        // Mapeo de nombres amigables
+        const platformNames = {
+            'linux': 'Clúster Linux',
+            'openstack': 'OpenStack'
+        };
+        
+        const platformName = platformNames[platform] || platform;
+        
+        if (!confirm(`¿Estás seguro de que quieres desplegar el slice "${sliceName}"?\n\nPlataforma: ${platformName}\n\nEsto enviará el slice al orquestador para su implementación.`)) {
             return;
         }
         
         const deployBtn = document.getElementById(`deploy-btn-${sliceId}`);
+        const deployDropdown = document.getElementById(`deploy-dropdown-${sliceId}`);
+        
         if (!deployBtn) {
             console.error(`No se encontró el botón deploy-btn-${sliceId}`);
             return;
@@ -328,29 +417,40 @@
         
         const originalHtml = deployBtn.innerHTML;
         deployBtn.disabled = true;
-        deployBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Desplegando...';
+        if (deployDropdown) deployDropdown.disabled = true;
         
+        // Icono según plataforma
+        const platformIcon = platform === 'openstack' ? 'fa-cloud' : 'fa-server';
+        deployBtn.innerHTML = `<i class="fas ${platformIcon} fa-spin"></i> Desplegando en ${platformName}...`;
+        
+        // 🟢 ENVIAR PLATAFORMA EN EL PAYLOAD
         fetch(`/deploy_slice/${sliceId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            }
+            },
+            body: JSON.stringify({
+                platform: platform  // 🟢 Enviar plataforma seleccionada
+            })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showAlert('success', `¡Slice "${sliceName}" enviado a despliegue exitosamente!`);
+                showAlert('success', `¡Slice "${sliceName}" desplegado exitosamente en ${platformName}!`);
                 deployBtn.innerHTML = '<i class="fas fa-cogs"></i> Desplegando';
                 deployBtn.className = 'btn btn-info btn-sm';
                 deployBtn.disabled = true;
+                if (deployDropdown) deployDropdown.disabled = true;
+                
                 updateSliceStatus(sliceId, data.new_status);
                 
                 setTimeout(() => {
                     location.reload();
                 }, 3000);
             } else {
-                showAlert('error', `Error desplegando slice: ${data.error}`);
+                showAlert('error', `Error desplegando slice en ${platformName}: ${data.error}`);
                 deployBtn.disabled = false;
+                if (deployDropdown) deployDropdown.disabled = false;
                 deployBtn.innerHTML = originalHtml;
             }
         })
@@ -358,6 +458,7 @@
             console.error('Error:', error);
             showAlert('error', 'Error de comunicación con el servidor');
             deployBtn.disabled = false;
+            if (deployDropdown) deployDropdown.disabled = false;
             deployBtn.innerHTML = originalHtml;
         });
     }
