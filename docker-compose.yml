@@ -194,10 +194,18 @@ services:
       DB_NAME: mydb
       MONITORING_URL: "http://monitoring_service:5010/metrics"
       LINUX_DRIVER_URL: http://linux-driver:9100
+
+      # Conejo
+      RABBITMQ_HOST: rabbitmq        # nombre del servicio
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin
+      RABBITMQ_QUEUE_NETWORK: network_tasks
     depends_on:
       slice_db:
         condition: service_healthy
       monitoring_service:
+        condition: service_started
+      rabbitmq:
         condition: service_started
     networks:
       - cloudnet
@@ -234,6 +242,13 @@ services:
       DB_USER: root
       DB_PASSWORD: root
       DB_NAME: mydb
+
+    #Conejo
+    RABBITMQ_HOST: rabbitmq
+    RABBITMQ_USER: admin
+    RABBITMQ_PASS: admin
+    RABBITMQ_QUEUE_NETWORK: network_tasks
+    
     networks:
       - cloudnet 
   
@@ -250,6 +265,18 @@ services:
     networks:
       - cloudnet
   
+  #Conejo
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # protocolo AMQP
+      - "15672:15672" # UI de administración
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    networks:
+      - cloudnet
   
       
 networks:

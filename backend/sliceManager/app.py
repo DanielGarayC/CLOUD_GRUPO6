@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests, json, os
+from rabbitmq_utils import rpc_call_network
 
 app = FastAPI(title="Slice Manager", version="3.0")
 
@@ -230,7 +231,21 @@ def solicitar_vlan():
     except Exception as e:
         print(f"❌ No se pudo conectar con Network Manager: {e}")
         return None
+#solicitar_vlan Versión Conejo + RPC:
 
+def solicitar_vlan_conejo():
+    """Solicita una VLAN normal via RabbitMQ RPC."""
+    try:
+        resp = rpc_call_network({"action": "ASIGNAR_VLAN"})
+        # Esperamos algo tipo {"idvlan": 1, "numero": "101"} o {"error": "..."}
+        if "idvlan" in resp and "numero" in resp:
+            return resp
+        else:
+            print(f"⚠️ Error en respuesta RPC VLAN: {resp}")
+            return None
+    except Exception as e:
+        print(f"❌ Error RPC solicitando VLAN: {e}")
+        return None
 
 def solicitar_vlan_internet():
     """Solicita una VLAN para salida a internet"""
