@@ -216,7 +216,7 @@ async def delete_vm(request: Request):
         return {"success": False, "error": f"Plataforma no soportada: {platform}"}
 
 async def delete_vm_linux(data):
-    """Eliminación en Linux (código original sin cambios)"""
+    """Eliminación en Linux (código corregido con búsqueda automática de TAPs)"""
     nombre_vm = data.get("nombre_vm")
     worker_ip = data.get("worker_ip") or data.get("worker")
     process_id = data.get("process_id")
@@ -260,21 +260,64 @@ async def delete_vm_linux(data):
         else:
             warnings.append(f"No se encontró proceso QEMU para {nombre_vm}")
     
-    # 2. Eliminar interfaces TAP
+    # Esperar a que el proceso termine
+    if proceso_eliminado:
+        import time
+        time.sleep(1)
+    
+    # 2. Eliminar interfaces TAP (CORREGIDO)
     taps_eliminadas = 0
-    if interfaces_tap or 1==1:
+    
+    if interfaces_tap:
+        # Si se proporcionaron TAPs específicas, eliminarlas
+        print(f"[LINUX] Eliminando {len(interfaces_tap)} interfaces TAP proporcionadas...")
         for tap_name in interfaces_tap:
             tap_cmd = (
                 f"sudo ovs-vsctl --if-exists del-port {OVS_BRIDGE} {tap_name}; "
-                f"sudo ip link delete {tap_name} 2>/dev/null || true"
+                f"sudo ip link delete {tap_name} 2>/dev/null || true; "
+                f"echo 'OK'"
             )
             cmd_ssh = (
                 f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
                 f"{USER_LINUX}@{worker_ip} \"{tap_cmd}\""
             )
             result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+            
             if result.returncode == 0:
+                print(f"[LINUX] Interfaz TAP {tap_name} eliminada")
                 taps_eliminadas += 1
+            else:
+                warning = f"Error eliminando TAP {tap_name}: {result.stderr}"
+                warnings.append(warning)
+    else:
+        # Si no se proporcionaron TAPs, buscarlas automáticamente
+        print(f"[LINUX] Buscando interfaces TAP automáticamente para '{nombre_vm}'...")
+        find_taps = f"ip link show | grep -oP '{nombre_vm}-tap[0-9]+' || true"
+        cmd_ssh = (
+            f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+            f"{USER_LINUX}@{worker_ip} \"{find_taps}\""
+        )
+        result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+        
+        if result.stdout.strip():
+            tap_names = result.stdout.strip().split('\n')
+            print(f"[LINUX] TAPs encontradas: {tap_names}")
+            
+            for tap_name in tap_names:
+                if tap_name:
+                    tap_cmd = (
+                        f"sudo ovs-vsctl --if-exists del-port {OVS_BRIDGE} {tap_name}; "
+                        f"sudo ip link delete {tap_name} 2>/dev/null || true"
+                    )
+                    cmd_ssh = (
+                        f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+                        f"{USER_LINUX}@{worker_ip} \"{tap_cmd}\""
+                    )
+                    subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+                    taps_eliminadas += 1
+                    print(f"[LINUX] TAP autodescubierta {tap_name} eliminada")
+        else:
+            print(f"[LINUX] No se encontraron TAPs para {nombre_vm}")
     
     # 3. Eliminar disco
     disco_eliminado = False
@@ -288,11 +331,27 @@ async def delete_vm_linux(data):
         result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
         disco_eliminado = "OK" in result.stdout
     
+    # 4. Limpiar archivo PID
+    pid_file = f"/var/run/{nombre_vm}.pid"
+    clean_pid_cmd = f"sudo rm -f {pid_file}"
+    cmd_ssh = (
+        f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+        f"{USER_LINUX}@{worker_ip} \"{clean_pid_cmd}\""
+    )
+    subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+    
+    # Preparar mensaje de respuesta
+    message = f"VM {nombre_vm} eliminada de Linux worker"
+    if taps_eliminadas > 0:
+        message += f" ({taps_eliminadas} interfaces TAP eliminadas)"
+    if disco_eliminado:
+        message += " [disco eliminado]"
+    
     return {
         "success": True,
         "status": True,
         "platform": "linux",
-        "mensaje": f"VM {nombre_vm} eliminada de Linux worker",
+        "mensaje": message,
         "details": {
             "proceso_eliminado": proceso_eliminado,
             "taps_eliminadas": taps_eliminadas,
