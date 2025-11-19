@@ -243,11 +243,11 @@ services:
       DB_PASSWORD: root
       DB_NAME: mydb
 
-    #Conejo
-    RABBITMQ_HOST: rabbitmq
-    RABBITMQ_USER: admin
-    RABBITMQ_PASS: admin
-    RABBITMQ_QUEUE_NETWORK: network_tasks
+      #Conejo
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin
+      RABBITMQ_QUEUE_NETWORK: network_tasks
     
     networks:
       - cloudnet 
