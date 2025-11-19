@@ -262,7 +262,7 @@ async def delete_vm_linux(data):
     
     # 2. Eliminar interfaces TAP
     taps_eliminadas = 0
-    if interfaces_tap:
+    if interfaces_tap or 1==1:
         for tap_name in interfaces_tap:
             tap_cmd = (
                 f"sudo ovs-vsctl --if-exists del-port {OVS_BRIDGE} {tap_name}; "
@@ -279,7 +279,7 @@ async def delete_vm_linux(data):
     # 3. Eliminar disco
     disco_eliminado = False
     disco_path = f"/var/lib/qemu-images/vms-disk/{nombre_vm}.qcow2"
-    if delete_disk:
+    if delete_disk or 1==1:
         delete_disk_cmd = f"sudo rm -f {disco_path} && echo 'OK' || echo 'FAIL'"
         cmd_ssh = (
             f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
