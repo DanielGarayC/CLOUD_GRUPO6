@@ -219,32 +219,32 @@ def generar_plan_deploy(id_slice: int,metrics_json: dict, instancias: list):
     }
 
 #Funciones para conexiones con Network Manager 
-def solicitar_vlan(): 
-    try: 
-        resp = requests.post(f"{NETWORK_BASE}/vlans/asignar", timeout=5) 
-        if resp.status_code == 200: 
-            return resp.json() 
-        else: 
-            print(f"⚠️ Error al asignar VLAN: {resp.status_code} - {resp.text}") 
-            return None 
-    except Exception as e: 
-        print(f"❌ No se pudo conectar con Network Manager: {e}") 
-        return None
+#def solicitar_vlan(): 
+ #   try: 
+  #      resp = requests.post(f"{NETWORK_BASE}/vlans/asignar", timeout=5) 
+   #     if resp.status_code == 200: 
+    #        return resp.json() 
+     #   else: 
+      #      print(f"⚠️ Error al asignar VLAN: {resp.status_code} - {resp.text}") 
+    #        return None 
+    #except Exception as e: 
+     #   print(f"❌ No se pudo conectar con Network Manager: {e}") 
+      #  return None
 #solicitar_vlan Versión Conejo + RPC:
 
-#def solicitar_vlan():
- #   """Solicita una VLAN normal via RabbitMQ RPC."""
-  #  try:
-   #     resp = rpc_call_network({"action": "ASIGNAR_VLAN"})
-       # Esperamos algo tipo {"idvlan": 1, "numero": "101"} o {"error": "..."}
-     #   if "idvlan" in resp and "numero" in resp:
-      #      return resp
-    #    else:
-     #       print(f"⚠️ Error en respuesta RPC VLAN: {resp}")
-      #      return None
-    #except Exception as e:
-     #   print(f"❌ Error RPC solicitando VLAN: {e}")
-      #  return None
+def solicitar_vlan():
+    """Solicita una VLAN normal via RabbitMQ RPC."""
+    try:
+        resp = rpc_call_network({"action": "ASIGNAR_VLAN"})
+        #Esperamos algo tipo {"idvlan": 1, "numero": "101"} o {"error": "..."}
+        if "idvlan" in resp and "numero" in resp:
+            return resp
+        else:
+            print(f"⚠️ Error en respuesta RPC VLAN: {resp}")
+            return None
+    except Exception as e:
+        print(f"❌ Error RPC solicitando VLAN: {e}")
+        return None
 
 def solicitar_vlan_internet():
     """Solicita una VLAN para salida a internet"""
@@ -260,27 +260,27 @@ def solicitar_vlan_internet():
         return None
 
 #solicitar_vnc Versión Conejo + RPC:
-#def solicitar_vnc():
- #   try:
-  #      resp = rpc_call_network({"action": "ASIGNAR_VNC"})
-   #     if resp and "puerto" in resp:
-    #        return resp
-     #   print("⚠️ Error RPC asignando VNC", resp)
-      #  return None
-    #except Exception as e:
-     #   print("❌ Error RPC solicitando VNC:", e)
-      #  return None
-def solicitar_vnc(): 
-    try: 
-        resp = requests.post(f"{NETWORK_BASE}/vncs/asignar", timeout=5) 
-        if resp.status_code == 200: 
-            return resp.json() 
-        else: 
-            print(f"⚠️ Error al asignar VNC: {resp.status_code} - {resp.text}") 
-            return None 
-    except Exception as e: 
-        print(f"❌ No se pudo conectar con Network Manager: {e}") 
+def solicitar_vnc():
+    try:
+        resp = rpc_call_network({"action": "ASIGNAR_VNC"})
+        if resp and "puerto" in resp:
+            return resp
+        print("⚠️ Error RPC asignando VNC", resp)
         return None
+    except Exception as e:
+        print("❌ Error RPC solicitando VNC:", e)
+        return None
+#def solicitar_vnc(): 
+ #   try: 
+  #      resp = requests.post(f"{NETWORK_BASE}/vncs/asignar", timeout=5) 
+   #     if resp.status_code == 200: 
+    #        return resp.json() 
+     #   else: 
+      #      print(f"⚠️ Error al asignar VNC: {resp.status_code} - {resp.text}") 
+       #     return None 
+    #except Exception as e: 
+     #   print(f"❌ No se pudo conectar con Network Manager: {e}") 
+      #  return None
 
 #Despliegue :D
 def desplegar_vm_en_worker(vm_data: dict):
