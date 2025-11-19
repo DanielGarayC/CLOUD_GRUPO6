@@ -212,6 +212,9 @@ services:
       - SSH_KEY=/home/ubuntu/.ssh/id_rsa_orch
       - USER=ubuntu
       - OVS_BRIDGE=br-int
+      - OPENSTACK_HEADNODE=10.20.12.106
+      - OPENSTACK_PORT=5821
+      - OPENSTACK_SCRIPTS_PATH=/home/ubuntu/openstack-scripts
     volumes:
       - /home/ubuntu/.ssh:/home/ubuntu/.ssh:ro
     networks:

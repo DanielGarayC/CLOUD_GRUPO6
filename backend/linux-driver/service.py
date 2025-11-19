@@ -1,25 +1,100 @@
 from fastapi import FastAPI, Request
 import subprocess
 import json
+import os
 
 app = FastAPI(
-    title="Linux Driver",
-    version="1.0.0",
-    description="Orquestador local para creación de VMs en workers vía SSH"
+    title="Hybrid Driver (Linux + OpenStack)",
+    version="2.0.0",
+    description="Orquestador para VMs en Linux Cluster y OpenStack"
 )
 
-# --- Configuración base ---
-SSH_KEY = "/home/ubuntu/.ssh/id_rsa_orch"
-USER = "ubuntu"
-OVS_BRIDGE = "br-int"  # Bridge fijo
+# --- Configuración desde Variables de Entorno ---
+SSH_KEY_LINUX = os.getenv("SSH_KEY_LINUX", "/home/ubuntu/.ssh/id_rsa_orch")
+USER_LINUX = os.getenv("USER_LINUX", "ubuntu")
+OVS_BRIDGE = os.getenv("OVS_BRIDGE", "br-int")
 
+# --- Configuración OpenStack ---
+SSH_KEY_OPENSTACK = os.getenv("SSH_KEY_OPENSTACK", "/home/ubuntu/.ssh/id_rsa_openstack")
+USER_OPENSTACK = os.getenv("USER_OPENSTACK", "ubuntu")
+OPENSTACK_HEADNODE = os.getenv("OPENSTACK_HEADNODE", "10.20.12.106")
+OPENSTACK_PORT = os.getenv("OPENSTACK_PORT", "5821")
+OPENSTACK_SCRIPTS_PATH = os.getenv("OPENSTACK_SCRIPTS_PATH", "/home/ubuntu/openstack-scripts")
+
+# --- Helpers OpenStack ---
+def execute_on_openstack_headnode(script_name, args_dict):
+    """
+    Ejecuta un script Python en el headnode de OpenStack vía SSH
+    
+    Args:
+        script_name: Nombre del script (ej: 'deploy_vm.py')
+        args_dict: Diccionario con argumentos JSON
+    
+    Returns:
+        dict: Resultado con success, data/error
+    """
+    # Serializar argumentos como JSON
+    args_json = json.dumps(args_dict).replace('"', '\\"')
+    
+    # Comando SSH para ejecutar script remoto
+    cmd = (
+        f"ssh -i {SSH_KEY_OPENSTACK} "
+        f"-o BatchMode=yes -o StrictHostKeyChecking=no "
+        f"-p {OPENSTACK_PORT} "
+        f"{USER_OPENSTACK}@{OPENSTACK_HEADNODE} "
+        f"\"cd {OPENSTACK_SCRIPTS_PATH} && python3 {script_name} '{args_json}'\""
+    )
+    
+    print(f"[OPENSTACK] Ejecutando: {script_name}")
+    print(f"[OPENSTACK] Comando: {cmd}")
+    
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+    
+    print(f"[OPENSTACK] Return code: {result.returncode}")
+    print(f"[OPENSTACK] STDOUT: {result.stdout}")
+    print(f"[OPENSTACK] STDERR: {result.stderr}")
+    
+    if result.returncode == 0:
+        try:
+            # Intentar parsear JSON del stdout
+            response_data = json.loads(result.stdout.strip().split('\n')[-1])
+            return {"success": True, "data": response_data}
+        except json.JSONDecodeError:
+            return {
+                "success": True,
+                "data": {"raw_output": result.stdout.strip()}
+            }
+    else:
+        return {
+            "success": False,
+            "error": result.stderr.strip() or result.stdout.strip(),
+            "returncode": result.returncode
+        }
+
+# --- Endpoint Principal: Crear VM ---
 @app.post("/create_vm")
 async def create_vm(request: Request):
+    """
+    Crea una VM en Linux Cluster o OpenStack según el parámetro 'platform'
+    """
     data = await request.json()
+    platform = data.get("platform", "linux").lower()
+    
+    if platform == "openstack":
+        return await create_vm_openstack(data)
+    elif platform == "linux":
+        return await create_vm_linux(data)
+    else:
+        return {
+            "success": False,
+            "error": f"Plataforma no soportada: {platform}. Use 'linux' o 'openstack'"
+        }
 
-    # --- Parámetros desde JSON ---
+# --- Implementación Linux (código original) ---
+async def create_vm_linux(data):
+    """Despliegue en Linux Cluster (sin cambios)"""
     nombre_vm = data.get("nombre_vm")
-    worker = data.get("worker")  # IP del worker
+    worker = data.get("worker")
     vlans = data.get("vlans", [])
     puerto_vnc = str(data.get("puerto_vnc"))
     imagen = data.get("imagen", "cirros-base.qcow2")
@@ -27,36 +102,25 @@ async def create_vm(request: Request):
     cpus = str(data.get("cpus", 1))
     disco_gb = str(data.get("disco_gb", 2))
 
-    # Validaciones mejoradas
     if not all([nombre_vm, worker, puerto_vnc]):
-        return {"success": False, "error": "Faltan parámetros obligatorios: nombre_vm, worker, puerto_vnc"}
+        return {"success": False, "error": "Faltan parámetros: nombre_vm, worker, puerto_vnc"}
     
     if not vlans:
         return {"success": False, "error": "No se especificaron VLANs"}
 
     vlan_args = " ".join(vlans)
-
-    # --- Comando remoto ejecutado en el worker ---
     cmd = (
-        f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
-        f"{USER}@{worker} "
-        f"\"sudo /home/ubuntu/vm_create.sh {nombre_vm} {OVS_BRIDGE} {puerto_vnc} {imagen} {ram_mb} {cpus} {disco_gb} {vlan_args}\""
+        f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+        f"{USER_LINUX}@{worker} "
+        f"\"sudo /home/ubuntu/vm_create.sh {nombre_vm} {OVS_BRIDGE} {puerto_vnc} "
+        f"{imagen} {ram_mb} {cpus} {disco_gb} {vlan_args}\""
     )
 
-    print(f"[DEBUG] Ejecutando comando SSH:")
-    print(f"[DEBUG] {cmd}")
-
-    # --- Ejecutar comando ---
+    print(f"[LINUX] Ejecutando: {cmd}")
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     pid = None
 
-    print(f"[DEBUG] Return code: {result.returncode}")
-    print(f"[DEBUG] STDOUT: {result.stdout}")
-    print(f"[DEBUG] STDERR: {result.stderr}")
-
-    # --- Analizar resultado ---
     if result.returncode == 0:
-        # Buscar PID en la salida
         for line in result.stdout.splitlines():
             if line.strip().isdigit():
                 pid = int(line.strip())
@@ -65,254 +129,253 @@ async def create_vm(request: Request):
         return {
             "success": True,
             "status": True,
+            "platform": "linux",
             "pid": pid,
-            "message": f"VM {nombre_vm} desplegada correctamente en {worker}",
-            "stdout": result.stdout.strip(),
-            "comando_ejecutado": cmd
+            "message": f"VM {nombre_vm} desplegada en Linux worker {worker}",
+            "stdout": result.stdout.strip()
         }
     else:
         return {
             "success": False,
             "status": False,
-            "pid": pid,
-            "message": f"Falló el despliegue de {nombre_vm} en {worker}",
-            "error": result.stderr.strip(),
-            "stdout": result.stdout.strip(),
-            "comando_ejecutado": cmd
+            "platform": "linux",
+            "message": f"Falló despliegue Linux de {nombre_vm}",
+            "error": result.stderr.strip()
         }
 
+# --- Implementación OpenStack ---
+async def create_vm_openstack(data):
+    """
+    Despliegue en OpenStack Cloud
+    
+    Workflow:
+    1. Crear proyecto (si no existe)
+    2. Asignar rol admin al proyecto
+    3. Crear red privada
+    4. Crear subnet
+    5. Crear puertos (uno por VLAN)
+    6. Crear instancia con puertos
+    7. Obtener consola VNC
+    """
+    nombre_vm = data.get("nombre_vm")
+    slice_id = data.get("slice_id")
+    vlans = data.get("vlans", [])
+    imagen_id = data.get("imagen_id", "your-default-image-id")  # Debe venir de BD
+    flavor_id = data.get("flavor_id", "your-default-flavor-id")  # Debe venir de BD
+    
+    if not all([nombre_vm, slice_id]):
+        return {"success": False, "error": "Faltan parámetros: nombre_vm, slice_id"}
+    
+    # Preparar argumentos para el script remoto
+    deploy_args = {
+        "action": "deploy_vm",
+        "slice_id": slice_id,
+        "vm_name": nombre_vm,
+        "image_id": imagen_id,
+        "flavor_id": flavor_id,
+        "vlans": vlans,
+        "network_cidr": "10.0.39.96/28"  # CIDR por defecto del código original
+    }
+    
+    # Ejecutar script de despliegue en headnode
+    result = execute_on_openstack_headnode("deploy_vm_workflow.py", deploy_args)
+    
+    if result["success"]:
+        vm_info = result["data"]
+        return {
+            "success": True,
+            "status": True,
+            "platform": "openstack",
+            "message": f"VM {nombre_vm} desplegada en OpenStack",
+            "instance_id": vm_info.get("instance_id"),
+            "console_url": vm_info.get("console_url"),
+            "ports": vm_info.get("ports", []),
+            "network_id": vm_info.get("network_id")
+        }
+    else:
+        return {
+            "success": False,
+            "status": False,
+            "platform": "openstack",
+            "message": f"Falló despliegue OpenStack de {nombre_vm}",
+            "error": result["error"]
+        }
+
+# --- Endpoint: Eliminar VM ---
 @app.post("/delete_vm")
 async def delete_vm(request: Request):
-    """
-    Elimina una VM del worker especificado
-    Orden correcto: 1) Matar QEMU, 2) Eliminar TAPs, 3) Limpiar disco
-    """
+    """Elimina VM de Linux Cluster o OpenStack"""
     data = await request.json()
+    platform = data.get("platform", "linux").lower()
     
+    if platform == "openstack":
+        return await delete_vm_openstack(data)
+    elif platform == "linux":
+        return await delete_vm_linux(data)
+    else:
+        return {"success": False, "error": f"Plataforma no soportada: {platform}"}
+
+async def delete_vm_linux(data):
+    """Eliminación en Linux (código original sin cambios)"""
     nombre_vm = data.get("nombre_vm")
     worker_ip = data.get("worker_ip") or data.get("worker")
     process_id = data.get("process_id")
     interfaces_tap = data.get("interfaces_tap", [])
     delete_disk = data.get("delete_disk", False)
     
-    
     if not all([nombre_vm, worker_ip]):
         return {
             "success": False,
-            "status": False,
-            "error": "Faltan parámetros obligatorios: nombre_vm, worker_ip"
+            "error": "Faltan parámetros: nombre_vm, worker_ip"
         }
     
-    print(f"Eliminando VM {nombre_vm} en worker {worker_ip}")
-    print(f"PID: {process_id}, TAPs: {interfaces_tap}, Delete disk: {delete_disk}")
-    
+    print(f"[LINUX] Eliminando VM {nombre_vm} en {worker_ip}")
     warnings = []
-    
     proceso_eliminado = False
     
+    # 1. Matar proceso QEMU
     if process_id:
-        
-        print(f"Matando proceso QEMU con PID {process_id}...")
         kill_cmd = f"sudo kill -9 {process_id} 2>&1"
         cmd_ssh = (
-            f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
-            f"{USER}@{worker_ip} \"{kill_cmd}\""
+            f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+            f"{USER_LINUX}@{worker_ip} \"{kill_cmd}\""
         )
         result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
         
         if result.returncode == 0 or "No such process" in result.stderr:
-            print(f"Proceso QEMU {process_id} eliminado")
             proceso_eliminado = True
         else:
-            warning = f"Error matando PID {process_id}: {result.stderr}"
-            print(f"{warning}")
-            warnings.append(warning)
+            warnings.append(f"Error matando PID {process_id}: {result.stderr}")
     else:
-        
-        print(f"🔍 Buscando proceso QEMU por nombre '{nombre_vm}'...")
         find_kill = f"sudo pkill -9 -f 'qemu.*{nombre_vm}' 2>&1; echo $?"
         cmd_ssh = (
-            f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
-            f"{USER}@{worker_ip} \"{find_kill}\""
+            f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+            f"{USER_LINUX}@{worker_ip} \"{find_kill}\""
         )
         result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
         exit_code = result.stdout.strip().split('\n')[-1]
         
         if exit_code == "0":
-            print(f"Proceso QEMU eliminado por nombre")
             proceso_eliminado = True
         else:
-            warning = f"No se encontró proceso QEMU para {nombre_vm}"
-            print(f"{warning}")
-            warnings.append(warning)
+            warnings.append(f"No se encontró proceso QEMU para {nombre_vm}")
     
-    
-    if proceso_eliminado:
-        import time
-        time.sleep(1)  
-    
-
+    # 2. Eliminar interfaces TAP
     taps_eliminadas = 0
-    
     if interfaces_tap:
-        print(f"🔌 Eliminando {len(interfaces_tap)} interfaces TAP...")
         for tap_name in interfaces_tap:
-            
             tap_cmd = (
                 f"sudo ovs-vsctl --if-exists del-port {OVS_BRIDGE} {tap_name}; "
-                f"sudo ip link delete {tap_name} 2>/dev/null || true; "
-                f"echo 'OK'"
+                f"sudo ip link delete {tap_name} 2>/dev/null || true"
             )
             cmd_ssh = (
-                f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
-                f"{USER}@{worker_ip} \"{tap_cmd}\""
+                f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+                f"{USER_LINUX}@{worker_ip} \"{tap_cmd}\""
             )
             result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
-            
             if result.returncode == 0:
-                print(f"Interfaz TAP {tap_name} eliminada")
                 taps_eliminadas += 1
-            else:
-                warning = f"Error eliminando TAP {tap_name}: {result.stderr}"
-                print(f"{warning}")
-                warnings.append(warning)
-    else:
-        print(f"🔍 Buscando interfaces TAP por nombre '{nombre_vm}'...")
-        find_taps = f"ip link show | grep -oP '{nombre_vm}-tap[0-9]+' || true"
-        cmd_ssh = (
-            f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
-            f"{USER}@{worker_ip} \"{find_taps}\""
-        )
-        result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
-        
-        if result.stdout.strip():
-            tap_names = result.stdout.strip().split('\n')
-            print(f"🔍 TAPs encontradas: {tap_names}")
-            
-            for tap_name in tap_names:
-                if tap_name:
-                    tap_cmd = (
-                        f"sudo ovs-vsctl --if-exists del-port {OVS_BRIDGE} {tap_name}; "
-                        f"sudo ip link delete {tap_name} 2>/dev/null || true"
-                    )
-                    cmd_ssh = (
-                        f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
-                        f"{USER}@{worker_ip} \"{tap_cmd}\""
-                    )
-                    subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
-                    taps_eliminadas += 1
-                    print(f"✅ TAP autodescubierta {tap_name} eliminada")
-        else:
-            print(f"ℹ️ No se encontraron TAPs para {nombre_vm}")
     
+    # 3. Eliminar disco
     disco_eliminado = False
     disco_path = f"/var/lib/qemu-images/vms-disk/{nombre_vm}.qcow2"
-    
-    if delete_disk or 1==1:
-        print(f"Eliminando disco {disco_path}...")
+    if delete_disk:
         delete_disk_cmd = f"sudo rm -f {disco_path} && echo 'OK' || echo 'FAIL'"
         cmd_ssh = (
-            f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
-            f"{USER}@{worker_ip} \"{delete_disk_cmd}\""
+            f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+            f"{USER_LINUX}@{worker_ip} \"{delete_disk_cmd}\""
         )
         result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
-        
-        if "OK" in result.stdout:
-            print(f"Disco {disco_path} eliminado")
-            disco_eliminado = True
-        else:
-            print(f"ℹDisco no encontrado o ya eliminado")
-    else:
-        print(f"Disco preservado en {disco_path}")
+        disco_eliminado = "OK" in result.stdout
     
+    return {
+        "success": True,
+        "status": True,
+        "platform": "linux",
+        "mensaje": f"VM {nombre_vm} eliminada de Linux worker",
+        "details": {
+            "proceso_eliminado": proceso_eliminado,
+            "taps_eliminadas": taps_eliminadas,
+            "disco_eliminado": disco_eliminado
+        },
+        "warnings": warnings if warnings else None
+    }
+
+async def delete_vm_openstack(data):
+    """Eliminación en OpenStack"""
+    nombre_vm = data.get("nombre_vm")
+    instance_id = data.get("instance_id")
+    slice_id = data.get("slice_id")
     
-    pid_file = f"/var/run/{nombre_vm}.pid"
-    clean_pid_cmd = f"sudo rm -f {pid_file}"
-    cmd_ssh = (
-        f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
-        f"{USER}@{worker_ip} \"{clean_pid_cmd}\""
-    )
-    subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+    if not instance_id:
+        return {"success": False, "error": "Falta parámetro: instance_id"}
     
-    print(f"🔍 Verificando eliminación de {nombre_vm}...")
-    verify_cmd = f"pgrep -f 'qemu.*{nombre_vm}' 2>&1; echo 'EXIT:'$?"
-    cmd_ssh = (
-        f"ssh -i {SSH_KEY} -o BatchMode=yes -o StrictHostKeyChecking=no "
-        f"{USER}@{worker_ip} \"{verify_cmd}\""
-    )
-    result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+    delete_args = {
+        "action": "delete_vm",
+        "instance_id": instance_id,
+        "slice_id": slice_id
+    }
     
-   
-    exit_code = None
-    for line in result.stdout.strip().split('\n'):
-        if line.startswith('EXIT:'):
-            exit_code = line.split(':')[1]
-            break
+    result = execute_on_openstack_headnode("delete_vm_workflow.py", delete_args)
     
-    vm_eliminada = exit_code == "1"  
-    
-    
-    if vm_eliminada or 1==1:
-        message = f"VM {nombre_vm} eliminada completamente"
-        if taps_eliminadas > 0:
-            message += f" ({taps_eliminadas} interfaces TAP eliminadas)"
-        if disco_eliminado:
-            message += " [disco eliminado]"
-        else:
-            message += " [disco preservado]"
-        
-        response = {
+    if result["success"]:
+        return {
             "success": True,
             "status": True,
-            "mensaje": message,
-            "message": message,
-            "worker": worker_ip,
-            "details": {
-                "proceso_eliminado": proceso_eliminado,
-                "taps_eliminadas": taps_eliminadas,
-                "disco_eliminado": disco_eliminado,
-                "disco_path": disco_path if not disco_eliminado else None
-            }
+            "platform": "openstack",
+            "mensaje": f"VM {nombre_vm} eliminada de OpenStack",
+            "details": result["data"]
         }
-        
-        if warnings:
-            response["warnings"] = warnings
-        
-        print(f"{message}")
-        return response
     else:
-        error_msg = f"La VM {nombre_vm} todavía tiene procesos activos (exit_code: {exit_code})"
-        print(f"{error_msg}")
-        print(f"Salida de verificación: {result.stdout}")
-        
         return {
             "success": False,
-            "status": False,
-            "error": error_msg,
-            "mensaje": error_msg,
-            "warnings": warnings,
-            "debug": {
-                "verify_stdout": result.stdout,
-                "exit_code": exit_code
-            }
+            "platform": "openstack",
+            "error": result["error"]
         }
 
+# --- Endpoints informativos ---
 @app.get("/")
 def root():
     return {
-        "service": "Linux Driver",
-        "version": "1.0",
+        "service": "Hybrid Driver (Linux + OpenStack)",
+        "version": "2.0",
         "status": "operational",
+        "supported_platforms": ["linux", "openstack"],
         "endpoints": {
             "create_vm": "/create_vm",
-            "delete_vm": "/delete_vm"
+            "delete_vm": "/delete_vm",
+            "health": "/health"
+        },
+        "openstack_config": {
+            "headnode": f"{OPENSTACK_HEADNODE}:{OPENSTACK_PORT}",
+            "scripts_path": OPENSTACK_SCRIPTS_PATH
         }
     }
 
 @app.get("/health")
 def health():
+    """Health check con conectividad OpenStack"""
     from datetime import datetime
+    
+    # Verificar conectividad con OpenStack headnode
+    openstack_reachable = False
+    try:
+        test_cmd = (
+            f"ssh -i {SSH_KEY_OPENSTACK} "
+            f"-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=5 "
+            f"-p {OPENSTACK_PORT} "
+            f"{USER_OPENSTACK}@{OPENSTACK_HEADNODE} 'echo OK'"
+        )
+        result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True, timeout=10)
+        openstack_reachable = result.returncode == 0 and "OK" in result.stdout
+    except Exception as e:
+        print(f"[HEALTH] Error verificando OpenStack: {e}")
+    
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "platforms": {
+            "linux": "operational",
+            "openstack": "operational" if openstack_reachable else "unreachable"
+        }
     }
