@@ -220,7 +220,7 @@ async def delete_vm_linux(data):
     nombre_vm = data.get("nombre_vm")
     worker_ip = data.get("worker_ip") or data.get("worker")
     process_id = data.get("process_id")
-    interfaces_tap = data.get("interfaces_tap", [])
+    interfaces_tap = data.get("interfaces_tap")
     delete_disk = data.get("delete_disk", False)
     
     if not all([nombre_vm, worker_ip]):
