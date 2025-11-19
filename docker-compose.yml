@@ -194,7 +194,6 @@ services:
       DB_NAME: mydb
       MONITORING_URL: "http://monitoring_service:5010/metrics"
       LINUX_DRIVER_URL: http://linux-driver:9100
-
       # Conejo
       RABBITMQ_HOST: rabbitmq        # nombre del servicio
       RABBITMQ_USER: admin
@@ -242,12 +241,11 @@ services:
       DB_USER: root
       DB_PASSWORD: root
       DB_NAME: mydb
-
-    #Conejo
-    RABBITMQ_HOST: rabbitmq
-    RABBITMQ_USER: admin
-    RABBITMQ_PASS: admin
-    RABBITMQ_QUEUE_NETWORK: network_tasks
+      #Conejo
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin
+      RABBITMQ_QUEUE_NETWORK: network_tasks
     
     networks:
       - cloudnet 
