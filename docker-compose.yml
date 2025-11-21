@@ -154,29 +154,30 @@ services:
     networks:
       - cloudnet
 
-  grafana:
-    image: grafana/grafana:10.2.0
-    container_name: grafana
-    restart: unless-stopped
-    user: "472"
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ALLOW_EMBEDDING=true
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - GF_SERVER_DOMAIN=localhost
-      - GF_SERVER_ROOT_URL=http://localhost:3000/
-      - GF_SECURITY_COOKIE_SAMESITE=none
-      - GF_SECURITY_COOKIE_SECURE=false
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes: 
-      - ./grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-    networks:
-      - cloudnet
+    grafana:
+      image: grafana/grafana:10.2.0
+      container_name: grafana
+      restart: unless-stopped
+      user: "472"
+      ports:
+        - "3000:3000"
+      environment:
+        - GF_SECURITY_ALLOW_EMBEDDING=true
+        - GF_AUTH_ANONYMOUS_ENABLED=true
+        - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+        - GF_SERVER_DOMAIN=localhost
+        - GF_SERVER_ROOT_URL=http://localhost:3000/
+        - GF_SECURITY_COOKIE_SAMESITE=none
+        - GF_SECURITY_COOKIE_SECURE=false
+        - GF_SECURITY_ADMIN_USER=admin
+        - GF_SECURITY_ADMIN_PASSWORD=admin
+      volumes: 
+        - grafana_data:/var/lib/grafana
+        - ./grafana/provisioning:/etc/grafana/provisioning
+      depends_on:
+        - prometheus
+      networks:
+        - cloudnet
 
 # Loki y Promtail
   loki:
@@ -316,6 +317,6 @@ networks:
     attachable: true
 
 volumes: 
-  grafana_storage: {}
+  grafana_data: {}
   prometheus_data: {}
   db_data: {}
