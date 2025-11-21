@@ -12,8 +12,8 @@ import network as svc   # tu network.py normal
 # CONFIG
 # ==========================
 RABBIT_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
-RABBIT_USER = os.getenv("RABBITMQ_USER", "guest")
-RABBIT_PASS = os.getenv("RABBITMQ_PASS", "guest")
+RABBIT_USER = os.getenv("RABBITMQ_USER", "cloud")
+RABBIT_PASS = os.getenv("RABBITMQ_PASS", "cloud123")
 QUEUE = os.getenv("RABBITMQ_QUEUE_NETWORK", "network_rpc")
 
 
@@ -82,7 +82,7 @@ def main():
             conn = connect_rabbitmq()
             ch = conn.channel()
 
-            ch.queue_declare(queue=QUEUE)
+            ch.queue_declare(queue=QUEUE, durable=False)
             print(f"📡 Esperando mensajes RPC en la cola '{QUEUE}'...")
 
             def callback(ch, method, props, body):

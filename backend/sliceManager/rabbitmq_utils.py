@@ -8,14 +8,14 @@ import uuid
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
 RABBITMQ_USER = os.getenv("RABBITMQ_USER", "admin")
 RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "admin")
-QUEUE_NETWORK = os.getenv("RABBITMQ_QUEUE_NETWORK", "network_tasks")
-RPC_QUEUE_NETWORK = os.getenv("RABBITMQ_QUEUE_RPC_NETWORK", "network_rpc")
+RPC_QUEUE_NETWORK = os.getenv("RABBITMQ_QUEUE_NETWORK", "network_rpc")
+QUEUE_NETWORK = RPC_QUEUE_NETWORK
 
 
 def get_connection():
     credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
     params = pika.ConnectionParameters(host=RABBITMQ_HOST,
-                                       credentials=credentials)
+                                       credentials=credentials, heartbeat=0)
     return pika.BlockingConnection(params)
 
 def publish_to_network(message: dict):
@@ -24,7 +24,7 @@ def publish_to_network(message: dict):
     ch = conn.channel()
 
     # Aseguramos que la cola exista
-    ch.queue_declare(queue=QUEUE_NETWORK, durable=True)
+    ch.queue_declare(queue=QUEUE_NETWORK, durable=False)
 
     body = json.dumps(message)
     ch.basic_publish(
@@ -32,11 +32,11 @@ def publish_to_network(message: dict):
         routing_key=QUEUE_NETWORK,
         body=body,
         properties=pika.BasicProperties(
-            delivery_mode=2  # persistente
+            delivery_mode=1  # no persistente
         ),
     )
     conn.close()
-def rpc_call_network(request: dict, timeout: int = 5):
+def rpc_call_network(request: dict, timeout: int = 10):
     """
     Hace una llamada RPC al Network Manager a través de RabbitMQ.
     Bloquea hasta recibir la respuesta o hasta timeout.
@@ -45,7 +45,7 @@ def rpc_call_network(request: dict, timeout: int = 5):
     ch = conn.channel()
 
     # Cola RPC donde escucha el Network Manager
-    ch.queue_declare(queue=RPC_QUEUE_NETWORK, durable=True)
+    ch.queue_declare(queue=RPC_QUEUE_NETWORK, durable=False)
 
     # Cola de respuesta exclusiva para esta conexión
     result = ch.queue_declare(queue="", exclusive=True)
