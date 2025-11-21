@@ -124,7 +124,10 @@ def asignar_vlans_a_enlaces(id_slice: int):
 # FUNCIÓN: generar plan de despliegue
 # ======================================
 def generar_plan_deploy(id_slice: int,metrics_json: dict, instancias: list):
+    print("🔧 DEBUG metrics_json keys:", list(metrics_json.keys()))
     metrics = metrics_json.get("metrics", {})
+    print("🔧 DEBUG metrics (interno) keys:", list(metrics.keys()))
+
     workers = []
 
     # Obtener recursos libres por worker
@@ -370,10 +373,12 @@ def verificar_viabilidad_endpoint(data: dict = Body(...)):
     print(f"🛰️ Evaluando slice {id_slice}...")
 
     instancias = obtener_instancias_por_slice(id_slice)
+    
     if not instancias:
         return {"can_deploy": False, "error": "No se encontraron instancias para el slice."}
 
     metrics = obtener_metricas_actuales()
+    print("🔍 DEBUG metrics crudas:", metrics)
     if not metrics:
         return {"can_deploy": False, "error": "No se pudo obtener métricas de los workers."}
 
