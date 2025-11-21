@@ -169,6 +169,7 @@ services:
       - GF_SECURITY_COOKIE_SAMESITE=none
       - GF_SECURITY_COOKIE_SECURE=false
     volumes: 
+      - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana_data:/var/lib/grafana 
     networks:
       - cloudnet
