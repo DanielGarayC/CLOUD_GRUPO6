@@ -215,7 +215,7 @@ def grafana_dashboard():
 
     # URL del dashboard de Workers Monitoring
     # Modo kiosk para ocultar menús de Grafana
-    grafana_url = "http://localhost:3000/d/workers-monitoring-v2/workers-monitoring-dashboard-enhanced?orgId=1&refresh=5s&kiosk"
+    grafana_url = "http://10.20.12.106:3000/d/workers-monitoring-v2/workers-monitoring-dashboard-enhanced?orgId=1&refresh=5s"
 
     app.logger.info(f"🌀 Admin {user.nombre} accediendo a monitoreo de workers")
     return render_template('grafana_embed.html', grafana_url=grafana_url, user=user)
