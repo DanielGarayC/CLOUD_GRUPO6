@@ -1080,10 +1080,13 @@ def deploy_slice(slice_id):
         verify_result = verify_response.json()
         
         if not verify_result.get('can_deploy', False):
+            print("🔍 DEBUG verify_result:", verify_result)
+            app.logger.error(f"[VERIFY ERROR] {verify_result}")
             return jsonify({
                 'success': False,
                 'error': 'El slice no puede ser desplegado en este momento',
-                'details': verify_result.get('error', 'Recursos insuficientes'),
+                'reason_backend': verify_result.get('error', None),
+                'raw_backend': verify_result,
                 'platform': platform
             })
         
