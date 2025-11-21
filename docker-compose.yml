@@ -312,4 +312,5 @@ networks:
 
 volumes: 
   grafana_storage: {}
+  prometheus_data: {}
   db_data: {}
