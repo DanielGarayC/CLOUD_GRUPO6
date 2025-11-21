@@ -198,7 +198,7 @@ services:
       RABBITMQ_HOST: rabbitmq        # nombre del servicio
       RABBITMQ_USER: cloud
       RABBITMQ_PASS: cloud123
-      RABBITMQ_QUEUE_NETWORK: network_tasks
+      RABBITMQ_QUEUE_NETWORK: network_rpc
     depends_on:
       slice_db:
         condition: service_healthy
@@ -250,7 +250,7 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: cloud
       RABBITMQ_PASS: cloud123
-      RABBITMQ_QUEUE_NETWORK: network_tasks
+      RABBITMQ_QUEUE_NETWORK: network_rpc
     
     networks:
       - cloudnet 
