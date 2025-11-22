@@ -59,6 +59,7 @@ CREATE TABLE `imagen` (
   `idimagen` int NOT NULL AUTO_INCREMENT,
   `ruta` varchar(225) DEFAULT NULL,
   `nombre` varchar(45) DEFAULT NULL,
+  `id_openstack` varchar(64) DEFAULT NULL,   -- nuevo campo agregado
   PRIMARY KEY (`idimagen`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -69,7 +70,9 @@ CREATE TABLE `imagen` (
 
 LOCK TABLES `imagen` WRITE;
 /*!40000 ALTER TABLE `imagen` DISABLE KEYS */;
-INSERT INTO `imagen` VALUES (1,'/var/lib/qemu-images/image-base/ubuntu.qcow2','ubuntu:latest'),(2,'/var/lib/qemu-images/image-base/cirros-base.qcow2','cirros:latest');
+INSERT INTO `imagen` VALUES 
+(1,'/var/lib/qemu-images/image-base/ubuntu.qcow2','ubuntu:latest', NULL),
+(2,'/var/lib/qemu-images/image-base/cirros-base.qcow2','cirros:latest', 'ad11fa04-b020-41f6-9cc3-7f7a589c6a2a');
 /*!40000 ALTER TABLE `imagen` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -125,7 +128,10 @@ LOCK TABLES `worker` WRITE;
 INSERT INTO worker (nombre, ip, cpu, ram, storage) VALUES
 ('server2', '192.168.201.2', '4', '8GB', '100GB'),
 ('server3', '192.168.201.3', '4', '8GB', '100GB'),
-('server4', '192.168.201.4', '4', '8GB', '100GB');
+('server4', '192.168.201.4', '4', '8GB', '100GB'),
+('worker1', '192.168.202.2', '4', '8GB', '100GB'),
+('worker2', '192.168.202.3', '4', '8GB', '100GB'),
+('worker3', '192.168.202.4', '4', '8GB', '100GB');
 /*!40000 ALTER TABLE `worker` ENABLE KEYS */;
 UNLOCK TABLES;
 
