@@ -382,9 +382,90 @@ def verificar_viabilidad_endpoint(data: dict = Body(...)):
     if not metrics:
         return {"can_deploy": False, "error": "No se pudo obtener métricas de los workers."}
 
-    resultado = generar_plan_deploy(id_slice, metrics, instancias)
+    resultado = generar_plan_verify(id_slice, metrics, instancias)
     print(json.dumps(resultado, indent=2))
     return resultado
+
+def generar_plan_verify(id_slice: int, metrics_json: dict, instancias: list):
+    """
+    Simula un plan de colocación usando Round-Robin SOLO para verificar recursos.
+    NO pide VLAN, NO pide VNC, NO toca RabbitMQ ni BD.
+    """
+    print(" [VERIFY] Simulación de Round Robin SIN VLAN, SIN VNC, SIN RabbitMQ")
+
+    print("🔧 DEBUG metrics_json keys:", list(metrics_json.keys()))
+    metrics = metrics_json.get("metrics", {})
+    print("🔧 DEBUG metrics (interno) keys:", list(metrics.keys()))
+
+    workers = []
+
+    # Construir workers con recursos libres a partir de las métricas
+    for host, data in metrics.items():
+        cpu_total = data.get("cpu_count", 1)
+        ram_total = data.get("ram_total_gb", 1)
+
+        cpu_free = cpu_total * (1 - data.get("cpu_percent", 0) / 100)
+        ram_free = ram_total * (1 - data.get("ram_percent", 0) / 100)
+
+        workers.append({
+            "nombre": host,
+            "ip": WORKER_IPS.get(host, "0.0.0.0"),
+            "cpu_free": round(cpu_free, 2),
+            "ram_free": round(ram_free, 2)
+        })
+
+    if not workers:
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "can_deploy": False,
+            "placement_plan": [],
+            "workers_status": [],
+            "error": "No hay workers válidos."
+        }
+
+    # Ordenar workers por nombre para RR determinista
+    workers.sort(key=lambda w: w["nombre"])
+
+    # Plan simulado de colocación
+    plan = []
+    idx = 0
+
+    for vm in instancias:
+        w = workers[idx]
+
+        # parsear RAM y storage tipo "1GB" → 1.0
+        ram_value = float(str(vm["ram"]).replace("GB", "").strip())
+        storage_value = float(str(vm["storage"]).replace("GB", "").strip())
+        cpu_value = int(vm["cpu"])
+
+        # restar recursos simulados al worker
+        w["cpu_free"] = round(w["cpu_free"] - cpu_value, 2)
+        w["ram_free"] = round(w["ram_free"] - ram_value, 2)
+
+        # construir item del plan (sin VLAN ni VNC)
+        plan.append({
+            "nombre_vm": vm["nombre"],
+            "worker": w["ip"],
+            "vlans": [],          # aún no asignadas en VERIFY
+            "puerto_vnc": None,   # aún no asignado en VERIFY
+            "imagen": vm["imagen"],
+            "ram_gb": ram_value,
+            "cpus": cpu_value,
+            "disco_gb": storage_value,
+        })
+
+        # siguiente worker en Round-Robin
+        idx = (idx + 1) % len(workers)
+
+    # verificar si en esta simulación ningún worker quedó con recursos negativos
+    puede = all(w["cpu_free"] >= 0 and w["ram_free"] >= 0 for w in workers)
+
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "can_deploy": puede,
+        "placement_plan": plan,
+        "workers_status": workers
+    }
 
 # ======================================
 # ENDPOINT raíz
