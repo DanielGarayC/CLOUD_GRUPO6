@@ -185,16 +185,21 @@ CREATE TABLE `instancia` (
   `vnc_idvnc` int DEFAULT NULL,
   `worker_idworker` int DEFAULT NULL,
   `process_id` int DEFAULT NULL,
+  `platform` varchar(20) DEFAULT 'linux' COMMENT 'Plataforma donde se despliega: linux | openstack',
+  `instance_id` varchar(100) DEFAULT NULL COMMENT 'UUID de la instancia en OpenStack (solo para platform=openstack)',
+
   PRIMARY KEY (`idinstancia`,`slice_idslice`),
   KEY `fk_instancia_slice1_idx` (`slice_idslice`),
   KEY `fk_instancia_imagen1_idx` (`imagen_idimagen`),
   KEY `fk_instancia_vnc1_idx` (`vnc_idvnc`),
   KEY `fk_instancia_worker1_idx` (`worker_idworker`),
+
   CONSTRAINT `fk_instancia_imagen1` FOREIGN KEY (`imagen_idimagen`) REFERENCES `imagen` (`idimagen`),
   CONSTRAINT `fk_instancia_slice1` FOREIGN KEY (`slice_idslice`) REFERENCES `slice` (`idslice`),
   CONSTRAINT `fk_instancia_vnc1` FOREIGN KEY (`vnc_idvnc`) REFERENCES `vnc` (`idvnc`),
   CONSTRAINT `fk_instancia_worker1` FOREIGN KEY (`worker_idworker`) REFERENCES `worker` (`idworker`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb3;
+
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -203,7 +208,10 @@ CREATE TABLE `instancia` (
 
 LOCK TABLES `instancia` WRITE;
 /*!40000 ALTER TABLE `instancia` DISABLE KEYS */;
-INSERT INTO `instancia` VALUES (1,19,'VM1','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL, NULL),(2,19,'VM2','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL, NULL),(3,19,'VM3','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL, NULL);
+INSERT INTO `instancia` VALUES
+(1,19,'VM1','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL,NULL,'linux',NULL),
+(2,19,'VM2','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL,NULL,'linux',NULL),
+(3,19,'VM3','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL,NULL,'linux',NULL);
 /*!40000 ALTER TABLE `instancia` ENABLE KEYS */;
 UNLOCK TABLES;
 
