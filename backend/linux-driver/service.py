@@ -98,9 +98,10 @@ async def create_vm_linux(data):
     vlans = data.get("vlans", [])
     puerto_vnc = str(data.get("puerto_vnc"))
     imagen = data.get("imagen", "cirros-base.qcow2")
-    ram_mb = str(data.get("ram_mb", 512))
-    cpus = str(data.get("cpus", 1))
-    disco_gb = str(data.get("disco_gb", 2))
+    ram_gb = float(data.get("ram_gb", 1))
+    ram_mb = str(int(ram_gb * 1024))  # GB → MB
+    cpus = str(int(data.get("cpus", 1)))
+    disco_gb = str(int(data.get("disco_gb", 10)))
 
     if not all([nombre_vm, worker, puerto_vnc]):
         return {"success": False, "error": "Faltan parámetros: nombre_vm, worker, puerto_vnc"}
@@ -146,42 +147,61 @@ async def create_vm_linux(data):
 # --- Implementación OpenStack ---
 async def create_vm_openstack(data):
     """
-    Despliegue en OpenStack Cloud
+    Despliegue en OpenStack Cloud (Versión actualizada)
     
     Workflow:
-    1. Crear proyecto (si no existe)
-    2. Asignar rol admin al proyecto
-    3. Crear red privada
-    4. Crear subnet
-    5. Crear puertos (uno por VLAN)
-    6. Crear instancia con puertos
-    7. Obtener consola VNC
+    1. Recibe flavor_spec (en lugar de flavor_id fijo)
+    2. Recibe redes[] (topología de red del slice)
+    3. Recibe imagen_id (UUID de OpenStack)
+    4. Ejecuta deploy_vm_workflow.py en headnode
     """
     nombre_vm = data.get("nombre_vm")
+    vm_id = data.get("vm_id")  
     slice_id = data.get("slice_id")
-    vlans = data.get("vlans", [])
-    imagen_id = data.get("imagen_id", "your-default-image-id")  # Debe venir de BD
-    flavor_id = data.get("flavor_id", "your-default-flavor-id")  # Debe venir de BD
+    imagen_id = data.get("imagen_id")  
+    flavor_spec = data.get("flavor_spec")  
+    redes = data.get("redes", [])  
+    salida_internet = data.get("salidainternet", False)
     
-    if not all([nombre_vm, slice_id]):
-        return {"success": False, "error": "Faltan parámetros: nombre_vm, slice_id"}
+    # Validaciones
+    if not all([nombre_vm, slice_id, imagen_id, flavor_spec]):
+        return {
+            "success": False, 
+            "error": "Faltan parámetros: nombre_vm, slice_id, imagen_id, flavor_spec"
+        }
     
     # Preparar argumentos para el script remoto
     deploy_args = {
-        "action": "deploy_vm",
         "slice_id": slice_id,
         "vm_name": nombre_vm,
-        "image_id": imagen_id,
-        "flavor_id": flavor_id,
-        "vlans": vlans,
-        "network_cidr": "10.0.39.96/28"  # CIDR por defecto del código original
+        "vm_id": vm_id,
+        "imagen_id": imagen_id,  #UUID de Glance
+        "flavor_spec": flavor_spec,  # {cpus, ram_gb, disk_gb, nombre}
+        "redes": redes,  #Lista de redes a crear
+        "salidainternet": salida_internet
     }
+    
+    print(f"[OPENSTACK] Desplegando VM {nombre_vm}...")
+    print(f"[OPENSTACK]   Imagen: {imagen_id}")
+    print(f"[OPENSTACK]   Flavor: {flavor_spec.get('nombre', 'custom')}")
+    print(f"[OPENSTACK]   Redes: {len(redes)}")
     
     # Ejecutar script de despliegue en headnode
     result = execute_on_openstack_headnode("deploy_vm_workflow.py", deploy_args)
     
     if result["success"]:
         vm_info = result["data"]
+        
+        #VERIFICAR QUE EL DESPLIEGUE FUE EXITOSO
+        if not vm_info.get("success"):
+            return {
+                "success": False,
+                "status": False,
+                "platform": "openstack",
+                "message": f"Falló despliegue OpenStack de {nombre_vm}",
+                "error": vm_info.get("error", "Error desconocido")
+            }
+        
         return {
             "success": True,
             "status": True,
@@ -189,15 +209,17 @@ async def create_vm_openstack(data):
             "message": f"VM {nombre_vm} desplegada en OpenStack",
             "instance_id": vm_info.get("instance_id"),
             "console_url": vm_info.get("console_url"),
+            "networks": vm_info.get("networks", []),
             "ports": vm_info.get("ports", []),
-            "network_id": vm_info.get("network_id")
+            "flavor_id": vm_info.get("flavor_id"),
+            "flavor_created": vm_info.get("flavor_created", False)
         }
     else:
         return {
             "success": False,
             "status": False,
             "platform": "openstack",
-            "message": f"Falló despliegue OpenStack de {nombre_vm}",
+            "message": f"Falló comunicación con headnode para {nombre_vm}",
             "error": result["error"]
         }
 
