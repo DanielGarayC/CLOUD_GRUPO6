@@ -583,10 +583,9 @@ def deploy_slice(data: dict = Body(...)):
         }
 
 def deploy_slice_linux(id_slice: int, instancias: list):
-    """Despliegue en plataforma Linux (código original adaptado)"""
+    """Despliegue en plataforma Linux"""
     print("🐧 [LINUX] Iniciando despliegue...")
     
-    # Generar plan
     metrics = obtener_metricas_actuales()
     if not metrics:
         return {"error": "No se pudo obtener métricas"}
@@ -595,7 +594,6 @@ def deploy_slice_linux(id_slice: int, instancias: list):
     if not plan.get("can_deploy"):
         return {"can_deploy": False, "error": "Recursos insuficientes"}
 
-    # Desplegar VMs
     resultados = []
     fallos = 0
     vms_exitosas = []
@@ -605,7 +603,7 @@ def deploy_slice_linux(id_slice: int, instancias: list):
 
         for vm in plan["placement_plan"]:
             vm_req = {
-                "platform": "linux",  # 🟢 ESPECIFICAR PLATAFORMA
+                "platform": "linux",
                 "nombre_vm": vm["nombre_vm"],
                 "worker": vm["worker"],
                 "vlans": [str(v) for v in vm["vlans"]],
@@ -619,11 +617,142 @@ def deploy_slice_linux(id_slice: int, instancias: list):
             future = executor.submit(desplegar_vm_en_driver, vm_req)
             future_map[future] = vm
 
-        # Procesar resultados (código original de procesamiento)
-        # ... [resto del código de procesamiento igual que antes]
+        # 🟢 PROCESAR RESULTADOS COMPLETO (del documento 16)
+        for future in as_completed(future_map):
+            vm = future_map[future]
+            vm_name = vm["nombre_vm"]
+            
+            try:
+                result = future.result()
+                
+                if result.get("status") or result.get("success"):
+                    print(f"✅ VM {vm_name}: PID {result.get('pid', 'N/A')}")
+                    
+                    with engine.begin() as conn:
+                        # Obtener VNC ID
+                        vnc_id = None
+                        if vm.get("puerto_vnc"):
+                            vnc_query = conn.execute(text("""
+                                SELECT idvnc FROM vnc WHERE puerto = :puerto
+                            """), {"puerto": vm["puerto_vnc"]})
+                            vnc_row = vnc_query.fetchone()
+                            vnc_id = vnc_row[0] if vnc_row else None
+                        
+                        # Obtener Worker ID
+                        worker_id = None
+                        if vm.get("worker"):
+                            worker_query = conn.execute(text("""
+                                SELECT idworker FROM worker WHERE ip = :worker_ip
+                            """), {"worker_ip": vm["worker"]})
+                            worker_row = worker_query.fetchone()
+                            worker_id = worker_row[0] if worker_row else None
+                            
+                            if not worker_id:
+                                insert_result = conn.execute(text("""
+                                    INSERT INTO worker (nombre, ip, cpu, ram, storage)
+                                    VALUES (:nombre, :ip, '4', '8GB', '100GB')
+                                """), {
+                                    "nombre": next((k for k, v in WORKER_IPS.items() if v == vm['worker']), f"worker_{vm['worker']}"),
+                                    "ip": vm['worker']
+                                })
+                                worker_id = insert_result.lastrowid
+                        
+                        # Actualizar instancia
+                        conn.execute(text("""
+                            UPDATE instancia
+                            SET estado = 'RUNNING',
+                                ip = :ip,
+                                vnc_idvnc = :vnc_id,
+                                worker_idworker = :worker_id,
+                                process_id = :pid,
+                                platform = 'linux'
+                            WHERE nombre = :vm_name AND slice_idslice = :sid
+                        """), {
+                            "ip": vm.get("ip_asignada"),
+                            "vnc_id": vnc_id,
+                            "worker_id": worker_id,
+                            "pid": result.get("pid"),
+                            "vm_name": vm_name,
+                            "sid": id_slice
+                        })
+                        
+                        # Actualizar VNC
+                        if vnc_id:
+                            conn.execute(text("""
+                                UPDATE vnc SET estado = 'ocupada' WHERE idvnc = :vnc_id
+                            """), {"vnc_id": vnc_id})
+                        
+                        # Marcar VLANs ocupadas
+                        for vlan_numero in vm["vlans"]:
+                            conn.execute(text("""
+                                UPDATE vlan SET estado = 'ocupada' WHERE numero = :vlan_numero
+                            """), {"vlan_numero": str(vlan_numero)})
+                    
+                    # Guardar interfaces TAP
+                    stdout = result.get("raw", {}).get("stdout", "") or result.get("stdout", "")
+                    interfaces_tap = extraer_interfaces_tap(stdout, vm_name)
+                    
+                    if interfaces_tap:
+                        guardar_interfaces_tap(vm_name, interfaces_tap, id_slice)
+                    
+                    vms_exitosas.append(vm_name)
+                    resultados.append({
+                        "vm": vm_name,
+                        "worker": vm["worker"],
+                        "success": True,
+                        "pid": result.get("pid"),
+                        "status": "RUNNING"
+                    })
+                else:
+                    fallos += 1
+                    with engine.begin() as conn:
+                        conn.execute(text("""
+                            UPDATE instancia SET estado = 'FAILED'
+                            WHERE nombre = :vm_name AND slice_idslice = :sid
+                        """), {"vm_name": vm_name, "sid": id_slice})
+                    
+                    resultados.append({
+                        "vm": vm_name,
+                        "success": False,
+                        "message": result.get("message", "Error desconocido")
+                    })
+                    
+            except Exception as e:
+                fallos += 1
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        UPDATE instancia SET estado = 'FAILED'
+                        WHERE nombre = :vm_name AND slice_idslice = :sid
+                    """), {"vm_name": vm_name, "sid": id_slice})
+                
+                resultados.append({
+                    "vm": vm_name,
+                    "success": False,
+                    "message": str(e)
+                })
+
+    # Estado final
+    estado_final = "RUNNING" if fallos == 0 else ("PARTIAL" if len(vms_exitosas) > 0 else "FAILED")
     
-    # [Código de actualización de BD y estado final igual que antes]
-    return {"success": True, "platform": "linux", "slice_id": id_slice}
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE slice SET estado = :e WHERE idslice = :sid
+        """), {"e": estado_final, "sid": id_slice})
+
+    return {
+        "success": fallos == 0,
+        "timestamp": datetime.utcnow().isoformat(),
+        "slice_id": id_slice,
+        "platform": "linux",
+        "estado_final": estado_final,
+        "resumen": {
+            "total_vms": len(plan["placement_plan"]),
+            "exitosas": len(vms_exitosas),
+            "fallidas": fallos
+        },
+        "vms_exitosas": vms_exitosas,
+        "detalle_completo": resultados
+    }
 
 def deploy_slice_openstack(id_slice: int, instancias: list):
     """Despliegue en plataforma OpenStack"""
