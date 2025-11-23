@@ -157,13 +157,7 @@ def parse_ram_to_mb(ram_input):
 # --- Implementación OpenStack ---
 async def create_vm_openstack(data):
     """
-    Despliegue en OpenStack Cloud (Versión actualizada)
-    
-    Workflow:
-    1. Recibe flavor_spec (en lugar de flavor_id fijo)
-    2. Recibe redes[] (topología de red del slice)
-    3. Recibe imagen_id (UUID de OpenStack)
-    4. Ejecuta deploy_vm_workflow.py en headnode
+    Despliegue en OpenStack Cloud (Versión corregida)
     """
     nombre_vm = data.get("nombre_vm")
     vm_id = data.get("vm_id")  
@@ -185,9 +179,9 @@ async def create_vm_openstack(data):
         "slice_id": slice_id,
         "vm_name": nombre_vm,
         "vm_id": vm_id,
-        "imagen_id": imagen_id,  #UUID de Glance
-        "flavor_spec": flavor_spec,  # {cpus, ram_gb, disk_gb, nombre}
-        "redes": redes,  #Lista de redes a crear
+        "imagen_id": imagen_id,
+        "flavor_spec": flavor_spec,
+        "redes": redes,
         "salidainternet": salida_internet
     }
     
@@ -199,39 +193,51 @@ async def create_vm_openstack(data):
     # Ejecutar script de despliegue en headnode
     result = execute_on_openstack_headnode("deploy_vm_workflow.py", deploy_args)
     
-    if result["success"]:
-        vm_info = result["data"]
-        
-        #VERIFICAR QUE EL DESPLIEGUE FUE EXITOSO
-        if not vm_info.get("success"):
-            return {
-                "success": False,
-                "status": False,
-                "platform": "openstack",
-                "message": f"Falló despliegue OpenStack de {nombre_vm}",
-                "error": vm_info.get("error", "Error desconocido")
-            }
-        
-        return {
-            "success": True,
-            "status": True,
-            "platform": "openstack",
-            "message": f"VM {nombre_vm} desplegada en OpenStack",
-            "instance_id": vm_info.get("instance_id"),
-            "console_url": vm_info.get("console_url"),
-            "networks": vm_info.get("networks", []),
-            "ports": vm_info.get("ports", []),
-            "flavor_id": vm_info.get("flavor_id"),
-            "flavor_created": vm_info.get("flavor_created", False)
-        }
-    else:
+    # Verificar comunicación con headnode
+    if not result["success"]:
         return {
             "success": False,
             "status": False,
             "platform": "openstack",
             "message": f"Falló comunicación con headnode para {nombre_vm}",
-            "error": result["error"]
+            "error": result.get("error", "Error de comunicación")
         }
+    
+    # Extraer datos del workflow
+    vm_info = result["data"]
+    
+    # Verificar éxito del workflow
+    if not vm_info.get("success", False):
+        error_msg = vm_info.get("error", "Error desconocido en workflow")
+        print(f"[OPENSTACK] ❌ Error en workflow: {error_msg}")
+        
+        return {
+            "success": False,
+            "status": False,
+            "platform": "openstack",
+            "message": f"Falló despliegue OpenStack de {nombre_vm}",
+            "error": error_msg,
+            "details": vm_info
+        }
+    
+    # Éxito
+    print(f"[OPENSTACK] ✅ VM {nombre_vm} desplegada exitosamente")
+    print(f"[OPENSTACK]    Instance ID: {vm_info.get('instance_id')}")
+    
+    return {
+        "success": True,
+        "status": True,
+        "platform": "openstack",
+        "message": f"VM {nombre_vm} desplegada en OpenStack",
+        "instance_id": vm_info.get("instance_id"),
+        "console_url": vm_info.get("console_url"),
+        "networks": vm_info.get("networks", []),
+        "ports": vm_info.get("ports", []),
+        "flavor_id": vm_info.get("flavor_id"),
+        "flavor_created": vm_info.get("flavor_created", False),
+        "project_id": vm_info.get("project_id"),
+        "steps_completed": vm_info.get("steps_completed", [])
+    }
 
 # --- Endpoint: Eliminar VM ---
 @app.post("/delete_vm")
