@@ -296,7 +296,7 @@ def generar_plan_deploy_linux(id_slice: int, metrics_json: dict, instancias: lis
     
     for vm in instancias:
         w = workers[idx]
-        ram_value = float(str(vm["ram"]).replace("GB", "").strip())
+        ram_value = parse_ram_to_gb(vm["ram"])
         storage_value = float(str(vm["storage"]).replace("GB", "").strip())
         
         vm_id = str(vm["idinstancia"])
@@ -358,7 +358,7 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list):
     
     for vm in instancias:
         vm_id = str(vm["idinstancia"])
-        ram_gb = float(str(vm["ram"]).replace("GB", "").strip())
+        ram_gb = parse_ram_to_gb(vm["ram"])
         storage_gb = float(str(vm["storage"]).replace("GB", "").strip())
         cpus = int(vm["cpu"])
         
@@ -444,6 +444,15 @@ def verificar_viabilidad_endpoint(data: dict = Body(...)):
     
     else:
         return {"can_deploy": False, "error": f"Plataforma no soportada: {platform}"}
+    
+def parse_ram_to_gb(ram_str):
+    """Convierte RAM en MB o GB a float en GB"""
+    ram_str = str(ram_str).strip().upper()
+    if "MB" in ram_str:
+        return float(ram_str.replace("MB", "")) / 1024
+    elif "GB" in ram_str:
+        return float(ram_str.replace("GB", ""))
+    return 1.0
 
 def generar_plan_verify_linux(id_slice: int, metrics_json: dict, instancias: list):
     """Verificación para Linux (código original)"""
@@ -473,7 +482,7 @@ def generar_plan_verify_linux(id_slice: int, metrics_json: dict, instancias: lis
 
     for vm in instancias:
         w = workers[idx]
-        ram_value = float(str(vm["ram"]).replace("GB", "").strip())
+        ram_value = parse_ram_to_gb(vm["ram"])
         cpu_value = int(vm["cpu"])
 
         w["cpu_free"] = round(w["cpu_free"] - cpu_value, 2)

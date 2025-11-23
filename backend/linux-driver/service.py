@@ -98,8 +98,7 @@ async def create_vm_linux(data):
     vlans = data.get("vlans", [])
     puerto_vnc = str(data.get("puerto_vnc"))
     imagen = data.get("imagen", "cirros-base.qcow2")
-    ram_gb = float(data.get("ram_gb", 1))
-    ram_mb = str(int(ram_gb * 1024))  # GB → MB
+    ram_mb = str(parse_ram_to_mb(data.get("ram_gb", 1)))
     cpus = str(int(data.get("cpus", 1)))
     disco_gb = str(int(data.get("disco_gb", 10)))
 
@@ -144,6 +143,17 @@ async def create_vm_linux(data):
             "error": result.stderr.strip()
         }
 
+def parse_ram_to_mb(ram_input):
+    """Convierte RAM (GB, MB o float) a MB para QEMU"""
+    if isinstance(ram_input, (int, float)):
+        return int(ram_input * 1024)  # Asume GB si es número
+    
+    ram_str = str(ram_input).strip().upper()
+    if "MB" in ram_str:
+        return int(float(ram_str.replace("MB", "")))
+    elif "GB" in ram_str:
+        return int(float(ram_str.replace("GB", "")) * 1024)
+    return 1024  # default 1GB
 # --- Implementación OpenStack ---
 async def create_vm_openstack(data):
     """
