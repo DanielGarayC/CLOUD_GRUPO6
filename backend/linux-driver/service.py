@@ -46,25 +46,81 @@ def execute_on_openstack_headnode(script_name, args_dict):
     )
     
     print(f"[OPENSTACK] Ejecutando: {script_name}")
-    print(f"[OPENSTACK] Comando: {cmd}")
     
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
     
     print(f"[OPENSTACK] Return code: {result.returncode}")
-    print(f"[OPENSTACK] STDOUT: {result.stdout}")
-    print(f"[OPENSTACK] STDERR: {result.stderr}")
     
     if result.returncode == 0:
+        stdout = result.stdout.strip()
+        print(f"[OPENSTACK] STDOUT length: {len(stdout)} chars")
+        
+        # 🟢 ESTRATEGIA MEJORADA: Buscar JSON en múltiples formas
+        
+        # Método 1: Intentar parsear la última línea (JSON compacto)
         try:
-            # Intentar parsear JSON del stdout
-            response_data = json.loads(result.stdout.strip().split('\n')[-1])
-            return {"success": True, "data": response_data}
+            last_line = stdout.split('\n')[-1].strip()
+            if last_line.startswith('{') and last_line.endswith('}'):
+                response_data = json.loads(last_line)
+                print(f"[OPENSTACK] ✅ JSON parseado (método: última línea)")
+                return {"success": True, "data": response_data}
+        except (json.JSONDecodeError, IndexError):
+            pass
+        
+        # Método 2: Buscar bloques JSON multi-línea
+        try:
+            lines = stdout.split('\n')
+            json_start = -1
+            brace_count = 0
+            
+            # Buscar el último bloque JSON válido
+            for i in range(len(lines) - 1, -1, -1):
+                line = lines[i].strip()
+                
+                if line.endswith('}'):
+                    json_start = i
+                    # Contar hacia atrás para encontrar el inicio
+                    for j in range(i, -1, -1):
+                        l = lines[j].strip()
+                        if l.startswith('{'):
+                            json_block = '\n'.join(lines[j:i+1])
+                            response_data = json.loads(json_block)
+                            print(f"[OPENSTACK] ✅ JSON parseado (método: multi-línea)")
+                            return {"success": True, "data": response_data}
+        except (json.JSONDecodeError, IndexError):
+            pass
+        
+        # Método 3: Concatenar todo el stdout y buscar JSON
+        try:
+            # Eliminar líneas de log/print que no son JSON
+            clean_lines = []
+            for line in stdout.split('\n'):
+                stripped = line.strip()
+                # Incluir solo líneas que parecen JSON
+                if stripped and (stripped.startswith('{') or stripped.startswith('"') or 
+                               stripped.startswith('[') or stripped.startswith('}')):
+                    clean_lines.append(stripped)
+            
+            if clean_lines:
+                json_str = ' '.join(clean_lines)
+                response_data = json.loads(json_str)
+                print(f"[OPENSTACK] ✅ JSON parseado (método: concatenación)")
+                return {"success": True, "data": response_data}
         except json.JSONDecodeError:
-            return {
-                "success": True,
-                "data": {"raw_output": result.stdout.strip()}
-            }
+            pass
+        
+        # Si ningún método funcionó, mostrar el stdout para debug
+        print(f"[OPENSTACK] ⚠️ No se pudo parsear JSON. Stdout completo:")
+        print(stdout[:500])  # Primeros 500 caracteres
+        
+        return {
+            "success": False,
+            "error": "No se pudo parsear respuesta JSON del workflow",
+            "raw_output": stdout[:200]
+        }
     else:
+        print(f"[OPENSTACK] ❌ Error en ejecución SSH")
+        print(f"[OPENSTACK] STDERR: {result.stderr}")
         return {
             "success": False,
             "error": result.stderr.strip() or result.stdout.strip(),
