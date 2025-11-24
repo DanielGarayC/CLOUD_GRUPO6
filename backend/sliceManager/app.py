@@ -1005,117 +1005,101 @@ def delete_slice_linux(id_slice: int, slice_data: dict):
     )
 
 def delete_slice_openstack(id_slice: int, slice_data: dict):
-    """Eliminación en plataforma OpenStack"""
-    print("☁️ [OPENSTACK] Eliminando slice...")
+    """
+    Eliminación en plataforma OpenStack mediante eliminación del proyecto completo.
     
-    vm_results = eliminar_vms_openstack_paralelo(slice_data["instancias"])
-    network_results = limpiar_redes_openstack(id_slice)
-    db_results = limpiar_registros_bd(id_slice)
+    En OpenStack, un slice corresponde a un proyecto, por lo que eliminando
+    el proyecto se eliminan automáticamente todas las VMs, redes, puertos,
+    routers y demás recursos asociados OwO.
+    """
+    print("[OPENSTACK] Eliminando slice completo...")
     
-    return generar_reporte_eliminacion(
-        id_slice, vm_results, network_results, db_results, "openstack"
-    )
-
-def eliminar_vms_openstack_paralelo(instancias: list):
-    """Elimina VMs de OpenStack en paralelo"""
-    results = []
+    #obtener nombre del slice para construir el nombre del proyecto
+    slice_info = slice_data.get("slice_info", {})
+    slice_nombre = slice_info.get("nombre", f"slice_{id_slice}")
+    project_name = f"slice_{id_slice}"
     
-    if not instancias:
-        return {"vms_eliminadas": 0, "errores": 0, "detalles": []}
+    print(f"📦 Proyecto a eliminar: {project_name}")
+    print(f"🔍 VMs asociadas: {len(slice_data.get('instancias', []))}")
     
-    print(f"🔧 Eliminando {len(instancias)} VMs de OpenStack...")
-    
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_vm = {}
-        
-        for instancia in instancias:
-            instance_id = instancia.get("instance_id")
-            if instance_id:  # Solo si tiene instance_id de OpenStack
-                future = executor.submit(eliminar_vm_openstack_individual, instancia)
-                future_to_vm[future] = instancia
-        
-        vms_eliminadas = 0
-        errores = 0
-        
-        for future in as_completed(future_to_vm):
-            instancia = future_to_vm[future]
-            try:
-                result = future.result()
-                results.append({
-                    "vm_nombre": instancia["nombre"],
-                    "instance_id": instancia.get("instance_id"),
-                    "success": result["success"],
-                    "message": result["message"]
-                })
-                
-                if result["success"]:
-                    vms_eliminadas += 1
-                    print(f"✅ VM {instancia['nombre']} eliminada de OpenStack")
-                else:
-                    errores += 1
-                    print(f"❌ Error eliminando {instancia['nombre']}: {result['message']}")
-                    
-            except Exception as e:
-                errores += 1
-                print(f"❌ Excepción: {e}")
-                results.append({
-                    "vm_nombre": instancia["nombre"],
-                    "success": False,
-                    "message": str(e)
-                })
-    
-    return {
-        "vms_eliminadas": vms_eliminadas,
-        "errores": errores,
-        "total": len(instancias),
-        "detalles": results
-    }
-
-def eliminar_vm_openstack_individual(instancia: dict):
-    """Elimina una VM individual de OpenStack"""
-    url = f"{LINUX_DRIVER_URL}/delete_vm"
-    
-    vm_data = {
-        "platform": "openstack",
-        "instance_id": instancia.get("instance_id"),
-        "slice_id": instancia.get("slice_idslice"),
-        "nombre_vm": instancia["nombre"]
+    delete_args = {
+        "action": "delete_project",
+        "project_name": project_name,
+        "slice_id": id_slice
     }
     
     try:
-        print(f"[HTTP] → DELETE {instancia['nombre']} (OpenStack)")
+        #Usar el helper del driver para ejecutar el script bash
+        url = f"{LINUX_DRIVER_URL}/delete_project_openstack"
         
-        resp = requests.post(url, json=vm_data, timeout=120)
+        resp = requests.post(url, json=delete_args, timeout=180)
         
         if resp.status_code != 200:
-            return {"success": False, "message": f"HTTP {resp.status_code}"}
+            print(f"Error HTTP {resp.status_code}: {resp.text}")
+            return {
+                "success": False,
+                "slice_id": id_slice,
+                "platform": "openstack",
+                "error": f"Error al comunicar con driver: HTTP {resp.status_code}",
+                "message": "Fallo en comunicación con OpenStack headnode"
+            }
         
-        data = resp.json()
-        success = bool(data.get("success", False))
-        message = data.get("mensaje") or data.get("message") or "VM eliminada"
+        result = resp.json()
         
-        return {"success": success, "message": message}
-        
+        if result.get("success"):
+            print(f"Proyecto {project_name} eliminado exitosamente")
+            
+            # Limpiar registros de base de datos
+            db_results = limpiar_registros_bd(id_slice)
+            
+            return {
+                "success": True,
+                "timestamp": datetime.utcnow().isoformat(),
+                "slice_id": id_slice,
+                "platform": "openstack",
+                "project_name": project_name,
+                "resumen": {
+                    "proyecto_eliminado": True,
+                    "vms_eliminadas": len(slice_data.get("instancias", [])),
+                    "recursos_liberados": "Todos los recursos del proyecto eliminados automáticamente"
+                },
+                "base_datos": db_results,
+                "details": result.get("details", {}),
+                "message": f"Slice {id_slice} ({project_name}) eliminado completamente de OpenStack"
+            }
+        else:
+            error_msg = result.get("error", "Error desconocido")
+            print(f"Fallo al eliminar proyecto: {error_msg}")
+            
+            return {
+                "success": False,
+                "slice_id": id_slice,
+                "platform": "openstack",
+                "project_name": project_name,
+                "error": error_msg,
+                "message": f"No se pudo eliminar el proyecto {project_name}",
+                "details": result.get("details", {})
+            }
+            
+    except requests.exceptions.Timeout:
+        print(f"⏱️ Timeout eliminando proyecto {project_name}")
+        return {
+            "success": False,
+            "slice_id": id_slice,
+            "platform": "openstack",
+            "error": "Timeout al eliminar proyecto (>180s)",
+            "message": "La operación tardó demasiado, verifique manualmente"
+        }
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        print(f"Excepción inesperada: {e}")
+        return {
+            "success": False,
+            "slice_id": id_slice,
+            "platform": "openstack",
+            "error": str(e),
+            "message": "Error crítico durante eliminación"
+        }
 
-def limpiar_redes_openstack(id_slice: int):
-    """Limpia recursos de red específicos de OpenStack"""
-    print("🌐 Liberando recursos de red OpenStack...")
-    
-    # En OpenStack, las redes se eliminan junto con las VMs
-    # Aquí solo actualizamos la BD si es necesario
-    
-    return {
-        "redes_eliminadas": 0,
-        "subnets_eliminados": 0,
-        "puertos_eliminados": 0,
-        "detalles": ["Recursos de red OpenStack gestionados por Neutron"]
-    }
-
-# ======================================
-# FUNCIONES AUXILIARES (Código Original)
-# ======================================
 
 def obtener_datos_completos_slice(id_slice: int):
     """Obtiene todos los datos del slice (código original)"""

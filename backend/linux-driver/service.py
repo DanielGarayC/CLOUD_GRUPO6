@@ -486,6 +486,119 @@ async def delete_vm_openstack(data):
             "error": result["error"]
         }
 
+@app.post("/delete_project_openstack")
+async def delete_project_openstack(request: Request):
+    """
+    Elimina un proyecto completo de OpenStack ejecutando un script bash
+    en el headnode.
+    """
+    data = await request.json()
+    project_name = data.get("project_name")
+    slice_id = data.get("slice_id")
+    
+    if not project_name:
+        return {
+            "success": False,
+            "error": "Falta parámetro: project_name"
+        }
+    
+    print(f"[OPENSTACK] Eliminando proyecto: {project_name}")
+    
+    # Comando para ejecutar el script bash en el headnode
+    delete_cmd = f"cd {OPENSTACK_SCRIPTS_PATH} && ./delete_project.sh {project_name}"
+    
+    cmd_ssh = (
+        f"ssh -i {SSH_KEY_OPENSTACK} "
+        f"-o BatchMode=yes -o StrictHostKeyChecking=no "
+        f"-p {OPENSTACK_PORT} "
+        f"{USER_OPENSTACK}@{OPENSTACK_HEADNODE} "
+        f"\"{delete_cmd}\""
+    )
+    
+    try:
+        result = subprocess.run(
+            cmd_ssh, 
+            shell=True, 
+            capture_output=True, 
+            text=True, 
+            timeout=180
+        )
+        
+        stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+        
+        print(f"[OPENSTACK] Return code: {result.returncode}")
+        print(f"[OPENSTACK] STDOUT: {stdout[:500]}")
+        
+        if result.returncode == 0:
+            # Verificar mensajes de éxito en stdout
+            success_indicators = [
+                "successfully deleted",
+                "project deleted",
+                "eliminado exitosamente",
+                "deletion complete"
+            ]
+            
+            is_success = any(indicator in stdout.lower() for indicator in success_indicators)
+            
+            if is_success or "error" not in stdout.lower():
+                return {
+                    "success": True,
+                    "message": f"Proyecto {project_name} eliminado exitosamente",
+                    "project_name": project_name,
+                    "slice_id": slice_id,
+                    "details": {
+                        "stdout": stdout,
+                        "resources_cleaned": "VMs, redes, puertos, routers y demás recursos eliminados"
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Script ejecutado pero con advertencias",
+                    "details": {
+                        "stdout": stdout,
+                        "stderr": stderr
+                    }
+                }
+        else:
+            # Error en la ejecución
+            error_msg = stderr if stderr else stdout
+            
+            # Casos especiales
+            if "not found" in error_msg.lower() or "does not exist" in error_msg.lower():
+                print(f"[OPENSTACK] Proyecto {project_name} no encontrado (posiblemente ya eliminado)")
+                return {
+                    "success": True,
+                    "message": f"Proyecto {project_name} no existe (ya eliminado)",
+                    "warning": "Proyecto no encontrado",
+                    "details": {"stdout": stdout, "stderr": stderr}
+                }
+            
+            return {
+                "success": False,
+                "error": f"Fallo al ejecutar script: {error_msg}",
+                "returncode": result.returncode,
+                "details": {
+                    "stdout": stdout,
+                    "stderr": stderr
+                }
+            }
+            
+    except subprocess.TimeoutExpired:
+        print(f"[OPENSTACK] Timeout eliminando proyecto {project_name}")
+        return {
+            "success": False,
+            "error": "Timeout al eliminar proyecto (>180s)",
+            "message": "La eliminación está tardando demasiado, verifique manualmente"
+        }
+    except Exception as e:
+        print(f"[OPENSTACK] Excepción: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 # --- Endpoints informativos ---
 @app.get("/")
 def root():
