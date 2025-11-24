@@ -324,7 +324,7 @@ services:
       - DB_PASS=root
       - DB_HOST=slice_db
       - DB_NAME=mydb
-      - MONITORING_URL=http://monitoring_service:5010/metrics
+      - MONITORING_URL=http://192.168.201.1:5010/metrics
     
     volumes:
       - ./backend/analyticsService/metrics_storage:/app/metrics_storage
