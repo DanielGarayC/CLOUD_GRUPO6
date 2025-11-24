@@ -1010,26 +1010,28 @@ def delete_slice_openstack(id_slice: int, slice_data: dict):
     
     En OpenStack, un slice corresponde a un proyecto, por lo que eliminando
     el proyecto se eliminan automáticamente todas las VMs, redes, puertos,
-    routers y demás recursos asociados OwO.
+    routers y demás recursos asociados.
     """
     print("[OPENSTACK] Eliminando slice completo...")
     
-    #obtener nombre del slice para construir el nombre del proyecto
+    # Obtener nombre del slice para construir el nombre del proyecto
     slice_info = slice_data.get("slice_info", {})
     slice_nombre = slice_info.get("nombre", f"slice_{id_slice}")
-    project_name = f"slice_{id_slice}"
+    project_name = f"slice_{id_slice}"  # Formato usado en deploy
     
-    print(f"📦 Proyecto a eliminar: {project_name}")
-    print(f"🔍 VMs asociadas: {len(slice_data.get('instancias', []))}")
+    print(f"Proyecto a eliminar: {project_name}")
+    print(f"VMs asociadas: {len(slice_data.get('instancias', []))}")
     
+    # Preparar argumentos para el script de eliminación
     delete_args = {
         "action": "delete_project",
         "project_name": project_name,
         "slice_id": id_slice
     }
     
+    # Ejecutar script de eliminación en headnode
     try:
-        #Usar el helper del driver para ejecutar el script bash
+        # Usar el helper del driver para ejecutar el script bash
         url = f"{LINUX_DRIVER_URL}/delete_project_openstack"
         
         resp = requests.post(url, json=delete_args, timeout=180)
@@ -1082,7 +1084,7 @@ def delete_slice_openstack(id_slice: int, slice_data: dict):
             }
             
     except requests.exceptions.Timeout:
-        print(f"⏱️ Timeout eliminando proyecto {project_name}")
+        print(f"Timeout eliminando proyecto {project_name}")
         return {
             "success": False,
             "slice_id": id_slice,

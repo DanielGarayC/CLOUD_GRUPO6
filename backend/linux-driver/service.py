@@ -489,7 +489,7 @@ async def delete_vm_openstack(data):
 @app.post("/delete_project_openstack")
 async def delete_project_openstack(request: Request):
     """
-    Elimina un proyecto completo de OpenStack ejecutando un script bash
+    Elimina un proyecto completo de OpenStack ejecutando el script bash
     en el headnode.
     """
     data = await request.json()
@@ -504,8 +504,12 @@ async def delete_project_openstack(request: Request):
     
     print(f"[OPENSTACK] Eliminando proyecto: {project_name}")
     
-    # Comando para ejecutar el script bash en el headnode
-    delete_cmd = f"cd {OPENSTACK_SCRIPTS_PATH} && ./delete_project.sh {project_name}"
+    # Comando con carga de credenciales de OpenStack
+    delete_cmd = (
+        f"source ~/env-scripts/cloud-admin-openrc && "
+        f"cd {OPENSTACK_SCRIPTS_PATH} && "
+        f"./delete_project.sh {project_name}"
+    )
     
     cmd_ssh = (
         f"ssh -i {SSH_KEY_OPENSTACK} "
@@ -531,31 +535,47 @@ async def delete_project_openstack(request: Request):
         print(f"[OPENSTACK] STDOUT: {stdout[:500]}")
         
         if result.returncode == 0:
-            # Verificar mensajes de éxito en stdout
+            
             success_indicators = [
+                "🎉 Proyecto",
+                "eliminado completamente",
                 "successfully deleted",
-                "project deleted",
-                "eliminado exitosamente",
-                "deletion complete"
+                "project deleted"
             ]
             
-            is_success = any(indicator in stdout.lower() for indicator in success_indicators)
+            is_success = any(indicator in stdout for indicator in success_indicators)
             
-            if is_success or "error" not in stdout.lower():
+            
+            details = {
+                "instancias_eliminadas": stdout.count("Eliminando instancia"),
+                "puertos_eliminados": stdout.count("Eliminando puerto"),
+                "subredes_eliminadas": stdout.count("Eliminando subred"),
+                "redes_eliminadas": stdout.count("Eliminando red"),
+                "log_completo": stdout
+            }
+            
+            if is_success:
+                print(f"[OPENSTACK] Proyecto {project_name} eliminado exitosamente")
+                print(f"[OPENSTACK]    • {details['instancias_eliminadas']} instancias")
+                print(f"[OPENSTACK]    • {details['puertos_eliminados']} puertos")
+                print(f"[OPENSTACK]    • {details['subredes_eliminadas']} subredes")
+                print(f"[OPENSTACK]    • {details['redes_eliminadas']} redes")
+                
                 return {
                     "success": True,
-                    "message": f"Proyecto {project_name} eliminado exitosamente",
+                    "message": f"Proyecto {project_name} eliminado completamente",
                     "project_name": project_name,
                     "slice_id": slice_id,
-                    "details": {
-                        "stdout": stdout,
-                        "resources_cleaned": "VMs, redes, puertos, routers y demás recursos eliminados"
-                    }
+                    "details": details
                 }
             else:
+                # El script se ejecutó pero no muestra mensaje de éxito
+                warning_msg = "Script ejecutado pero sin confirmación de éxito"
+                print(f"[OPENSTACK] {warning_msg}")
+                
                 return {
                     "success": False,
-                    "error": "Script ejecutado pero con advertencias",
+                    "error": warning_msg,
                     "details": {
                         "stdout": stdout,
                         "stderr": stderr
@@ -566,18 +586,20 @@ async def delete_project_openstack(request: Request):
             error_msg = stderr if stderr else stdout
             
             # Casos especiales
-            if "not found" in error_msg.lower() or "does not exist" in error_msg.lower():
-                print(f"[OPENSTACK] Proyecto {project_name} no encontrado (posiblemente ya eliminado)")
+            if "no encontrado" in error_msg.lower() or "not found" in error_msg.lower():
+                print(f"[OPENSTACK] Proyecto {project_name} no encontrado")
                 return {
-                    "success": True,
-                    "message": f"Proyecto {project_name} no existe (ya eliminado)",
+                    "success": True,  # Consideramos éxito si ya no existe
+                    "message": f"Proyecto {project_name} no existe (posiblemente ya eliminado)",
                     "warning": "Proyecto no encontrado",
                     "details": {"stdout": stdout, "stderr": stderr}
                 }
             
+            print(f"[OPENSTACK] Error: {error_msg[:200]}")
+            
             return {
                 "success": False,
-                "error": f"Fallo al ejecutar script: {error_msg}",
+                "error": f"Fallo al ejecutar script: {error_msg[:200]}",
                 "returncode": result.returncode,
                 "details": {
                     "stdout": stdout,
@@ -590,7 +612,7 @@ async def delete_project_openstack(request: Request):
         return {
             "success": False,
             "error": "Timeout al eliminar proyecto (>180s)",
-            "message": "La eliminación está tardando demasiado, verifique manualmente"
+            "message": "La eliminación está tardando demasiado, verifique manualmente en el headnode"
         }
     except Exception as e:
         print(f"[OPENSTACK] Excepción: {e}")
