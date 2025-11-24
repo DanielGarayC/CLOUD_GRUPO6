@@ -506,7 +506,7 @@ async def delete_project_openstack(request: Request):
     
     # Comando con carga de credenciales de OpenStack
     delete_cmd = (
-        f"source ~/env-scripts/cloud-admin-openrc && "
+        f"source /root/env-scripts/cloud-admin-openrc && "
         f"cd {OPENSTACK_SCRIPTS_PATH} && "
         f"./delete_project.sh {project_name}"
     )
