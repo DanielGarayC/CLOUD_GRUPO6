@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recursos del Cluster - Admin</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #0ea5e9;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-color: #0f172a;
+            --light-bg: #f8fafc;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--light-bg);
+            color: var(--dark-color);
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 1rem 0;
+        }
+
+        .page-header {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: 100%;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .worker-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        .progress-bar-custom {
+            height: 8px;
+            border-radius: 4px;
+        }
+
+        .badge-status {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .badge-online {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-offline {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--dark-color);
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .btn-export:hover {
+            transform: translateY(-1px);
+            color: white;
+        }
+
+        .btn-refresh {
+            background: white;
+            border: 2px solid #e2e8f0;
+            color: var(--dark-color);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-refresh:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        .slice-details {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background: #f8fafc;
+            border-radius: 6px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center gap-3">
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: white;">TeleFlow</div>
+                    <small style="font-size: 0.7rem; color: rgba(255,255,255,0.8); font-weight: 500;">
+                        Panel de Administración
+                    </small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-white">
+                    <i class="fas fa-user-shield me-2"></i>{{ user.nombre }}
+                </span>
+                <a href="/dashboard" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                </a>
+                <a href="/logout" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-sign-out-alt me-1"></i>Salir
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <!-- Header -->
+        <div class="page-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-2">
+                        <i class="fas fa-chart-line me-2" style="color: var(--primary-color);"></i>
+                        Recursos del Cluster
+                    </h2>
+                    <p class="text-muted mb-0">
+                        Monitoreo en tiempo real de recursos utilizados y disponibles
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-refresh" onclick="refreshData()">
+                        <i class="fas fa-sync-alt me-2"></i>Actualizar
+                    </button>
+                    <button class="btn btn-export" onclick="exportMetrics()">
+                        <i class="fas fa-download me-2"></i>Exportar CSV
+                    </button>
+                </div>
+            </div>
+            <div class="mt-3">
+                <small class="text-muted">
+                    <i class="fas fa-clock me-1"></i>
+                    Última actualización: <span id="lastUpdate">-</span>
+                </small>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-3 text-muted">Cargando recursos del cluster...</p>
+        </div>
+
+        <!-- Main Content -->
+        <div id="mainContent" style="display: none;">
+            <!-- Totales del Cluster -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="stat-icon" style="background: #dbeafe; color: #1e40af;">
+                                <i class="fas fa-microchip"></i>
+                            </div>
+                            <div class="ms-3">
+                                <div class="metric-label">CPU Total</div>
+                                <div class="metric-value" id="totalCPU">-</div>
+                            </div>
+                        </div>
+                        <div class="progress progress-bar-custom mb-2">
+                            <div class="progress-bar bg-primary" id="cpuProgress" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted">
+                            <span id="cpuUtilizado">-</span> utilizados · 
+                            <span id="cpuDisponible">-</span> disponibles
+                        </small>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="stat-icon" style="background: #dcfce7; color: #166534;">
+                                <i class="fas fa-memory"></i>
+                            </div>
+                            <div class="ms-3">
+                                <div class="metric-label">RAM Total</div>
+                                <div class="metric-value" id="totalRAM">-</div>
+                            </div>
+                        </div>
+                        <div class="progress progress-bar-custom mb-2">
+                            <div class="progress-bar bg-success" id="ramProgress" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted">
+                            <span id="ramUtilizado">-</span> utilizados · 
+                            <span id="ramDisponible">-</span> disponibles
+                        </small>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="stat-icon" style="background: #fef3c7; color: #92400e;">
+                                <i class="fas fa-hdd"></i>
+                            </div>
+                            <div class="ms-3">
+                                <div class="metric-label">Storage Total</div>
+                                <div class="metric-value" id="totalStorage">-</div>
+                            </div>
+                        </div>
+                        <div class="progress progress-bar-custom mb-2">
+                            <div class="progress-bar bg-warning" id="storageProgress" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted">
+                            <span id="storageUtilizado">-</span> utilizados · 
+                            <span id="storageDisponible">-</span> disponibles
+                        </small>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="stat-icon" style="background: #e0e7ff; color: #4338ca;">
+                                <i class="fas fa-server"></i>
+                            </div>
+                            <div class="ms-3">
+                                <div class="metric-label">Instancias</div>
+                                <div class="metric-value" id="totalInstancias">-</div>
+                            </div>
+                        </div>
+                        <small class="text-muted">
+                            Instancias en slices RUNNING
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfica de Utilización -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="worker-card">
+                        <h5 class="mb-3">
+                            <i class="fas fa-chart-bar me-2"></i>
+                            Utilización de Recursos por Worker
+                        </h5>
+                        <div class="chart-container">
+                            <canvas id="utilizacionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workers Individuales -->
+            <div class="row">
+                <div class="col-12">
+                    <h5 class="mb-3">
+                        <i class="fas fa-server me-2"></i>
+                        Detalle por Worker
+                    </h5>
+                </div>
+            </div>
+
+            <div id="workersContainer" class="row">
+                <!-- Se llenará dinámicamente con JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // URL del Analytics Service
+        const ANALYTICS_URL = 'http://localhost:5030'; // Ajusta según tu configuración
+
+        let chartInstance = null;
+
+        // Cargar datos al iniciar
+        document.addEventListener('DOMContentLoaded', function() {
+            loadResources();
+            // Actualizar cada 30 segundos
+            setInterval(loadResources, 30000);
+        });
+
+        function showLoading() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+            document.getElementById('mainContent').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+        }
+
+        function refreshData() {
+            loadResources();
+        }
+
+        async function loadResources() {
+            try {
+                showLoading();
+                
+                const response = await fetch(`${ANALYTICS_URL}/resources/summary`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                updateClusterTotals(data.cluster_totals);
+                updateWorkers(data.workers);
+                updateChart(data.workers);
+                updateTimestamp(data.timestamp);
+                
+                hideLoading();
+            } catch (error) {
+                console.error('Error cargando recursos:', error);
+                alert('Error al cargar recursos del cluster: ' + error.message);
+                hideLoading();
+            }
+        }
+
+        function updateClusterTotals(totals) {
+            // CPU
+            document.getElementById('totalCPU').textContent = `${totals.cpu_total} cores`;
+            document.getElementById('cpuUtilizado').textContent = `${totals.cpu_utilizado} cores`;
+            document.getElementById('cpuDisponible').textContent = `${totals.cpu_disponible} cores`;
+            document.getElementById('cpuProgress').style.width = `${totals.utilizacion_percent.cpu}%`;
+            
+            // RAM
+            document.getElementById('totalRAM').textContent = `${totals.ram_total_gb} GB`;
+            document.getElementById('ramUtilizado').textContent = `${totals.ram_utilizado_gb} GB`;
+            document.getElementById('ramDisponible').textContent = `${totals.ram_disponible_gb} GB`;
+            document.getElementById('ramProgress').style.width = `${totals.utilizacion_percent.ram}%`;
+            
+            // Storage
+            document.getElementById('totalStorage').textContent = `${totals.storage_total_gb} GB`;
+            document.getElementById('storageUtilizado').textContent = `${totals.storage_utilizado_gb} GB`;
+            document.getElementById('storageDisponible').textContent = `${totals.storage_disponible_gb} GB`;
+            document.getElementById('storageProgress').style.width = `${totals.utilizacion_percent.storage}%`;
+            
+            // Instancias
+            document.getElementById('totalInstancias').textContent = totals.instancias_running_total;
+        }
+
+        function updateWorkers(workers) {
+            const container = document.getElementById('workersContainer');
+            container.innerHTML = '';
+            
+            for (const [workerName, workerData] of Object.entries(workers)) {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 col-lg-4 mb-3';
+                
+                const statusBadge = workerData.estado === 'online' 
+                    ? '<span class="badge badge-status badge-online"><i class="fas fa-circle me-1"></i>Online</span>'
+                    : '<span class="badge badge-status badge-offline"><i class="fas fa-circle me-1"></i>Offline</span>';
+                
+                col.innerHTML = `
+                    <div class="worker-card">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-server me-2" style="color: var(--primary-color);"></i>
+                                    ${workerName}
+                                </h6>
+                                <small class="text-muted">${workerData.ip}</small>
+                            </div>
+                            ${statusBadge}
+                        </div>
+                        
+                        <!-- CPU -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="metric-label">CPU</small>
+                                <small class="fw-bold">${workerData.utilizado_bd.cpu}/${workerData.capacidad.cpu_total} cores (${workerData.utilizacion_percent.cpu}%)</small>
+                            </div>
+                            <div class="progress progress-bar-custom">
+                                <div class="progress-bar bg-primary" style="width: ${workerData.utilizacion_percent.cpu}%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- RAM -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="metric-label">RAM</small>
+                                <small class="fw-bold">${workerData.utilizado_bd.ram_gb}/${workerData.capacidad.ram_total_gb} GB (${workerData.utilizacion_percent.ram}%)</small>
+                            </div>
+                            <div class="progress progress-bar-custom">
+                                <div class="progress-bar bg-success" style="width: ${workerData.utilizacion_percent.ram}%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Storage -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="metric-label">Storage</small>
+                                <small class="fw-bold">${workerData.utilizado_bd.storage_gb}/${workerData.capacidad.storage_total_gb} GB (${workerData.utilizacion_percent.storage}%)</small>
+                            </div>
+                            <div class="progress progress-bar-custom">
+                                <div class="progress-bar bg-warning" style="width: ${workerData.utilizacion_percent.storage}%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Instancias -->
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <small class="metric-label">Instancias Running</small>
+                            <span class="badge bg-primary">${workerData.utilizado_bd.instancias_running}</span>
+                        </div>
+                        
+                        ${workerData.utilizado_bd.slices_detalle ? `
+                            <div class="slice-details">
+                                <i class="fas fa-info-circle me-1"></i>
+                                <strong>Slices:</strong><br>
+                                ${workerData.utilizado_bd.slices_detalle}
+                            </div>
+                        ` : ''}
+                        
+                        ${workerData.metricas_sistema && Object.keys(workerData.metricas_sistema).length > 0 ? `
+                            <hr class="my-3">
+                            <small class="text-muted">
+                                <i class="fas fa-chart-line me-1"></i>
+                                <strong>Métricas del Sistema:</strong><br>
+                                CPU: ${workerData.metricas_sistema.cpu_percent_sistema}% | 
+                                RAM: ${workerData.metricas_sistema.ram_percent_sistema}% | 
+                                Disk: ${workerData.metricas_sistema.disk_percent_sistema}%
+                                ${workerData.metricas_sistema.qemu_count ? ` | QEMU: ${workerData.metricas_sistema.qemu_count}` : ''}
+                            </small>
+                        ` : ''}
+                    </div>
+                `;
+                
+                container.appendChild(col);
+            }
+        }
+
+        function updateChart(workers) {
+            const ctx = document.getElementById('utilizacionChart');
+            
+            const workerNames = Object.keys(workers);
+            const cpuData = workerNames.map(name => workers[name].utilizacion_percent.cpu);
+            const ramData = workerNames.map(name => workers[name].utilizacion_percent.ram);
+            const storageData = workerNames.map(name => workers[name].utilizacion_percent.storage);
+            
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: workerNames,
+                    datasets: [
+                        {
+                            label: 'CPU %',
+                            data: cpuData,
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'RAM %',
+                            data: ramData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Storage %',
+                            data: storageData,
+                            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                            borderColor: 'rgba(245, 158, 11, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            const formatted = date.toLocaleString('es-ES', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('lastUpdate').textContent = formatted;
+        }
+
+        async function exportMetrics() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                window.location.href = `${ANALYTICS_URL}/metrics/export/${today}`;
+            } catch (error) {
+                alert('Error al exportar métricas: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

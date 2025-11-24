@@ -10,3 +10,20 @@ loki/data/
 # Databases
 *.db
 *.sqlite
+
+# Ignorar datos de métricas
+metrics_storage/
+
+# Ignorar archivos de entorno
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# Logs
+*.log

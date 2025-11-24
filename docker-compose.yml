@@ -310,6 +310,40 @@ services:
     networks:
       - cloudnet
   
+
+  analytics-service:
+    build: ./backend/analyticsService  # ← Asegúrate que apunte al directorio correcto
+    container_name: analytics_service
+    restart: unless-stopped
+    
+    ports:
+      - "5030:5030"
+    
+    environment:
+      - DB_USER=root
+      - DB_PASS=root
+      - DB_HOST=slice_db
+      - DB_NAME=mydb
+      - MONITORING_URL=http://monitoring_service:5010/metrics
+    
+    volumes:
+      - ./backend/analyticsService/metrics_storage:/app/metrics_storage
+    
+    networks:
+      - cloudnet  # ← Cambio importante: usar la misma red que los demás servicios
+    
+    depends_on:
+      slice_db:
+        condition: service_healthy
+      monitoring_service:
+        condition: service_started
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+  
       
 networks:
   cloudnet:
