@@ -515,9 +515,22 @@
             const ctx = document.getElementById('utilizacionChart');
             
             const workerNames = Object.keys(workers);
-            const cpuData = workerNames.map(name => workers[name].utilizacion_percent.cpu);
-            const ramData = workerNames.map(name => workers[name].utilizacion_percent.ram);
-            const storageData = workerNames.map(name => workers[name].utilizacion_percent.storage);
+            
+            // Datos de utilización por VMs (desde BD)
+            const cpuUtilizadoVM = workerNames.map(name => workers[name].utilizacion_percent.cpu);
+            const ramUtilizadoVM = workerNames.map(name => workers[name].utilizacion_percent.ram);
+            const storageUtilizadoVM = workerNames.map(name => workers[name].utilizacion_percent.storage);
+            
+            // Datos de utilización del sistema operativo
+            const cpuSistema = workerNames.map(name => 
+                workers[name].metricas_sistema?.cpu_percent_sistema || 0
+            );
+            const ramSistema = workerNames.map(name => 
+                workers[name].metricas_sistema?.ram_percent_sistema || 0
+            );
+            const diskSistema = workerNames.map(name => 
+                workers[name].metricas_sistema?.disk_percent_sistema || 0
+            );
             
             if (chartInstance) {
                 chartInstance.destroy();
@@ -529,37 +542,96 @@
                     labels: workerNames,
                     datasets: [
                         {
-                            label: 'CPU %',
-                            data: cpuData,
-                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            label: 'CPU Sistema %',
+                            data: cpuSistema,
+                            backgroundColor: 'rgba(147, 197, 253, 0.6)',
                             borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            stack: 'cpu'
                         },
                         {
-                            label: 'RAM %',
-                            data: ramData,
-                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            label: 'CPU VMs %',
+                            data: cpuUtilizadoVM,
+                            backgroundColor: 'rgba(59, 130, 246, 0.9)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1,
+                            stack: 'cpu'
+                        },
+                        {
+                            label: 'RAM Sistema %',
+                            data: ramSistema,
+                            backgroundColor: 'rgba(134, 239, 172, 0.6)',
                             borderColor: 'rgba(16, 185, 129, 1)',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            stack: 'ram'
                         },
                         {
-                            label: 'Storage %',
-                            data: storageData,
-                            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                            label: 'RAM VMs %',
+                            data: ramUtilizadoVM,
+                            backgroundColor: 'rgba(16, 185, 129, 0.9)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1,
+                            stack: 'ram'
+                        },
+                        {
+                            label: 'Disk Sistema %',
+                            data: diskSistema,
+                            backgroundColor: 'rgba(253, 224, 71, 0.6)',
                             borderColor: 'rgba(245, 158, 11, 1)',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            stack: 'storage'
+                        },
+                        {
+                            label: 'Storage VMs %',
+                            data: storageUtilizadoVM,
+                            backgroundColor: 'rgba(245, 158, 11, 0.9)',
+                            borderColor: 'rgba(245, 158, 11, 1)',
+                            borderWidth: 1,
+                            stack: 'storage'
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
                     plugins: {
                         legend: {
                             position: 'top',
+                            labels: {
+                                boxWidth: 12,
+                                font: {
+                                    size: 11
+                                }
+                            }
                         },
                         title: {
-                            display: false
+                            display: true,
+                            text: 'Uso del Sistema (fondo claro) vs. Recursos Reservados para VMs (fondo oscuro)',
+                            font: {
+                                size: 12
+                            },
+                            color: '#64748b',
+                            padding: {
+                                bottom: 10
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + '%';
+                                },
+                                footer: function(tooltipItems) {
+                                    let total = 0;
+                                    tooltipItems.forEach(item => {
+                                        total += item.parsed.y;
+                                    });
+                                    return 'Total: ' + total.toFixed(1) + '%';
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -570,12 +642,27 @@
                                 callback: function(value) {
                                     return value + '%';
                                 }
+                            },
+                            stacked: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            stacked: true,
+                            grid: {
+                                display: false
                             }
                         }
                     }
                 }
             });
         }
+
+
+
+
+
 
         function updateTimestamp(timestamp) {
             const date = new Date(timestamp);
