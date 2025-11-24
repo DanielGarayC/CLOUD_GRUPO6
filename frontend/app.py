@@ -1469,6 +1469,57 @@ def admin_resources():
     
     return render_template('admin_resources.html', user=user)
 
+
+
+# ======================================
+# RUTAS PARA ADMIN - ANALYTICS
+# ======================================
+
+@app.route('/admin/resources')
+def admin_resources():
+    """Dashboard de recursos para administradores"""
+    if 'user_id' not in session:
+        flash('Por favor inicia sesión', 'error')
+        return redirect(url_for('login'))
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('Usuario no encontrado', 'error')
+        return redirect(url_for('login'))
+    
+    # Verificar que sea admin (rol_idrol = 1)
+    if user.rol_idrol != 1:
+        flash('Acceso denegado. Solo para administradores.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('admin_resources.html', user=user)
+
+@app.route('/api/analytics/resources/summary')
+def api_analytics_summary():
+    """Proxy para evitar CORS"""
+    import requests
+    try:
+        resp = requests.get('http://analytics_service:5030/resources/summary', timeout=10)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/analytics/metrics/export/<fecha>')
+def api_analytics_export(fecha):
+    """Proxy para exportar CSV"""
+    import requests
+    try:
+        resp = requests.get(f'http://analytics_service:5030/metrics/export/{fecha}', timeout=10)
+        from flask import Response
+        return Response(
+            resp.content,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=metrics_{fecha}.csv'}
+        )
+    except Exception as e:
+        return {"error": str(e)}, 500
+    
+    
 if __name__ == '__main__':
     initialize_database()
     app.run(debug=True, host='0.0.0.0', port=5000)
