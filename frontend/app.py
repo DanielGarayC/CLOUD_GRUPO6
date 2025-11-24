@@ -1448,29 +1448,6 @@ def user_details(user_id):
         'slices': slices_info
     })
 
-# Agregar después de las otras rutas
-
-@app.route('/admin/resources')
-def admin_resources():
-    """Dashboard de recursos para administradores"""
-    if 'user_id' not in session:
-        flash('Por favor inicia sesión', 'error')
-        return redirect(url_for('login'))
-    
-    user = User.query.get(session['user_id'])
-    if not user:
-        flash('Usuario no encontrado', 'error')
-        return redirect(url_for('login'))
-    
-    # Verificar que sea admin (rol_idrol = 1)
-    if user.rol_idrol != 1:
-        flash('Acceso denegado. Solo para administradores.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    return render_template('admin_resources.html', user=user)
-
-
-
 # ======================================
 # RUTAS PARA ADMIN - ANALYTICS
 # ======================================
