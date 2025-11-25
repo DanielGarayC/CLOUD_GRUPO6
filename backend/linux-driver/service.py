@@ -15,7 +15,7 @@ SSH_KEY_LINUXHN = os.getenv("SSH_KEY_LINUXHN", "/home/ubuntu/.ssh/id_rsa_linux")
 USER_LINUXHN = os.getenv("USER_LINUXHN", "ubuntu")
 LINUX_HEADNODE = os.getenv("LINUX_HEADNODE", "10.20.12.106")
 LINUX_PORT = os.getenv("LINUX_PORT", "5811")
-LINUX_SCRIPTS_PATH = os.getenv("LINUX_SCRIPTS_PATH", "/home/ubuntu/openstack-scripts")
+LINUX_SCRIPTS_PATH = os.getenv("LINUX_SCRIPTS_PATH", "/home/ubuntu/linux-scripts")
 # --- Configuración OpenStack ---
 SSH_KEY_OPENSTACK = os.getenv("SSH_KEY_OPENSTACK", "/home/ubuntu/.ssh/id_rsa_openstack")
 USER_OPENSTACK = os.getenv("USER_OPENSTACK", "ubuntu")
