@@ -223,54 +223,40 @@ async def create_vm_linux(data):
     if not vlans:
         return {"success": False, "error": "No se especificaron VLANs"}
 
-    deploy_args = {
-        "nombre_vm": nombre_vm,
-        "worker": worker,
-        "vlans": vlans,
-        "puerto_vnc": puerto_vnc,
-        "imagen": imagen,
-        "ram_mb": ram_mb,
-        "cpus": cpus,
-        "disco_gb": disco_gb
-    }
+    vlan_args = " ".join(vlans)
+    cmd = (
+        f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+        f"{USER_LINUX}@{worker} "
+        f"\"sudo /home/ubuntu/vm_create.sh {nombre_vm} {OVS_BRIDGE} {puerto_vnc} "
+        f"{imagen} {ram_mb} {cpus} {disco_gb} {vlan_args}\""
+    )
 
-    print(f"[LINUX] Enviando request al headnode Linux para desplegar {nombre_vm}...")
-    result = execute_on_linux_headnode("deploy_vm_linux.py", deploy_args)
+    print(f"[LINUX] Ejecutando: {cmd}")
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    pid = None
 
-    if not result["success"]:
-        # Error de comunicación o parseo
+    if result.returncode == 0:
+        for line in result.stdout.splitlines():
+            if line.strip().isdigit():
+                pid = int(line.strip())
+                break
+        
         return {
-            "success": False,
-            "status": False,
+            "success": True,
+            "status": True,
             "platform": "linux",
-            "message": f"Falló comunicación con headnode Linux para {nombre_vm}",
-            "error": result.get("error", "Error desconocido"),
-            "details": result
+            "pid": pid,
+            "message": f"VM {nombre_vm} desplegada en Linux worker {worker}",
+            "stdout": result.stdout.strip()
         }
-    vm_info = result["data"]
-    
-    if not vm_info.get("success", False):
-        # El script del headnode reportó error
+    else:
         return {
             "success": False,
             "status": False,
             "platform": "linux",
             "message": f"Falló despliegue Linux de {nombre_vm}",
-            "error": vm_info.get("error", "Error en workflow Linux"),
-            "details": vm_info
+            "error": result.stderr.strip()
         }
-
-    # Éxito
-    return {
-        "success": True,
-        "status": True,
-        "platform": "linux",
-        "message": f"VM {nombre_vm} desplegada en Linux (vía headnode)",
-        "pid": vm_info.get("pid"),
-        "worker": vm_info.get("worker", worker),
-        "stdout": vm_info.get("stdout", "")
-    }
-
 
 def parse_ram_to_mb(ram_input):
     """Convierte RAM (GB, MB o float) a MB para QEMU"""
@@ -396,48 +382,136 @@ async def delete_vm_linux(data):
             "error": "Faltan parámetros: nombre_vm, worker_ip"
         }
     
-    delete_args = {
-        "nombre_vm": nombre_vm,
-        "worker": worker_ip,
-        "process_id": process_id,
-        "interfaces_tap": interfaces_tap,
-        "delete_disk": delete_disk
-    }
-
-    print(f"[LINUX] Enviando request al headnode Linux para eliminar {nombre_vm}...")
-    result = execute_on_linux_headnode("delete_vm_linux.py", delete_args)
+    print(f"[LINUX] Eliminando VM {nombre_vm} en {worker_ip}")
+    warnings = []
+    proceso_eliminado = False
     
-    if not result["success"]:
-        return {
-            "success": False,
-            "status": False,
-            "platform": "linux",
-            "mensaje": f"Falló comunicación con headnode Linux al eliminar {nombre_vm}",
-            "error": result.get("error", "Error desconocido"),
-            "details": result
-        }
-
-    info = result["data"]
-
-    if not info.get("success", False):
-        return {
-            "success": False,
-            "status": False,
-            "platform": "linux",
-            "mensaje": f"Falló eliminación Linux de {nombre_vm}",
-            "error": info.get("error", "Error en workflow Linux"),
-            "details": info
-        }
-
+    # 1. Matar proceso QEMU
+    if process_id:
+        kill_cmd = f"sudo kill -9 {process_id} 2>&1"
+        cmd_ssh = (
+            f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+            f"{USER_LINUX}@{worker_ip} \"{kill_cmd}\""
+        )
+        result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+        
+        if result.returncode == 0 or "No such process" in result.stderr:
+            proceso_eliminado = True
+        else:
+            warnings.append(f"Error matando PID {process_id}: {result.stderr}")
+    else:
+        find_kill = f"sudo pkill -9 -f 'qemu.*{nombre_vm}' 2>&1; echo $?"
+        cmd_ssh = (
+            f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+            f"{USER_LINUX}@{worker_ip} \"{find_kill}\""
+        )
+        result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+        exit_code = result.stdout.strip().split('\n')[-1]
+        
+        if exit_code == "0":
+            proceso_eliminado = True
+        else:
+            warnings.append(f"No se encontró proceso QEMU para {nombre_vm}")
+    
+    # Esperar a que el proceso termine
+    if proceso_eliminado:
+        import time
+        time.sleep(1)
+    
+    # 2. Eliminar interfaces TAP (CORREGIDO)
+    taps_eliminadas = 0
+    
+    if interfaces_tap:
+        # Si se proporcionaron TAPs específicas, eliminarlas
+        print(f"[LINUX] Eliminando {len(interfaces_tap)} interfaces TAP proporcionadas...")
+        for tap_name in interfaces_tap:
+            tap_cmd = (
+                f"sudo ovs-vsctl --if-exists del-port {OVS_BRIDGE} {tap_name}; "
+                f"sudo ip link delete {tap_name} 2>/dev/null || true; "
+                f"echo 'OK'"
+            )
+            cmd_ssh = (
+                f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+                f"{USER_LINUX}@{worker_ip} \"{tap_cmd}\""
+            )
+            result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                print(f"[LINUX] Interfaz TAP {tap_name} eliminada")
+                taps_eliminadas += 1
+            else:
+                warning = f"Error eliminando TAP {tap_name}: {result.stderr}"
+                warnings.append(warning)
+    else:
+        # Si no se proporcionaron TAPs, buscarlas automáticamente
+        print(f"[LINUX] Buscando interfaces TAP automáticamente para '{nombre_vm}'...")
+        find_taps = f"ip link show | grep -oP '{nombre_vm}-tap[0-9]+' || true"
+        cmd_ssh = (
+            f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+            f"{USER_LINUX}@{worker_ip} \"{find_taps}\""
+        )
+        result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+        
+        if result.stdout.strip():
+            tap_names = result.stdout.strip().split('\n')
+            print(f"[LINUX] TAPs encontradas: {tap_names}")
+            
+            for tap_name in tap_names:
+                if tap_name:
+                    tap_cmd = (
+                        f"sudo ovs-vsctl --if-exists del-port {OVS_BRIDGE} {tap_name}; "
+                        f"sudo ip link delete {tap_name} 2>/dev/null || true"
+                    )
+                    cmd_ssh = (
+                        f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+                        f"{USER_LINUX}@{worker_ip} \"{tap_cmd}\""
+                    )
+                    subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+                    taps_eliminadas += 1
+                    print(f"[LINUX] TAP autodescubierta {tap_name} eliminada")
+        else:
+            print(f"[LINUX] No se encontraron TAPs para {nombre_vm}")
+    
+    # 3. Eliminar disco
+    disco_eliminado = False
+    disco_path = f"/var/lib/qemu-images/vms-disk/{nombre_vm}.qcow2"
+    if delete_disk or 1==1:
+        delete_disk_cmd = f"sudo rm -f {disco_path} && echo 'OK' || echo 'FAIL'"
+        cmd_ssh = (
+            f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+            f"{USER_LINUX}@{worker_ip} \"{delete_disk_cmd}\""
+        )
+        result = subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+        disco_eliminado = "OK" in result.stdout
+    
+    # 4. Limpiar archivo PID
+    pid_file = f"/var/run/{nombre_vm}.pid"
+    clean_pid_cmd = f"sudo rm -f {pid_file}"
+    cmd_ssh = (
+        f"ssh -i {SSH_KEY_LINUX} -o BatchMode=yes -o StrictHostKeyChecking=no "
+        f"{USER_LINUX}@{worker_ip} \"{clean_pid_cmd}\""
+    )
+    subprocess.run(cmd_ssh, shell=True, capture_output=True, text=True)
+    
+    # Preparar mensaje de respuesta
+    message = f"VM {nombre_vm} eliminada de Linux worker"
+    if taps_eliminadas > 0:
+        message += f" ({taps_eliminadas} interfaces TAP eliminadas)"
+    if disco_eliminado:
+        message += " [disco eliminado]"
+    
     return {
         "success": True,
         "status": True,
         "platform": "linux",
-        "mensaje": info.get("mensaje", f"VM {nombre_vm} eliminada de Linux"),
-        "details": info.get("details", {}),
-        "warnings": info.get("warnings")
+        "mensaje": message,
+        "details": {
+            "proceso_eliminado": proceso_eliminado,
+            "taps_eliminadas": taps_eliminadas,
+            "disco_eliminado": disco_eliminado
+        },
+        "warnings": warnings if warnings else None
     }
-    
 
 async def delete_vm_openstack(data):
     """Eliminación en OpenStack"""
