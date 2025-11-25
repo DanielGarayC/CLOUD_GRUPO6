@@ -761,12 +761,12 @@
 
         function showNoHistoryMessage() {
             document.getElementById('noHistoryMessage'). style.display = 'block';
-            document.getElementById('chartsContainer').style.display = 'none';
+            document.getElementById('chartsContainer').classList.add('d-none');
         }
 
         function hideNoHistoryMessage() {
             document.getElementById('noHistoryMessage').style.display = 'none';
-            document.getElementById('chartsContainer').style.display = 'block';
+            document.getElementById('chartsContainer').classList.remove('d-none');
         }
 
         function changeTimePeriod() {
