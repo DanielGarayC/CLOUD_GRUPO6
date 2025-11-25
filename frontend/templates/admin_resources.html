@@ -248,7 +248,7 @@
                             <div class="progress-bar bg-primary" id="cpuProgress" style="width: 0%"></div>
                         </div>
                         <small class="text-muted">
-                            <span id="cpuUtilizado">-</span> utilizados · 
+                            <span id="cpuUtilizado">-</span> asignados · 
                             <span id="cpuDisponible">-</span> disponibles
                         </small>
                     </div>
@@ -269,7 +269,7 @@
                             <div class="progress-bar bg-success" id="ramProgress" style="width: 0%"></div>
                         </div>
                         <small class="text-muted">
-                            <span id="ramUtilizado">-</span> utilizados · 
+                            <span id="ramUtilizado">-</span> asignados · 
                             <span id="ramDisponible">-</span> disponibles
                         </small>
                     </div>
@@ -290,7 +290,7 @@
                             <div class="progress-bar bg-warning" id="storageProgress" style="width: 0%"></div>
                         </div>
                         <small class="text-muted">
-                            <span id="storageUtilizado">-</span> utilizados · 
+                            <span id="storageUtilizado">-</span> asignados · 
                             <span id="storageDisponible">-</span> disponibles
                         </small>
                     </div>
@@ -314,16 +314,34 @@
                 </div>
             </div>
 
-            <!-- Gráfica de Utilización -->
+            <!-- Gráfica de Utilización TEMPORAL -->
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="worker-card">
-                        <h5 class="mb-3">
-                            <i class="fas fa-chart-bar me-2"></i>
-                            Utilización de Recursos por Worker
-                        </h5>
-                        <div class="chart-container">
-                            <canvas id="utilizacionChart"></canvas>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-line me-2"></i>
+                                Utilización Real del Sistema (Últimos 30 minutos)
+                            </h5>
+                            
+                            <!-- Selector de período -->
+                            <select class="form-select form-select-sm" id="periodSelector" style="width: 180px;" onchange="changeTimePeriod()">
+                                <option value="10">Últimos 10 min</option>
+                                <option value="30" selected>Últimos 30 min</option>
+                                <option value="60">Última hora</option>
+                                <option value="180">Últimas 3 horas</option>
+                                <option value="360">Últimas 6 horas</option>
+                            </select>
+                        </div>
+                        
+                        <p class="text-muted mb-3" style="font-size: 0. 875rem;">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Muestra el uso REAL de CPU, RAM y Disco en el sistema físico.  
+                            <strong>Los picos indican saturación.</strong>
+                        </p>
+                        
+                        <div class="chart-container" style="height: 400px;">
+                            <canvas id="timelineChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -511,86 +529,104 @@
             }
         }
 
-        function updateChart(workers) {
-            const ctx = document.getElementById('utilizacionChart');
+        let timelineChartInstance = null;
+        let currentPeriod = 30; // minutos
+
+        async function loadTimelineData(minutes = 30) {
+            try {
+                const response = await fetch(`${ANALYTICS_URL}/metrics/history?minutes=${minutes}`);
+                const data = await response.json();
+                
+                if (! data.success) {
+                    console.warn('No hay datos históricos:', data. error);
+                    showNoHistoryMessage();
+                    return;
+                }
+                
+                updateTimelineChart(data.data);
+            } catch (error) {
+                console.error('Error cargando histórico:', error);
+                showNoHistoryMessage();
+            }
+        }
+
+        function updateTimelineChart(historyData) {
+            const ctx = document.getElementById('timelineChart');
             
-            const workerNames = Object.keys(workers);
-            
-            // Datos de utilización por VMs (desde BD)
-            const cpuUtilizadoVM = workerNames.map(name => workers[name].utilizacion_percent.cpu);
-            const ramUtilizadoVM = workerNames.map(name => workers[name].utilizacion_percent.ram);
-            const storageUtilizadoVM = workerNames.map(name => workers[name].utilizacion_percent.storage);
-            
-            // Datos de utilización del sistema operativo
-            const cpuSistema = workerNames.map(name => 
-                workers[name].metricas_sistema?.cpu_percent_sistema || 0
-            );
-            const ramSistema = workerNames.map(name => 
-                workers[name].metricas_sistema?.ram_percent_sistema || 0
-            );
-            const diskSistema = workerNames.map(name => 
-                workers[name].metricas_sistema?.disk_percent_sistema || 0
-            );
-            
-            if (chartInstance) {
-                chartInstance.destroy();
+            if (timelineChartInstance) {
+                timelineChartInstance. destroy();
             }
             
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: workerNames,
-                    datasets: [
-                        {
-                            label: 'CPU Sistema %',
-                            data: cpuSistema,
-                            backgroundColor: 'rgba(147, 197, 253, 0.6)',
-                            borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 1,
-                            stack: 'cpu'
-                        },
-                        {
-                            label: 'CPU VMs %',
-                            data: cpuUtilizadoVM,
-                            backgroundColor: 'rgba(59, 130, 246, 0.9)',
-                            borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 1,
-                            stack: 'cpu'
-                        },
-                        {
-                            label: 'RAM Sistema %',
-                            data: ramSistema,
-                            backgroundColor: 'rgba(134, 239, 172, 0.6)',
-                            borderColor: 'rgba(16, 185, 129, 1)',
-                            borderWidth: 1,
-                            stack: 'ram'
-                        },
-                        {
-                            label: 'RAM VMs %',
-                            data: ramUtilizadoVM,
-                            backgroundColor: 'rgba(16, 185, 129, 0.9)',
-                            borderColor: 'rgba(16, 185, 129, 1)',
-                            borderWidth: 1,
-                            stack: 'ram'
-                        },
-                        {
-                            label: 'Disk Sistema %',
-                            data: diskSistema,
-                            backgroundColor: 'rgba(253, 224, 71, 0.6)',
-                            borderColor: 'rgba(245, 158, 11, 1)',
-                            borderWidth: 1,
-                            stack: 'storage'
-                        },
-                        {
-                            label: 'Storage VMs %',
-                            data: storageUtilizadoVM,
-                            backgroundColor: 'rgba(245, 158, 11, 0.9)',
-                            borderColor: 'rgba(245, 158, 11, 1)',
-                            borderWidth: 1,
-                            stack: 'storage'
-                        }
-                    ]
-                },
+            // Preparar datasets para cada worker
+            const datasets = [];
+            const colors = {
+                'server2': { cpu: '#3b82f6', ram: '#10b981', disk: '#f59e0b' },
+                'server3': { cpu: '#8b5cf6', ram: '#14b8a6', disk: '#f97316' },
+                'server4': { cpu: '#ec4899', ram: '#06b6d4', disk: '#eab308' }
+            };
+            
+            const metrics = ['cpu_percent', 'ram_percent', 'disk_percent'];
+            const metricLabels = {
+                'cpu_percent': 'CPU',
+                'ram_percent': 'RAM',
+                'disk_percent': 'Disk'
+            };
+            
+            Object.keys(historyData).forEach(workerName => {
+                const workerData = historyData[workerName];
+                const timestamps = workerData.timestamps;
+                
+                // CPU
+                datasets.push({
+                    label: `${workerName} - CPU %`,
+                    data: workerData.cpu_percent. map((val, idx) => ({
+                        x: timestamps[idx],
+                        y: val
+                    })),
+                    borderColor: colors[workerName]?.cpu || '#3b82f6',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 5
+                });
+                
+                // RAM
+                datasets.push({
+                    label: `${workerName} - RAM %`,
+                    data: workerData.ram_percent.map((val, idx) => ({
+                        x: timestamps[idx],
+                        y: val
+                    })),
+                    borderColor: colors[workerName]?.ram || '#10b981',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    borderDash: [5, 5]  // Línea discontinua para RAM
+                });
+                
+                // Disk
+                datasets.push({
+                    label: `${workerName} - Disk %`,
+                    data: workerData.disk_percent.map((val, idx) => ({
+                        x: timestamps[idx],
+                        y: val
+                    })),
+                    borderColor: colors[workerName]?.disk || '#f59e0b',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    borderDash: [2, 2]  // Línea punteada para Disk
+                });
+            });
+            
+            timelineChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -600,58 +636,74 @@
                     },
                     plugins: {
                         legend: {
-                            position: 'top',
+                            position: 'bottom',
                             labels: {
                                 boxWidth: 12,
-                                font: {
-                                    size: 11
-                                }
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Uso del Sistema (fondo claro) vs. Recursos Reservados para VMs (fondo oscuro)',
-                            font: {
-                                size: 12
-                            },
-                            color: '#64748b',
-                            padding: {
-                                bottom: 10
+                                font: { size: 10 },
+                                usePointStyle: true
                             }
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + '%';
-                                },
-                                footer: function(tooltipItems) {
-                                    let total = 0;
-                                    tooltipItems.forEach(item => {
-                                        total += item.parsed.y;
-                                    });
-                                    return 'Total: ' + total.toFixed(1) + '%';
+                                    return context.dataset.label + ': ' + context.parsed.y. toFixed(1) + '%';
+                                }
+                            }
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: 80,
+                                    yMax: 80,
+                                    borderColor: '#ef4444',
+                                    borderWidth: 2,
+                                    borderDash: [10, 5],
+                                    label: {
+                                        content: 'Umbral de saturación (80%)',
+                                        enabled: true,
+                                        position: 'end',
+                                        backgroundColor: '#ef4444',
+                                        color: 'white',
+                                        font: { size: 10 }
+                                    }
                                 }
                             }
                         }
                     },
                     scales: {
+                        x: {
+                            type: 'category',
+                            title: {
+                                display: true,
+                                text: 'Tiempo'
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45,
+                                font: { size: 9 }
+                            }
+                        },
                         y: {
                             beginAtZero: true,
                             max: 100,
+                            title: {
+                                display: true,
+                                text: 'Utilización (%)'
+                            },
                             ticks: {
                                 callback: function(value) {
                                     return value + '%';
                                 }
                             },
-                            stacked: true,
                             grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        },
-                        x: {
-                            stacked: true,
-                            grid: {
-                                display: false
+                                color: function(context) {
+                                    // Línea roja en 80%
+                                    if (context.tick.value === 80) {
+                                        return '#ef4444';
+                                    }
+                                    return 'rgba(0, 0, 0, 0.05)';
+                                }
                             }
                         }
                     }
@@ -659,8 +711,51 @@
             });
         }
 
+        function showNoHistoryMessage() {
+            const container = document.querySelector('.chart-container');
+            container.innerHTML = `
+                <div style="text-align: center; padding: 3rem; color: #64748b;">
+                    <i class="fas fa-chart-line" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p class="mt-3 mb-0">
+                        <strong>No hay datos históricos disponibles</strong><br>
+                        <small>Los datos se recopilarán automáticamente.  Espera unos minutos.</small>
+                    </p>
+                </div>
+            `;
+        }
 
+        function changeTimePeriod() {
+            const select = document.getElementById('periodSelector');
+            currentPeriod = parseInt(select. value);
+            loadTimelineData(currentPeriod);
+        }
 
+        // Modificar loadResources para cargar también el histórico
+        async function loadResources() {
+            try {
+                showLoading();
+                
+                const response = await fetch(`${ANALYTICS_URL}/resources/summary`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                updateClusterTotals(data.cluster_totals);
+                updateWorkers(data.workers);
+                updateTimestamp(data.timestamp);
+                
+                // Cargar gráfica temporal
+                await loadTimelineData(currentPeriod);
+                
+                hideLoading();
+            } catch (error) {
+                console. error('Error cargando recursos:', error);
+                alert('Error al cargar recursos del cluster: ' + error.message);
+                hideLoading();
+            }
+        }
 
 
 

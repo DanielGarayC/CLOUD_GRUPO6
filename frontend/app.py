@@ -1496,7 +1496,24 @@ def api_analytics_export(fecha):
     except Exception as e:
         return {"error": str(e)}, 500
     
+@app.route('/api/analytics/metrics/history')
+def api_analytics_history():
+    """Proxy para obtener histórico de métricas"""
+    import requests
     
+    # Obtener parámetro de minutos (default 30)
+    minutes = request. args.get('minutes', 30, type=int)
+    
+    try:
+        resp = requests.get(
+            f'http://analytics_service:5030/metrics/history?minutes={minutes}', 
+            timeout=10
+        )
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return {"error": str(e)}, 500
+     
+
 if __name__ == '__main__':
     initialize_database()
     app.run(debug=True, host='0.0.0.0', port=5000)

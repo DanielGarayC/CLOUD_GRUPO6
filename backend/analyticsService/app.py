@@ -149,11 +149,11 @@ def obtener_metricas_actuales():
 def guardar_metricas_snapshot(metricas: dict, recursos_utilizados: dict):
     """
     Guarda un snapshot de las métricas actuales en CSV
-    Combina métricas del sistema (monitoring service) con recursos utilizados (BD)
+    SE GUARDA CADA VEZ que se consulta /resources/summary
     """
     try:
         fecha = datetime.utcnow().strftime("%Y-%m-%d")
-        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.utcnow(). strftime("%Y-%m-%d %H:%M:%S")
         
         # Archivo CSV por día
         csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
@@ -164,12 +164,12 @@ def guardar_metricas_snapshot(metricas: dict, recursos_utilizados: dict):
         with open(csv_file, 'a', newline='') as f:
             fieldnames = [
                 'timestamp', 'worker_nombre', 'worker_ip',
-                # Capacidad total
+                # Capacidad total (real desde métricas)
                 'cpu_total', 'ram_total_gb', 'storage_total_gb',
                 # Recursos utilizados (BD - RUNNING slices)
                 'cpu_utilizado_bd', 'ram_utilizado_bd_gb', 'storage_utilizado_bd_gb', 
                 'instancias_running', 'slices_detalle',
-                # Métricas del sistema (monitoring service)
+                # Métricas del sistema (USO REAL)
                 'cpu_percent_sistema', 'ram_percent_sistema', 'disk_percent_sistema',
                 'ram_sistema_gb', 'disk_free_gb', 'qemu_count'
             ]
@@ -177,7 +177,7 @@ def guardar_metricas_snapshot(metricas: dict, recursos_utilizados: dict):
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             
             if not file_exists:
-                writer.writeheader()
+                writer. writeheader()
             
             # Escribir una fila por worker
             if metricas and 'metrics' in metricas:
@@ -188,26 +188,34 @@ def guardar_metricas_snapshot(metricas: dict, recursos_utilizados: dict):
                     ram_percent = data.get('ram_percent', 0)
                     ram_sistema = (ram_total * ram_percent / 100) if ram_total > 0 else 0
                     
+                    # Calcular disco total real
+                    disk_free = data.get('disk_free_gb', 0)
+                    disk_percent = data.get('disk_percent', 0)
+                    if disk_percent < 100 and disk_percent > 0:
+                        disk_total = disk_free / (1 - disk_percent / 100)
+                    else:
+                        disk_total = 10
+                    
                     writer.writerow({
                         'timestamp': timestamp,
                         'worker_nombre': worker_nombre,
                         'worker_ip': utilizados.get('ip', 'N/A'),
-                        # Capacidad
+                        # Capacidad real
                         'cpu_total': data.get('cpu_count', 0),
                         'ram_total_gb': ram_total,
-                        'storage_total_gb': data.get('disk_free_gb', 0) / (1 - data.get('disk_percent', 0) / 100) if data.get('disk_percent', 0) < 100 else 100,
+                        'storage_total_gb': round(disk_total, 2),
                         # Utilizados según BD
                         'cpu_utilizado_bd': utilizados.get('cpu_utilizado', 0),
                         'ram_utilizado_bd_gb': utilizados.get('ram_utilizado_gb', 0),
                         'storage_utilizado_bd_gb': utilizados.get('storage_utilizado_gb', 0),
                         'instancias_running': utilizados.get('num_instancias_running', 0),
                         'slices_detalle': utilizados.get('slices_instancias', ''),
-                        # Métricas del sistema
+                        # Métricas del sistema (USO REAL)
                         'cpu_percent_sistema': data.get('cpu_percent', 0),
                         'ram_percent_sistema': ram_percent,
-                        'disk_percent_sistema': data.get('disk_percent', 0),
+                        'disk_percent_sistema': disk_percent,
                         'ram_sistema_gb': round(ram_sistema, 2),
-                        'disk_free_gb': data.get('disk_free_gb', 0),
+                        'disk_free_gb': disk_free,
                         'qemu_count': data.get('qemu_count', 0)
                     })
         
@@ -217,6 +225,7 @@ def guardar_metricas_snapshot(metricas: dict, recursos_utilizados: dict):
     except Exception as e:
         print(f"❌ Error guardando snapshot: {e}")
         return None
+
 
 def listar_archivos_metricas():
     """Lista todos los archivos CSV de métricas disponibles"""
@@ -510,6 +519,68 @@ def get_latest_metrics():
         
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+#extra
+@app.get("/metrics/history")
+def get_metrics_history(minutes: int = 30):
+    """
+    Obtener histórico de métricas de los últimos N minutos
+    
+    Parámetros:
+        minutes: Minutos de histórico a obtener (default: 30)
+    
+    Retorna datos para graficar evolución temporal
+    """
+    try:
+        fecha = datetime.utcnow(). strftime("%Y-%m-%d")
+        csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
+        
+        if not csv_file.exists():
+            return {
+                "success": False,
+                "error": "No hay datos históricos disponibles para hoy"
+            }
+        
+        # Leer CSV
+        import pandas as pd
+        df = pd.read_csv(csv_file)
+        
+        # Convertir timestamp a datetime
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        # Filtrar últimos N minutos
+        cutoff_time = datetime.utcnow() - timedelta(minutes=minutes)
+        df = df[df['timestamp'] >= cutoff_time]
+        
+        # Agrupar por worker
+        history = {}
+        
+        for worker in df['worker_nombre'].unique():
+            worker_data = df[df['worker_nombre'] == worker]. sort_values('timestamp')
+            
+            history[worker] = {
+                "timestamps": worker_data['timestamp'].dt.strftime('%H:%M:%S').tolist(),
+                "cpu_percent": worker_data['cpu_percent_sistema'].tolist(),
+                "ram_percent": worker_data['ram_percent_sistema'].tolist(),
+                "disk_percent": worker_data['disk_percent_sistema'].tolist(),
+                "qemu_count": worker_data['qemu_count'].tolist()
+            }
+        
+        return {
+            "success": True,
+            "period_minutes": minutes,
+            "data": history
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+    
+
+
 
 # ======================================
 # MAIN
