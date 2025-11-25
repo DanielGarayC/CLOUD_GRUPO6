@@ -533,6 +533,10 @@ def get_metrics_history(minutes: int = 30):
     Retorna datos para graficar evolución temporal
     """
     try:
+        from datetime import timedelta
+        import csv
+        from collections import defaultdict
+        
         fecha = datetime.utcnow(). strftime("%Y-%m-%d")
         csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
         
@@ -542,43 +546,48 @@ def get_metrics_history(minutes: int = 30):
                 "error": "No hay datos históricos disponibles para hoy"
             }
         
-        # Leer CSV
-        import pandas as pd
-        df = pd.read_csv(csv_file)
-        
-        # Convertir timestamp a datetime
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
-        
-        # Filtrar últimos N minutos
+        # Leer CSV manualmente (sin pandas por ahora)
         cutoff_time = datetime.utcnow() - timedelta(minutes=minutes)
-        df = df[df['timestamp'] >= cutoff_time]
         
-        # Agrupar por worker
-        history = {}
+        history = defaultdict(lambda: {
+            "timestamps": [],
+            "cpu_percent": [],
+            "ram_percent": [],
+            "disk_percent": [],
+            "qemu_count": []
+        })
         
-        for worker in df['worker_nombre'].unique():
-            worker_data = df[df['worker_nombre'] == worker]. sort_values('timestamp')
-            
-            history[worker] = {
-                "timestamps": worker_data['timestamp'].dt.strftime('%H:%M:%S').tolist(),
-                "cpu_percent": worker_data['cpu_percent_sistema'].tolist(),
-                "ram_percent": worker_data['ram_percent_sistema'].tolist(),
-                "disk_percent": worker_data['disk_percent_sistema'].tolist(),
-                "qemu_count": worker_data['qemu_count'].tolist()
-            }
+        with open(csv_file, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    # Parsear timestamp
+                    row_time = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S')
+                    
+                    # Filtrar por tiempo
+                    if row_time >= cutoff_time:
+                        worker = row['worker_nombre']
+                        history[worker]["timestamps"].append(row['timestamp'])
+                        history[worker]["cpu_percent"].append(float(row. get('cpu_percent_sistema', 0)))
+                        history[worker]["ram_percent"].append(float(row.get('ram_percent_sistema', 0)))
+                        history[worker]["disk_percent"].append(float(row.get('disk_percent_sistema', 0)))
+                        history[worker]["qemu_count"]. append(int(row.get('qemu_count', 0)))
+                except Exception as e:
+                    print(f"Error procesando fila: {e}")
+                    continue
         
         return {
             "success": True,
             "period_minutes": minutes,
-            "data": history
+            "data": dict(history)
         }
         
     except Exception as e:
+        print(f"❌ Error obteniendo histórico: {e}")
         return {
             "success": False,
             "error": str(e)
         }
-    
 
 
 
