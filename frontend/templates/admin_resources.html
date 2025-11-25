@@ -314,34 +314,48 @@
                 </div>
             </div>
 
-            <!-- Gráfica de Utilización TEMPORAL -->
+            <!-- Gráficas de Utilización TEMPORAL por Server -->
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="worker-card">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">
-                                <i class="fas fa-chart-line me-2"></i>
-                                Utilización Real del Sistema (Últimos 30 minutos)
-                            </h5>
+                            <div>
+                                <h5 class="mb-1">
+                                    <i class="fas fa-chart-line me-2"></i>
+                                    Utilización Real del Sistema a lo largo del tiempo
+                                </h5>
+                                <p class="text-muted mb-0" style="font-size: 0. 875rem;">
+                                    <i class="fas fa-calendar-alt me-1"></i>
+                                    <span id="chartDate">-</span>
+                                    <span class="ms-3">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Muestra el uso REAL de CPU, RAM y Disco en el sistema físico.  Los picos indican saturación.
+                                    </span>
+                                </p>
+                            </div>
                             
                             <!-- Selector de período -->
                             <select class="form-select form-select-sm" id="periodSelector" style="width: 180px;" onchange="changeTimePeriod()">
                                 <option value="10">Últimos 10 min</option>
-                                <option value="30" selected>Últimos 30 min</option>
+                                <option value="30">Últimos 30 min</option>
                                 <option value="60">Última hora</option>
                                 <option value="180">Últimas 3 horas</option>
-                                <option value="360">Últimas 6 horas</option>
+                                <option value="360" selected>Últimas 6 horas</option>
                             </select>
                         </div>
                         
-                        <p class="text-muted mb-3" style="font-size: 0. 875rem;">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Muestra el uso REAL de CPU, RAM y Disco en el sistema físico.  
-                            <strong>Los picos indican saturación.</strong>
-                        </p>
+                        <!-- Mensaje si no hay datos -->
+                        <div id="noHistoryMessage" style="display: none; text-align: center; padding: 3rem; color: #64748b;">
+                            <i class="fas fa-chart-line" style="font-size: 3rem; opacity: 0.3;"></i>
+                            <p class="mt-3 mb-0">
+                                <strong>No hay datos históricos disponibles</strong><br>
+                                <small>Los datos se recopilarán automáticamente.  Espera unos minutos y actualiza. </small>
+                            </p>
+                        </div>
                         
-                        <div class="chart-container" style="height: 400px;">
-                            <canvas id="timelineChart"></canvas>
+                        <!-- Contenedor de gráficas separadas por server -->
+                        <div id="chartsContainer" class="row">
+                            <!-- Se llenarán dinámicamente -->
                         </div>
                     </div>
                 </div>
@@ -529,199 +543,230 @@
             }
         }
 
-        let timelineChartInstance = null;
-        let currentPeriod = 30; // minutos
+        let serverChartInstances = {}; // Múltiples instancias, una por servidor
+        let currentPeriod = 360; // 6 horas por defecto
 
-        async function loadTimelineData(minutes = 30) {
+        async function loadTimelineData(minutes = 360) {
             try {
                 const response = await fetch(`${ANALYTICS_URL}/metrics/history?minutes=${minutes}`);
                 const data = await response.json();
                 
                 if (! data.success) {
-                    console.warn('No hay datos históricos:', data. error);
+                    console.warn('No hay datos históricos:', data.error);
                     showNoHistoryMessage();
                     return;
                 }
                 
-                updateTimelineChart(data.data);
+                hideNoHistoryMessage();
+                updateTimelineCharts(data.data);
             } catch (error) {
                 console.error('Error cargando histórico:', error);
                 showNoHistoryMessage();
             }
         }
 
-        function updateTimelineChart(historyData) {
-            const ctx = document.getElementById('timelineChart');
+        function updateTimelineCharts(historyData) {
+            const container = document.getElementById('chartsContainer');
+            container.innerHTML = ''; // Limpiar
             
-            if (timelineChartInstance) {
-                timelineChartInstance. destroy();
+            // Destruir instancias anteriores
+            Object.values(serverChartInstances).forEach(chart => chart.destroy());
+            serverChartInstances = {};
+            
+            if (! historyData || Object.keys(historyData).length === 0) {
+                showNoHistoryMessage();
+                return;
             }
             
-            // Preparar datasets para cada worker
-            const datasets = [];
-            const colors = {
-                'server2': { cpu: '#3b82f6', ram: '#10b981', disk: '#f59e0b' },
-                'server3': { cpu: '#8b5cf6', ram: '#14b8a6', disk: '#f97316' },
-                'server4': { cpu: '#ec4899', ram: '#06b6d4', disk: '#eab308' }
+            // Actualizar fecha en el título
+            const firstWorker = Object.keys(historyData)[0];
+            if (historyData[firstWorker]?.timestamps?.length > 0) {
+                const firstTimestamp = historyData[firstWorker].timestamps[0];
+                const date = new Date(firstTimestamp);
+                document.getElementById('chartDate'). textContent = date.toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+            
+            // Colores por servidor
+            const workerColors = {
+                'server2': {
+                    cpu: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 1)' },
+                    ram: { bg: 'rgba(16, 185, 129, 0.2)', border: 'rgba(16, 185, 129, 1)' },
+                    disk: { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 1)' }
+                },
+                'server3': {
+                    cpu: { bg: 'rgba(139, 92, 246, 0.2)', border: 'rgba(139, 92, 246, 1)' },
+                    ram: { bg: 'rgba(20, 184, 166, 0.2)', border: 'rgba(20, 184, 166, 1)' },
+                    disk: { bg: 'rgba(249, 115, 22, 0.2)', border: 'rgba(249, 115, 22, 1)' }
+                },
+                'server4': {
+                    cpu: { bg: 'rgba(236, 72, 153, 0.2)', border: 'rgba(236, 72, 153, 1)' },
+                    ram: { bg: 'rgba(6, 182, 212, 0.2)', border: 'rgba(6, 182, 212, 1)' },
+                    disk: { bg: 'rgba(234, 179, 8, 0.2)', border: 'rgba(234, 179, 8, 1)' }
+                }
             };
             
-            const metrics = ['cpu_percent', 'ram_percent', 'disk_percent'];
-            const metricLabels = {
-                'cpu_percent': 'CPU',
-                'ram_percent': 'RAM',
-                'disk_percent': 'Disk'
-            };
-            
-            Object.keys(historyData).forEach(workerName => {
+            // Crear una gráfica por servidor
+            Object.keys(historyData).sort().forEach(workerName => {
                 const workerData = historyData[workerName];
-                const timestamps = workerData.timestamps;
                 
-                // CPU
-                datasets.push({
-                    label: `${workerName} - CPU %`,
-                    data: workerData.cpu_percent. map((val, idx) => ({
-                        x: timestamps[idx],
-                        y: val
-                    })),
-                    borderColor: colors[workerName]?.cpu || '#3b82f6',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    pointHoverRadius: 5
+                if (! workerData.timestamps || workerData.timestamps.length === 0) {
+                    return;
+                }
+                
+                // Extraer solo la hora de los timestamps
+                const timeLabels = workerData.timestamps. map(ts => {
+                    const date = new Date(ts);
+                    return date.toLocaleTimeString('es-ES', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
                 });
                 
-                // RAM
-                datasets.push({
-                    label: `${workerName} - RAM %`,
-                    data: workerData.ram_percent.map((val, idx) => ({
-                        x: timestamps[idx],
-                        y: val
-                    })),
-                    borderColor: colors[workerName]?.ram || '#10b981',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    pointHoverRadius: 5,
-                    borderDash: [5, 5]  // Línea discontinua para RAM
-                });
+                // Crear columna para este servidor
+                const col = document.createElement('div');
+                col.className = 'col-md-4 mb-4';
                 
-                // Disk
-                datasets.push({
-                    label: `${workerName} - Disk %`,
-                    data: workerData.disk_percent.map((val, idx) => ({
-                        x: timestamps[idx],
-                        y: val
-                    })),
-                    borderColor: colors[workerName]?.disk || '#f59e0b',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    pointHoverRadius: 5,
-                    borderDash: [2, 2]  // Línea punteada para Disk
-                });
-            });
-            
-            timelineChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: { datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
+                const colors = workerColors[workerName] || workerColors['server2'];
+                
+                col.innerHTML = `
+                    <div style="background: #f8fafc; border-radius: 8px; padding: 1rem;">
+                        <h6 class="mb-3 text-center">
+                            <i class="fas fa-server me-2"></i>${workerName}
+                            <span class="badge bg-success ms-2" style="font-size: 0.7rem;">Online</span>
+                        </h6>
+                        <div style="height: 250px; position: relative;">
+                            <canvas id="chart-${workerName}"></canvas>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(col);
+                
+                // Crear gráfica para este servidor
+                const ctx = document.getElementById(`chart-${workerName}`);
+                
+                serverChartInstances[workerName] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: timeLabels,
+                        datasets: [
+                            {
+                                label: 'CPU %',
+                                data: workerData.cpu_percent,
+                                backgroundColor: colors.cpu.bg,
+                                borderColor: colors.cpu.border,
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            },
+                            {
+                                label: 'RAM %',
+                                data: workerData.ram_percent,
+                                backgroundColor: colors.ram.bg,
+                                borderColor: colors.ram.border,
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            },
+                            {
+                                label: 'Disk %',
+                                data: workerData.disk_percent,
+                                backgroundColor: colors.disk. bg,
+                                borderColor: colors.disk.border,
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            }
+                        ]
                     },
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                boxWidth: 12,
-                                font: { size: 10 },
-                                usePointStyle: true
-                            }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
                         },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y. toFixed(1) + '%';
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 10,
+                                    font: { size: 9 },
+                                    usePointStyle: true,
+                                    padding: 10
                                 }
-                            }
-                        },
-                        annotation: {
-                            annotations: {
-                                line1: {
-                                    type: 'line',
-                                    yMin: 80,
-                                    yMax: 80,
-                                    borderColor: '#ef4444',
-                                    borderWidth: 2,
-                                    borderDash: [10, 5],
-                                    label: {
-                                        content: 'Umbral de saturación (80%)',
-                                        enabled: true,
-                                        position: 'end',
-                                        backgroundColor: '#ef4444',
-                                        color: 'white',
-                                        font: { size: 10 }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + context.parsed.y. toFixed(1) + '%';
                                     }
                                 }
                             }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            type: 'category',
-                            title: {
-                                display: true,
-                                text: 'Tiempo'
-                            },
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 45,
-                                font: { size: 9 }
-                            }
                         },
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            title: {
-                                display: true,
-                                text: 'Utilización (%)'
-                            },
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
+                        scales: {
+                            x: {
+                                title: {
+                                    display: false
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                    font: { size: 8 },
+                                    maxTicksLimit: 10
+                                },
+                                grid: {
+                                    display: false
                                 }
                             },
-                            grid: {
-                                color: function(context) {
-                                    // Línea roja en 80%
-                                    if (context.tick.value === 80) {
-                                        return '#ef4444';
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                    display: false
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    },
+                                    font: { size: 9 }
+                                },
+                                grid: {
+                                    color: function(context) {
+                                        // Línea roja en 80%
+                                        if (context.tick.value === 80) {
+                                            return 'rgba(239, 68, 68, 0.5)';
+                                        }
+                                        return 'rgba(0, 0, 0, 0.05)';
                                     }
-                                    return 'rgba(0, 0, 0, 0.05)';
                                 }
                             }
                         }
                     }
-                }
+                });
             });
         }
 
         function showNoHistoryMessage() {
-            const container = document.querySelector('.chart-container');
-            container.innerHTML = `
-                <div style="text-align: center; padding: 3rem; color: #64748b;">
-                    <i class="fas fa-chart-line" style="font-size: 3rem; opacity: 0.3;"></i>
-                    <p class="mt-3 mb-0">
-                        <strong>No hay datos históricos disponibles</strong><br>
-                        <small>Los datos se recopilarán automáticamente.  Espera unos minutos.</small>
-                    </p>
-                </div>
-            `;
+            document.getElementById('noHistoryMessage'). style.display = 'block';
+            document.getElementById('chartsContainer').style.display = 'none';
+        }
+
+        function hideNoHistoryMessage() {
+            document.getElementById('noHistoryMessage').style.display = 'none';
+            document.getElementById('chartsContainer').style.display = 'block';
         }
 
         function changeTimePeriod() {
@@ -729,6 +774,7 @@
             currentPeriod = parseInt(select. value);
             loadTimelineData(currentPeriod);
         }
+
 
         // Modificar loadResources para cargar también el histórico
         async function loadResources() {
