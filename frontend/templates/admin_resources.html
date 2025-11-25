@@ -630,7 +630,7 @@
                 
                 // Crear columna para este servidor
                 const col = document.createElement('div');
-                col.className = 'col-12 mb-3'   
+                col.className = 'col-md-4 mb-3';  
 
                 const colors = workerColors[workerName] || workerColors['server2'];
                 
@@ -640,7 +640,7 @@
                             <i class="fas fa-server me-2"></i>${workerName}
                             <span class="badge bg-success ms-2" style="font-size: 0.7rem;">Online</span>
                         </h6>
-                        <div style="height: 200px; position: relative;">  <!-- ← Cambiar de 250px a 200px -->
+                        <div style="height: 180px; position: relative;">  <!-- ← Cambiar de 250px a 200px -->
                             <canvas id="chart-${workerName}"></canvas>
                         </div>
                     </div>
