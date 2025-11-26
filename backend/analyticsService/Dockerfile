@@ -22,7 +22,7 @@ ENV DB_USER=root
 ENV DB_PASS=root
 ENV DB_HOST=slice_db
 ENV DB_NAME=mydb
-ENV MONITORING_URL=http://192.168.201.1:5010/metrics
+ENV MONITORING_URL=http://monitoring_service:5010/metrics
 
 # Volumen para persistencia
 VOLUME ["/app/metrics_storage"]

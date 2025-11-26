@@ -21,7 +21,7 @@ DB_NAME = os.getenv("DB_NAME", "mydb")
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}"
 engine = create_engine(DATABASE_URL)
 
-MONITORING_URL = os.getenv("MONITORING_URL", "http://192.168.201.1:5010/metrics")
+MONITORING_URL = os.getenv("MONITORING_URL", "http://monitoring_service:5010/metrics")
 
 # Directorio para almacenar métricas
 METRICS_STORAGE_DIR = Path("/app/metrics_storage")
