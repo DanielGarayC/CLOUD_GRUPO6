@@ -311,75 +311,92 @@ def get_resources_summary():
             }
         }
         
-        for worker_nombre, capacidad in capacidades.items():
-            utilizados = recursos_utilizados.get(worker_nombre, {
-                "cpu_utilizado": 0,
-                "ram_utilizado_gb": 0,
-                "storage_utilizado_gb": 0,
-                "num_instancias_running": 0,
-                "ip": capacidad.get("ip", "N/A"),
-                "slices_instancias": ""
-            })
-            
-            # Calcular disponible
-            cpu_disponible = capacidad["cpu_total"] - utilizados["cpu_utilizado"]
-            ram_disponible = capacidad["ram_total_gb"] - utilizados["ram_utilizado_gb"]
-            storage_disponible = capacidad["storage_total_gb"] - utilizados["storage_utilizado_gb"]
-            
-            # Métricas en tiempo real del sistema operativo
-            metricas_rt = {}
-            if metricas and "metrics" in metricas:
-                if worker_nombre in metricas["metrics"]:
-                    m = metricas["metrics"][worker_nombre]
-                    metricas_rt = {
-                        "cpu_percent_sistema": m.get("cpu_percent", 0),
-                        "ram_percent_sistema": m.get("ram_percent", 0),
-                        "disk_percent_sistema": m.get("disk_percent", 0),
-                        "disk_free_gb": m.get("disk_free_gb", 0),
-                        "qemu_count": m.get("qemu_count", 0),
-                        "timestamp_sent": m.get("timestamp_sent", ""),
-                        "received_at": m.get("received_at", "")
+        # ✅ CAMBIO CLAVE: Iterar sobre las MÉTRICAS (no sobre capacidades)
+        if metricas and "metrics" in metricas:
+            for worker_nombre, metric_data in metricas["metrics"].items():
+                # Obtener capacidad (de BD o calcular desde métricas)
+                if worker_nombre in capacidades:
+                    capacidad = capacidades[worker_nombre]
+                else:
+                    # Si no está en BD, usar datos de las métricas
+                    disk_free = metric_data.get('disk_free_gb', 0)
+                    disk_percent = metric_data.get('disk_percent', 0)
+                    if disk_percent < 100 and disk_percent > 0:
+                        disk_total = disk_free / (1 - disk_percent / 100)
+                    else:
+                        disk_total = 10
+                    
+                    capacidad = {
+                        "ip": f"N/A",  # No conocemos la IP
+                        "cpu_total": int(metric_data.get('cpu_count', 4)),
+                        "ram_total_gb": float(metric_data.get('ram_total_gb', 8)),
+                        "storage_total_gb": round(disk_total, 2)
                     }
-            
-            resumen["workers"][worker_nombre] = {
-                "ip": capacidad.get("ip", "N/A"),
-                "capacidad": {
-                    "cpu_total": capacidad["cpu_total"],
-                    "ram_total_gb": round(capacidad["ram_total_gb"], 2),
-                    "storage_total_gb": round(capacidad["storage_total_gb"], 2)
-                },
-                "utilizado_bd": {
-                    "cpu": utilizados["cpu_utilizado"],
-                    "ram_gb": round(utilizados["ram_utilizado_gb"], 2),
-                    "storage_gb": round(utilizados["storage_utilizado_gb"], 2),
-                    "instancias_running": utilizados["num_instancias_running"],
-                    "slices_detalle": utilizados["slices_instancias"]
-                },
-                "disponible": {
-                    "cpu": max(0, cpu_disponible),
-                    "ram_gb": round(max(0, ram_disponible), 2),
-                    "storage_gb": round(max(0, storage_disponible), 2)
-                },
-                "utilizacion_percent": {
-                    "cpu": round((utilizados["cpu_utilizado"] / capacidad["cpu_total"]) * 100, 2) if capacidad["cpu_total"] > 0 else 0,
-                    "ram": round((utilizados["ram_utilizado_gb"] / capacidad["ram_total_gb"]) * 100, 2) if capacidad["ram_total_gb"] > 0 else 0,
-                    "storage": round((utilizados["storage_utilizado_gb"] / capacidad["storage_total_gb"]) * 100, 2) if capacidad["storage_total_gb"] > 0 else 0
-                },
-                "metricas_sistema": metricas_rt,
-                "estado": "online" if metricas_rt else "offline"
-            }
-            
-            # Acumular totales del cluster
-            resumen["cluster_totals"]["cpu_total"] += capacidad["cpu_total"]
-            resumen["cluster_totals"]["cpu_utilizado"] += utilizados["cpu_utilizado"]
-            resumen["cluster_totals"]["cpu_disponible"] += max(0, cpu_disponible)
-            resumen["cluster_totals"]["ram_total_gb"] += capacidad["ram_total_gb"]
-            resumen["cluster_totals"]["ram_utilizado_gb"] += utilizados["ram_utilizado_gb"]
-            resumen["cluster_totals"]["ram_disponible_gb"] += max(0, ram_disponible)
-            resumen["cluster_totals"]["storage_total_gb"] += capacidad["storage_total_gb"]
-            resumen["cluster_totals"]["storage_utilizado_gb"] += utilizados["storage_utilizado_gb"]
-            resumen["cluster_totals"]["storage_disponible_gb"] += max(0, storage_disponible)
-            resumen["cluster_totals"]["instancias_running_total"] += utilizados["num_instancias_running"]
+                
+                utilizados = recursos_utilizados.get(worker_nombre, {
+                    "cpu_utilizado": 0,
+                    "ram_utilizado_gb": 0,
+                    "storage_utilizado_gb": 0,
+                    "num_instancias_running": 0,
+                    "ip": capacidad. get("ip", "N/A"),
+                    "slices_instancias": ""
+                })
+                
+                # Calcular disponible
+                cpu_disponible = capacidad["cpu_total"] - utilizados["cpu_utilizado"]
+                ram_disponible = capacidad["ram_total_gb"] - utilizados["ram_utilizado_gb"]
+                storage_disponible = capacidad["storage_total_gb"] - utilizados["storage_utilizado_gb"]
+                
+                # Métricas en tiempo real del sistema operativo
+                metricas_rt = {
+                    "cpu_percent_sistema": metric_data.get("cpu_percent", 0),
+                    "ram_percent_sistema": metric_data.get("ram_percent", 0),
+                    "disk_percent_sistema": metric_data.get("disk_percent", 0),
+                    "disk_free_gb": metric_data.get("disk_free_gb", 0),
+                    "qemu_count": metric_data. get("qemu_count", 0),
+                    "timestamp_sent": metric_data.get("timestamp_sent", ""),
+                    "received_at": metric_data.get("received_at", "")
+                }
+                
+                resumen["workers"][worker_nombre] = {
+                    "ip": capacidad.get("ip", "N/A"),
+                    "capacidad": {
+                        "cpu_total": capacidad["cpu_total"],
+                        "ram_total_gb": round(capacidad["ram_total_gb"], 2),
+                        "storage_total_gb": round(capacidad["storage_total_gb"], 2)
+                    },
+                    "utilizado_bd": {
+                        "cpu": utilizados["cpu_utilizado"],
+                        "ram_gb": round(utilizados["ram_utilizado_gb"], 2),
+                        "storage_gb": round(utilizados["storage_utilizado_gb"], 2),
+                        "instancias_running": utilizados["num_instancias_running"],
+                        "slices_detalle": utilizados["slices_instancias"]
+                    },
+                    "disponible": {
+                        "cpu": max(0, cpu_disponible),
+                        "ram_gb": round(max(0, ram_disponible), 2),
+                        "storage_gb": round(max(0, storage_disponible), 2)
+                    },
+                    "utilizacion_percent": {
+                        "cpu": round((utilizados["cpu_utilizado"] / capacidad["cpu_total"]) * 100, 2) if capacidad["cpu_total"] > 0 else 0,
+                        "ram": round((utilizados["ram_utilizado_gb"] / capacidad["ram_total_gb"]) * 100, 2) if capacidad["ram_total_gb"] > 0 else 0,
+                        "storage": round((utilizados["storage_utilizado_gb"] / capacidad["storage_total_gb"]) * 100, 2) if capacidad["storage_total_gb"] > 0 else 0
+                    },
+                    "metricas_sistema": metricas_rt,
+                    "estado": "online"
+                }
+                
+                # Acumular totales del cluster
+                resumen["cluster_totals"]["cpu_total"] += capacidad["cpu_total"]
+                resumen["cluster_totals"]["cpu_utilizado"] += utilizados["cpu_utilizado"]
+                resumen["cluster_totals"]["cpu_disponible"] += max(0, cpu_disponible)
+                resumen["cluster_totals"]["ram_total_gb"] += capacidad["ram_total_gb"]
+                resumen["cluster_totals"]["ram_utilizado_gb"] += utilizados["ram_utilizado_gb"]
+                resumen["cluster_totals"]["ram_disponible_gb"] += max(0, ram_disponible)
+                resumen["cluster_totals"]["storage_total_gb"] += capacidad["storage_total_gb"]
+                resumen["cluster_totals"]["storage_utilizado_gb"] += utilizados["storage_utilizado_gb"]
+                resumen["cluster_totals"]["storage_disponible_gb"] += max(0, storage_disponible)
+                resumen["cluster_totals"]["instancias_running_total"] += utilizados["num_instancias_running"]
         
         # Redondear totales
         for key in ["ram_total_gb", "ram_utilizado_gb", "ram_disponible_gb", 
@@ -397,6 +414,7 @@ def get_resources_summary():
         
     except Exception as e:
         return {"error": str(e), "timestamp": datetime.utcnow().isoformat()}
+
 
 @app.post("/resources/snapshot")
 def create_snapshot():
