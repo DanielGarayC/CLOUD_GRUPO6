@@ -752,6 +752,46 @@ def deploy_slice_linux(id_slice: int, instancias: list):
         conn.execute(text("""
             UPDATE slice SET estado = :e WHERE idslice = :sid
         """), {"e": estado_final, "sid": id_slice})
+    
+    # ================================
+    # 🔥 ROLLBACK SI ALGUNA VM FALLA
+    # ================================
+    if fallos > 0:
+        print("🔥 Error detectado: iniciando rollback del slice...")
+
+        # Solo eliminar las VMs que sí se desplegaron
+        instancias_exitosas = [
+            inst for inst in instancias 
+            if inst["nombre"] in vms_exitosas
+        ]
+
+        print(f"🧹 Eliminando {len(instancias_exitosas)} VMs exitosas...")
+
+        vm_results = eliminar_vms_paralelo(instancias_exitosas)
+
+        print("🧹 Liberando recursos de red...")
+        network_results = liberar_recursos_red(id_slice)
+
+        print("🧹 Limpiando BD...")
+        db_results = limpiar_registros_bd(id_slice)
+
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE slice SET estado='DRAW'
+                WHERE idslice=:sid
+            """), {"sid": id_slice})
+
+        return {
+            "success": False,
+            "slice_id": id_slice,
+            "platform": "linux",
+            "estado_final": "DRAW",
+            "error": "Una o más VMs fallaron, se ejecutó rollback completo.",
+            "rollback": {
+                "vms_eliminadas": vm_results,
+                "recursos_red": network_results,
+                "base_datos": db_results
+        }}
 
     return {
         "success": fallos == 0,
