@@ -633,7 +633,12 @@ def deploy_slice_linux(id_slice: int, instancias: list):
             
             try:
                 result = future.result()
-                
+                print("Resultado del driver:")
+                try:
+                    print(json.dumps(result, indent=2))
+                except:
+                    print(result)
+                    print("adios")
                 if result.get("status") or result.get("success"):
                     print(f"✅ VM {vm_name}: PID {result.get('pid', 'N/A')}")
                     
@@ -1231,7 +1236,8 @@ def eliminar_vm_individual_linux(instancia: dict):
         "vm_id": instancia["idinstancia"],
         "vnc_puerto": instancia.get("vnc_puerto"),
         "process_id": instancia.get("process_id"),
-        "interfaces_tap": interfaces_tap
+        "interfaces_tap": interfaces_tap,
+        "delete_disk": True 
     }
     
     try:
