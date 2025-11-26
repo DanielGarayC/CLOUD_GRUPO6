@@ -77,7 +77,8 @@ services:
         condition: service_started
     volumes:
       - ./frontend:/app
-      - /home/ubuntu/.ssh:/root/.ssh:ro
+      - /home/ubuntu/.ssh/id_rsa_novnc:/root/.ssh/id_rsa_novnc:ro
+      - /home/ubuntu/.ssh/id_rsa_novnc.pub:/root/.ssh/id_rsa_novnc.pub:ro
       - ./novnc/tokens:/opt/novnc/tokens
     networks:
       - cloudnet

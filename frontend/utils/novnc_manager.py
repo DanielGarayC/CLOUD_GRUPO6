@@ -4,7 +4,7 @@ import logging
 
 TOKENS_FILE = "/opt/novnc/tokens"
 BASE_LOCAL_PORT = 15000
-SSH_KEY_PATH = "/root/.ssh/id_rsa_orch"
+SSH_KEY_PATH = "/root/.ssh/id_rsa_novnc"
 
 # Logging básico
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
