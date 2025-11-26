@@ -62,7 +62,7 @@ def obtener_capacidad_total_workers():
                     ram,
                     storage
                 FROM worker
-                WHERE nombre IN ('server2', 'server3', 'server4','worker1',worker2','worker3')
+                WHERE nombre IN ('server2', 'server3', 'server4','worker1','worker2','worker3')
             """)
             
             result = conn.execute(query)
