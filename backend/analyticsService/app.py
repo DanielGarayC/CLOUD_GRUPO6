@@ -257,24 +257,41 @@ async def recolectar_metricas_periodicamente():
     Tarea en background que recolecta métricas cada 10 segundos
     """
     print("🔄 Iniciando recolección automática de métricas cada 10 segundos...")
+    print(f"📍 Guardando en: {METRICS_STORAGE_DIR}")
     
+    # Esperar 5 segundos antes de empezar (dar tiempo a que todo arranque)
+    await asyncio.sleep(5)
+    
+    contador = 0
     while True:
         try:
+            contador += 1
+            print(f"\n🔍 Recolección #{contador} - {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
+            
             # Obtener datos
             recursos_utilizados = obtener_recursos_utilizados_bd()
+            print(f"   📊 Recursos utilizados obtenidos: {len(recursos_utilizados)} workers")
+            
             metricas = obtener_metricas_actuales()
             
             # Guardar snapshot
             if metricas:
-                guardar_metricas_snapshot(metricas, recursos_utilizados)
-                print(f"✅ Métricas recolectadas automáticamente - {datetime.utcnow().strftime('%H:%M:%S')}")
+                print(f"   📡 Métricas recibidas de monitoring service")
+                archivo = guardar_metricas_snapshot(metricas, recursos_utilizados)
+                if archivo:
+                    print(f"   ✅ Snapshot guardado exitosamente")
+                else:
+                    print(f"   ⚠️ Error al guardar snapshot")
             else:
-                print(f"⚠️ No se pudieron obtener métricas del monitoring service")
+                print(f"   ⚠️ No se pudieron obtener métricas del monitoring service")
             
         except Exception as e:
-            print(f"❌ Error en recolección automática: {e}")
+            print(f"   ❌ Error en recolección automática: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Esperar 10 segundos
+        print(f"   ⏳ Esperando 10 segundos hasta próxima recolección...")
         await asyncio.sleep(10)
 
 # ======================================
@@ -616,4 +633,8 @@ def get_metrics_history(minutes: int = 30):
 if __name__ == "__main__":
     import uvicorn
     print("🚀 Analytics Service con recolección automática cada 10 segundos...")
-    uvicorn.run(app, host="0.0.0.0", port=5030)
+    print(f"📁 Directorio de métricas: {METRICS_STORAGE_DIR}")
+    print(f"🔗 URL Monitoring: {MONITORING_URL}")
+    print(f"🗄️ Base de datos: {DATABASE_URL}")
+    print("-" * 60)
+    uvicorn.run(app, host="0.0.0.0", port=5030, log_level="info")
