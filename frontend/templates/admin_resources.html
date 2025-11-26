@@ -248,7 +248,7 @@
                             <div class="progress-bar bg-primary" id="cpuProgress" style="width: 0%"></div>
                         </div>
                         <small class="text-muted">
-                            <span id="cpuUtilizado">-</span> utilizados · 
+                            <span id="cpuUtilizado">-</span> asignados · 
                             <span id="cpuDisponible">-</span> disponibles
                         </small>
                     </div>
@@ -269,7 +269,7 @@
                             <div class="progress-bar bg-success" id="ramProgress" style="width: 0%"></div>
                         </div>
                         <small class="text-muted">
-                            <span id="ramUtilizado">-</span> utilizados · 
+                            <span id="ramUtilizado">-</span> asignados · 
                             <span id="ramDisponible">-</span> disponibles
                         </small>
                     </div>
@@ -290,7 +290,7 @@
                             <div class="progress-bar bg-warning" id="storageProgress" style="width: 0%"></div>
                         </div>
                         <small class="text-muted">
-                            <span id="storageUtilizado">-</span> utilizados · 
+                            <span id="storageUtilizado">-</span> asignados · 
                             <span id="storageDisponible">-</span> disponibles
                         </small>
                     </div>
@@ -314,16 +314,48 @@
                 </div>
             </div>
 
-            <!-- Gráfica de Utilización -->
+            <!-- Gráficas de Utilización TEMPORAL por Server -->
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="worker-card">
-                        <h5 class="mb-3">
-                            <i class="fas fa-chart-bar me-2"></i>
-                            Utilización de Recursos por Worker
-                        </h5>
-                        <div class="chart-container">
-                            <canvas id="utilizacionChart"></canvas>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h5 class="mb-1">
+                                    <i class="fas fa-chart-line me-2"></i>
+                                    Utilización Real del Sistema a lo largo del tiempo
+                                </h5>
+                                <p class="text-muted mb-0" style="font-size: 0. 875rem;">
+                                    <i class="fas fa-calendar-alt me-1"></i>
+                                    <span id="chartDate">-</span>
+                                    <span class="ms-3">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Muestra el uso REAL de CPU, RAM y Disco en el sistema físico.  Los picos indican saturación.
+                                    </span>
+                                </p>
+                            </div>
+                            
+                            <!-- Selector de período -->
+                            <select class="form-select form-select-sm" id="periodSelector" style="width: 180px;" onchange="changeTimePeriod()">
+                                <option value="10">Últimos 10 min</option>
+                                <option value="30">Últimos 30 min</option>
+                                <option value="60">Última hora</option>
+                                <option value="180">Últimas 3 horas</option>
+                                <option value="360" selected>Últimas 6 horas</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Mensaje si no hay datos -->
+                        <div id="noHistoryMessage" style="display: none; text-align: center; padding: 3rem; color: #64748b;">
+                            <i class="fas fa-chart-line" style="font-size: 3rem; opacity: 0.3;"></i>
+                            <p class="mt-3 mb-0">
+                                <strong>No hay datos históricos disponibles</strong><br>
+                                <small>Los datos se recopilarán automáticamente.  Espera unos minutos y actualiza. </small>
+                            </p>
+                        </div>
+                        
+                        <!-- Contenedor de gráficas separadas por server -->
+                        <div id="chartsContainer" class="row">
+                            <!-- Se llenarán dinámicamente -->
                         </div>
                     </div>
                 </div>
@@ -511,156 +543,265 @@
             }
         }
 
-        function updateChart(workers) {
-            const ctx = document.getElementById('utilizacionChart');
+        let serverChartInstances = {}; // Múltiples instancias, una por servidor
+        let currentPeriod = 360; // 6 horas por defecto
+
+        async function loadTimelineData(minutes = 360) {
+            try {
+                const response = await fetch(`${ANALYTICS_URL}/metrics/history?minutes=${minutes}`);
+                const data = await response.json();
+                
+                if (! data.success) {
+                    console.warn('No hay datos históricos:', data.error);
+                    showNoHistoryMessage();
+                    return;
+                }
+                
+                hideNoHistoryMessage();
+                updateTimelineCharts(data.data);
+            } catch (error) {
+                console.error('Error cargando histórico:', error);
+                showNoHistoryMessage();
+            }
+        }
+
+        function updateTimelineCharts(historyData) {
+            const container = document.getElementById('chartsContainer');
+            container.innerHTML = ''; // Limpiar
             
-            const workerNames = Object.keys(workers);
+            // Destruir instancias anteriores
+            Object.values(serverChartInstances).forEach(chart => chart.destroy());
+            serverChartInstances = {};
             
-            // Datos de utilización por VMs (desde BD)
-            const cpuUtilizadoVM = workerNames.map(name => workers[name].utilizacion_percent.cpu);
-            const ramUtilizadoVM = workerNames.map(name => workers[name].utilizacion_percent.ram);
-            const storageUtilizadoVM = workerNames.map(name => workers[name].utilizacion_percent.storage);
-            
-            // Datos de utilización del sistema operativo
-            const cpuSistema = workerNames.map(name => 
-                workers[name].metricas_sistema?.cpu_percent_sistema || 0
-            );
-            const ramSistema = workerNames.map(name => 
-                workers[name].metricas_sistema?.ram_percent_sistema || 0
-            );
-            const diskSistema = workerNames.map(name => 
-                workers[name].metricas_sistema?.disk_percent_sistema || 0
-            );
-            
-            if (chartInstance) {
-                chartInstance.destroy();
+            if (! historyData || Object.keys(historyData).length === 0) {
+                showNoHistoryMessage();
+                return;
             }
             
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: workerNames,
-                    datasets: [
-                        {
-                            label: 'CPU Sistema %',
-                            data: cpuSistema,
-                            backgroundColor: 'rgba(147, 197, 253, 0.6)',
-                            borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 1,
-                            stack: 'cpu'
-                        },
-                        {
-                            label: 'CPU VMs %',
-                            data: cpuUtilizadoVM,
-                            backgroundColor: 'rgba(59, 130, 246, 0.9)',
-                            borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 1,
-                            stack: 'cpu'
-                        },
-                        {
-                            label: 'RAM Sistema %',
-                            data: ramSistema,
-                            backgroundColor: 'rgba(134, 239, 172, 0.6)',
-                            borderColor: 'rgba(16, 185, 129, 1)',
-                            borderWidth: 1,
-                            stack: 'ram'
-                        },
-                        {
-                            label: 'RAM VMs %',
-                            data: ramUtilizadoVM,
-                            backgroundColor: 'rgba(16, 185, 129, 0.9)',
-                            borderColor: 'rgba(16, 185, 129, 1)',
-                            borderWidth: 1,
-                            stack: 'ram'
-                        },
-                        {
-                            label: 'Disk Sistema %',
-                            data: diskSistema,
-                            backgroundColor: 'rgba(253, 224, 71, 0.6)',
-                            borderColor: 'rgba(245, 158, 11, 1)',
-                            borderWidth: 1,
-                            stack: 'storage'
-                        },
-                        {
-                            label: 'Storage VMs %',
-                            data: storageUtilizadoVM,
-                            backgroundColor: 'rgba(245, 158, 11, 0.9)',
-                            borderColor: 'rgba(245, 158, 11, 1)',
-                            borderWidth: 1,
-                            stack: 'storage'
-                        }
-                    ]
+            // Actualizar fecha en el título
+            const firstWorker = Object.keys(historyData)[0];
+            if (historyData[firstWorker]?.timestamps?.length > 0) {
+                const firstTimestamp = historyData[firstWorker].timestamps[0];
+                const date = new Date(firstTimestamp);
+                document.getElementById('chartDate'). textContent = date.toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+            
+            // Colores por servidor
+            const workerColors = {
+                'server2': {
+                    cpu: { bg: 'rgba(59, 130, 246, 0.2)', border: 'rgba(59, 130, 246, 1)' },
+                    ram: { bg: 'rgba(16, 185, 129, 0.2)', border: 'rgba(16, 185, 129, 1)' },
+                    disk: { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 1)' }
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
+                'server3': {
+                    cpu: { bg: 'rgba(139, 92, 246, 0.2)', border: 'rgba(139, 92, 246, 1)' },
+                    ram: { bg: 'rgba(20, 184, 166, 0.2)', border: 'rgba(20, 184, 166, 1)' },
+                    disk: { bg: 'rgba(249, 115, 22, 0.2)', border: 'rgba(249, 115, 22, 1)' }
+                },
+                'server4': {
+                    cpu: { bg: 'rgba(236, 72, 153, 0.2)', border: 'rgba(236, 72, 153, 1)' },
+                    ram: { bg: 'rgba(6, 182, 212, 0.2)', border: 'rgba(6, 182, 212, 1)' },
+                    disk: { bg: 'rgba(234, 179, 8, 0.2)', border: 'rgba(234, 179, 8, 1)' }
+                }
+            };
+            
+            // Crear una gráfica por servidor
+            Object.keys(historyData).sort().forEach(workerName => {
+                const workerData = historyData[workerName];
+                
+                if (! workerData.timestamps || workerData.timestamps.length === 0) {
+                    return;
+                }
+                
+                // Extraer solo la hora de los timestamps
+                const timeLabels = workerData.timestamps. map(ts => {
+                    const date = new Date(ts);
+                    return date.toLocaleTimeString('es-ES', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                });
+                
+                // Crear columna para este servidor
+                const col = document.createElement('div');
+                col.className = 'col-md-4 mb-3';  
+
+                const colors = workerColors[workerName] || workerColors['server2'];
+                
+                col.innerHTML = `
+                    <div style="background: #f8fafc; border-radius: 8px; padding: 1rem;">
+                        <h6 class="mb-3 text-center">
+                            <i class="fas fa-server me-2"></i>${workerName}
+                            <span class="badge bg-success ms-2" style="font-size: 0.7rem;">Online</span>
+                        </h6>
+                        <div style="height: 180px; position: relative;">  <!-- ← Cambiar de 250px a 200px -->
+                            <canvas id="chart-${workerName}"></canvas>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(col);
+                
+                // Crear gráfica para este servidor
+                const ctx = document.getElementById(`chart-${workerName}`);
+                
+                serverChartInstances[workerName] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: timeLabels,
+                        datasets: [
+                            {
+                                label: 'CPU %',
+                                data: workerData.cpu_percent,
+                                backgroundColor: colors.cpu.bg,
+                                borderColor: colors.cpu.border,
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            },
+                            {
+                                label: 'RAM %',
+                                data: workerData.ram_percent,
+                                backgroundColor: colors.ram.bg,
+                                borderColor: colors.ram.border,
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            },
+                            {
+                                label: 'Disk %',
+                                data: workerData.disk_percent,
+                                backgroundColor: colors.disk. bg,
+                                borderColor: colors.disk.border,
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            }
+                        ]
                     },
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: {
-                                boxWidth: 12,
-                                font: {
-                                    size: 11
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 10,
+                                    font: { size: 9 },
+                                    usePointStyle: true,
+                                    padding: 10
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + context.parsed.y. toFixed(1) + '%';
+                                    }
                                 }
                             }
                         },
-                        title: {
-                            display: true,
-                            text: 'Uso del Sistema (fondo claro) vs. Recursos Reservados para VMs (fondo oscuro)',
-                            font: {
-                                size: 12
-                            },
-                            color: '#64748b',
-                            padding: {
-                                bottom: 10
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + '%';
+                        scales: {
+                            x: {
+                                title: {
+                                    display: false
                                 },
-                                footer: function(tooltipItems) {
-                                    let total = 0;
-                                    tooltipItems.forEach(item => {
-                                        total += item.parsed.y;
-                                    });
-                                    return 'Total: ' + total.toFixed(1) + '%';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                    font: { size: 8 },
+                                    maxTicksLimit: 10
+                                },
+                                grid: {
+                                    display: false
                                 }
                             },
-                            stacked: true,
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        },
-                        x: {
-                            stacked: true,
-                            grid: {
-                                display: false
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                    display: false
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    },
+                                    font: { size: 9 }
+                                },
+                                grid: {
+                                    color: function(context) {
+                                        // Línea roja en 80%
+                                        if (context.tick.value === 80) {
+                                            return 'rgba(239, 68, 68, 0.5)';
+                                        }
+                                        return 'rgba(0, 0, 0, 0.05)';
+                                    }
+                                }
                             }
                         }
                     }
-                }
+                });
             });
         }
 
+        function showNoHistoryMessage() {
+            document.getElementById('noHistoryMessage'). style.display = 'block';
+            document.getElementById('chartsContainer').classList.add('d-none');
+        }
+
+        function hideNoHistoryMessage() {
+            document.getElementById('noHistoryMessage').style.display = 'none';
+            document.getElementById('chartsContainer').classList.remove('d-none');
+        }
+
+        function changeTimePeriod() {
+            const select = document.getElementById('periodSelector');
+            currentPeriod = parseInt(select. value);
+            loadTimelineData(currentPeriod);
+        }
 
 
+        // Modificar loadResources para cargar también el histórico
+        async function loadResources() {
+            try {
+                showLoading();
+                
+                const response = await fetch(`${ANALYTICS_URL}/resources/summary`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                updateClusterTotals(data.cluster_totals);
+                updateWorkers(data.workers);
+                updateTimestamp(data.timestamp);
+                
+                // Cargar gráfica temporal
+                await loadTimelineData(currentPeriod);
+                
+                hideLoading();
+            } catch (error) {
+                console. error('Error cargando recursos:', error);
+                alert('Error al cargar recursos del cluster: ' + error.message);
+                hideLoading();
+            }
+        }
 
 
 
