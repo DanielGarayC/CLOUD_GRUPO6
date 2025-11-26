@@ -1,6 +1,8 @@
 import os
 import subprocess
 import logging
+from flask import request
+
 
 TOKENS_FILE = "/opt/novnc/tokens"
 BASE_LOCAL_PORT = 15000
@@ -9,6 +11,11 @@ SSH_KEY_PATH = "/root/.ssh/id_rsa_novnc"
 # Logging básico
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+def get_public_host():
+    # ejemplo: "10.20.12.106:5000" → "10.20.12.106"
+    return request.host.split(":")[0]
+
 
 def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
     token = f"slice{slice_id}-vm{instance_id}"
@@ -64,8 +71,10 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
 
     # 3️⃣ Generar URL para el navegador
     headnode_ip = "127.0.0.1"
+    public_ip = get_public_host()
+
     novnc_url = (
-        f"http://{headnode_ip}:6080/vnc.html"
+        f"http://{public_ip}:6080/vnc.html"
         f"?path=websockify?token={token}"
         f"&autoconnect=true&resize=scale&reconnect=true"
     )
