@@ -104,6 +104,20 @@ if delete_disk:
     disco_eliminado = "OK" in stdout
 
 # ===========================================================
+# 4. Limpiar archivo PID en el worker
+# ===========================================================
+pid_file_eliminado = False
+
+pid_path = f"/var/run/{nombre_vm}.pid"
+clean_pid_cmd = f"sudo rm -f {pid_path}"
+_, _, rc_pid = run_worker(clean_pid_cmd)
+# rm -f devuelve 0 aunque el archivo no exista, así que lo consideramos ok
+if rc_pid == 0:
+    pid_file_eliminado = True
+else:
+    warnings.append(f"No se pudo eliminar PID file {pid_path}")
+    
+# ===========================================================
 # Respuesta final al driver
 # ===========================================================
 response = {
@@ -112,7 +126,8 @@ response = {
     "details": {
         "proceso_eliminado": proceso_eliminado,
         "taps_eliminadas": taps_eliminadas,
-        "disco_eliminado": disco_eliminado
+        "disco_eliminado": disco_eliminado,
+        "pid_file_eliminado": pid_file_eliminado 
     }
 }
 

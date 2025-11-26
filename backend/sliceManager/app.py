@@ -591,6 +591,37 @@ def deploy_slice(data: dict = Body(...)):
             "estado_final": "FAILED"
         }
 
+def limpiar_estado_runtime_slice(id_slice: int):
+    """
+    Limpia solo el estado de ejecución del slice (para rollback):
+    - Borra interfaces_tap asociadas
+    - Pone en NULL vnc_idvnc, worker_idworker, process_id, ip
+    - Devuelve instancias a estado 'PENDING' (o el que uses como base)
+    NO borra instancias, enlaces ni slice.
+    """
+    try:
+        with engine.begin() as conn:
+            # Borrar TAPs
+            conn.execute(text("""
+                DELETE it FROM interfaces_tap it
+                JOIN instancia i ON it.instancia_idinstancia = i.idinstancia
+                WHERE i.slice_idslice = :sid
+            """), {"sid": id_slice})
+
+            # Resetear estado runtime de instancias
+            conn.execute(text("""
+                UPDATE instancia
+                SET vnc_idvnc = NULL,
+                    worker_idworker = NULL,
+                    process_id = NULL,
+                    ip = NULL,
+                    estado = 'PENDING'
+                WHERE slice_idslice = :sid
+            """), {"sid": id_slice})
+
+    except Exception as e:
+        print(f"⚠️ Error limpiando estado runtime del slice {id_slice}: {e}")
+
 def deploy_slice_linux(id_slice: int, instancias: list):
     """Despliegue en plataforma Linux"""
     print("🐧 [LINUX] Iniciando despliegue...")
@@ -759,21 +790,25 @@ def deploy_slice_linux(id_slice: int, instancias: list):
     if fallos > 0:
         print("🔥 Error detectado: iniciando rollback del slice...")
 
+        # Releer datos completos del slice para tener worker_ip, vnc, etc.
+        slice_data = obtener_datos_completos_slice(id_slice)
+        instancias_completas = slice_data["instancias"] if slice_data else []
+
         # Solo eliminar las VMs que sí se desplegaron
         instancias_exitosas = [
-            inst for inst in instancias 
+            inst for inst in instancias_completas
             if inst["nombre"] in vms_exitosas
         ]
 
-        print(f"🧹 Eliminando {len(instancias_exitosas)} VMs exitosas...")
+        print(f"🧹 Eliminando {len(instancias_exitosas)} VMs exitosas (rollback)...")
 
         vm_results = eliminar_vms_paralelo(instancias_exitosas)
 
-        print("🧹 Liberando recursos de red...")
+        print("🧹 Liberando recursos de red (VLAN/VNC)...")
         network_results = liberar_recursos_red(id_slice)
 
-        print("🧹 Limpiando BD...")
-        db_results = limpiar_registros_bd(id_slice)
+        print("🧹 Limpiando estado runtime en BD (sin borrar slice)...")
+        limpiar_estado_runtime_slice(id_slice)
 
         with engine.begin() as conn:
             conn.execute(text("""
@@ -789,9 +824,9 @@ def deploy_slice_linux(id_slice: int, instancias: list):
             "error": "Una o más VMs fallaron, se ejecutó rollback completo.",
             "rollback": {
                 "vms_eliminadas": vm_results,
-                "recursos_red": network_results,
-                "base_datos": db_results
-        }}
+                "recursos_red": network_results
+            }
+        }
 
     return {
         "success": fallos == 0,
