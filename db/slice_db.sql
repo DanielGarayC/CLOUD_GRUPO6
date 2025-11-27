@@ -97,7 +97,7 @@ CREATE TABLE `vnc` (
 
 LOCK TABLES `vnc` WRITE;
 /*!40000 ALTER TABLE `vnc` DISABLE KEYS */;
-INSERT INTO `vnc` VALUES (1,'5901','disponible'),(2,'5902','disponible'),(3,'5903','disponible'),(4,'5904','disponible'),(5,'5905','disponible'),(6,'5906','disponible'),(7,'5907','disponible'),(8,'5908','disponible'),(9,'5909','disponible'),(10,'5910','disponible'),(11,'5911','disponible'),(12,'5912','disponible'),(13,'5913','disponible'),(14,'5914','disponible'),(15,'5915','disponible'),(16,'5916','disponible'),(17,'5917','disponible'),(18,'5918','disponible'),(19,'5919','disponible'),(20,'5920','disponible');
+INSERT INTO `vnc` VALUES (1,'1','disponible'),(2,'2','disponible'),(3,'3','disponible'),(4,'4','disponible'),(5,'5','disponible'),(6,'6','disponible'),(7,'7','disponible'),(8,'8','disponible'),(9,'9','disponible'),(10,'10','disponible'),(11,'11','disponible'),(12,'12','disponible'),(13,'13','disponible'),(14,'14','disponible'),(15,'15','disponible'),(16,'16','disponible'),(17,'17','disponible'),(18,'18','disponible'),(19,'19','disponible'),(20,'20','disponible');
 /*!40000 ALTER TABLE `vnc` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -210,9 +210,9 @@ CREATE TABLE `instancia` (
 LOCK TABLES `instancia` WRITE;
 /*!40000 ALTER TABLE `instancia` DISABLE KEYS */;
 INSERT INTO `instancia` VALUES
-(1,19,'VM1','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL,NULL,'linux',NULL),
-(2,19,'VM2','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL,NULL,'linux',NULL),
-(3,19,'VM3','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL,NULL,'linux',NULL);
+(1,19,'VM1','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL,NULL,'linux',NULL, NULL),
+(2,19,'VM2','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL,NULL,'linux',NULL, NULL),
+(3,19,'VM3','STOPPED','1','1GB','10GB',0,1,NULL,NULL,NULL,NULL,'linux',NULL, NULL);
 /*!40000 ALTER TABLE `instancia` ENABLE KEYS */;
 UNLOCK TABLES;
 
