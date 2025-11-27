@@ -55,7 +55,20 @@ def execute_on_openstack_headnode(script_name, args_dict):
     
     if result.returncode == 0:
         stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+        
         print(f"[OPENSTACK] STDOUT length: {len(stdout)} chars")
+        
+        # 🔍 MOSTRAR TODO EL STDOUT PARA VER LOS DEBUG
+        print(f"[OPENSTACK] ================== STDOUT COMPLETO ==================")
+        print(stdout)
+        print(f"[OPENSTACK] ======================= FIN =======================")
+        
+        # Si hay algo en stderr también mostrarlo
+        if stderr:
+            print(f"[OPENSTACK] ================== STDERR ==================")
+            print(stderr)
+            print(f"[OPENSTACK] ==================== FIN ====================")
         
         # 🟢 ESTRATEGIA MEJORADA: Buscar JSON en múltiples formas
         
@@ -123,6 +136,7 @@ def execute_on_openstack_headnode(script_name, args_dict):
     else:
         print(f"[OPENSTACK] ❌ Error en ejecución SSH")
         print(f"[OPENSTACK] STDERR: {result.stderr}")
+        print(f"[OPENSTACK] STDOUT: {result.stdout}")  # También mostrar stdout en caso de error
         return {
             "success": False,
             "error": result.stderr.strip() or result.stdout.strip(),
