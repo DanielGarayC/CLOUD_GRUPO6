@@ -17,5 +17,5 @@ RUN mkdir -p /app/logs_metrics
 EXPOSE 5010
 
 # Comando de inicio
-#CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5010"]
-CMD ["python", "app.py"]
+CMD ["python", "app.py", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5010"]
+
