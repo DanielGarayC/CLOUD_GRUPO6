@@ -4,6 +4,8 @@ from sqlalchemy import create_engine, text
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests, json, os
 from rabbitmq_utils import rpc_call_network
+from rabbitmq_utils import rpc_call_vm_placement
+
 
 app = FastAPI(title="Slice Manager Hybrid", version="4.0")
 
