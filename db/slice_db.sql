@@ -187,7 +187,8 @@ CREATE TABLE `instancia` (
   `process_id` int DEFAULT NULL,
   `platform` varchar(20) DEFAULT 'linux' COMMENT 'Plataforma donde se despliega: linux | openstack',
   `instance_id` varchar(100) DEFAULT NULL COMMENT 'UUID de la instancia en OpenStack (solo para platform=openstack)',
-
+  `console_url` varchar(500) DEFAULT NULL COMMENT 'URL de consola VNC/noVNC para acceso remoto',
+  
   PRIMARY KEY (`idinstancia`,`slice_idslice`),
   KEY `fk_instancia_slice1_idx` (`slice_idslice`),
   KEY `fk_instancia_imagen1_idx` (`imagen_idimagen`),

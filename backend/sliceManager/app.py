@@ -712,7 +712,8 @@ def deploy_slice_linux(id_slice: int, instancias: list):
                                 vnc_idvnc = :vnc_id,
                                 worker_idworker = :worker_id,
                                 process_id = :pid,
-                                platform = 'linux'
+                                platform = 'linux',
+                                console_url = 'no hay'
                             WHERE nombre = :vm_name AND slice_idslice = :sid
                         """), {
                             "ip": vm.get("ip_asignada"),
@@ -898,6 +899,7 @@ def deploy_slice_openstack(id_slice: int, instancias: list):
                             SET estado = 'RUNNING',
                                 instance_id = :instance_id,
                                 platform = 'openstack'
+                                console_url = :console_url
                             WHERE nombre = :vm_name AND slice_idslice = :sid
                         """), {
                             "instance_id": result.get("instance_id"),

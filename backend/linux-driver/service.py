@@ -59,18 +59,16 @@ def execute_on_openstack_headnode(script_name, args_dict):
         
         print(f"[OPENSTACK] STDOUT length: {len(stdout)} chars")
         
-        # 🔍 MOSTRAR TODO EL STDOUT PARA VER LOS DEBUG
         print(f"[OPENSTACK] ================== STDOUT COMPLETO ==================")
         print(stdout)
         print(f"[OPENSTACK] ======================= FIN =======================")
         
-        # Si hay algo en stderr también mostrarlo
         if stderr:
             print(f"[OPENSTACK] ================== STDERR ==================")
             print(stderr)
             print(f"[OPENSTACK] ==================== FIN ====================")
         
-        # 🟢 ESTRATEGIA MEJORADA: Buscar JSON en múltiples formas
+        # ESTRATEGIA MEJORADA: Buscar JSON en múltiples formas
         
         # Método 1: Intentar parsear la última línea (JSON compacto)
         try:
