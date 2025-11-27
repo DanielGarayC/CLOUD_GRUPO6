@@ -352,6 +352,7 @@ async def create_vm_openstack(data):
     # Éxito
     print(f"[OPENSTACK] ✅ VM {nombre_vm} desplegada exitosamente")
     print(f"[OPENSTACK]    Instance ID: {vm_info.get('instance_id')}")
+    print(f"[OPENSTACK]    Console URL: {vm_info.get('console_url', 'No disponible')}")
     
     return {
         "success": True,
