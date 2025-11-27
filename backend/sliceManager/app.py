@@ -898,11 +898,12 @@ def deploy_slice_openstack(id_slice: int, instancias: list):
                             UPDATE instancia
                             SET estado = 'RUNNING',
                                 instance_id = :instance_id,
-                                platform = 'openstack'
+                                platform = 'openstack',
                                 console_url = :console_url
                             WHERE nombre = :vm_name AND slice_idslice = :sid
                         """), {
                             "instance_id": result.get("instance_id"),
+                            "console_url": result.get("console_url"),
                             "vm_name": vm_name,
                             "sid": id_slice
                         })
