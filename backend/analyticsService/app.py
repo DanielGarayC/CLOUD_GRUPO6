@@ -7,8 +7,8 @@ import csv
 import os
 from pathlib import Path
 from typing import Optional
-
-app = FastAPI(title="Analytics Service", version="1.0")
+import asyncio
+from contextlib import asynccontextmanager
 
 # ======================================
 # CONFIGURACIÓN
@@ -26,6 +26,9 @@ MONITORING_URL = os.getenv("MONITORING_URL", "http://monitoring_service:5010/met
 # Directorio para almacenar métricas
 METRICS_STORAGE_DIR = Path("/app/metrics_storage")
 METRICS_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Variable global para controlar la tarea de recolección
+collection_task = None
 
 # ======================================
 # FUNCIONES AUXILIARES
@@ -62,7 +65,7 @@ def obtener_capacidad_total_workers():
                     ram,
                     storage
                 FROM worker
-                WHERE nombre IN ('server2', 'server3', 'server4')
+                WHERE nombre IN ('server2', 'server3', 'server4','worker1','worker2','worker3')
             """)
             
             result = conn.execute(query)
@@ -126,7 +129,6 @@ def obtener_recursos_utilizados_bd():
                     "slices_instancias": row.slices_instancias or ""
                 }
             
-            print(f"📊 Recursos utilizados (RUNNING): {recursos_utilizados}")
             return recursos_utilizados
             
     except Exception as e:
@@ -149,11 +151,10 @@ def obtener_metricas_actuales():
 def guardar_metricas_snapshot(metricas: dict, recursos_utilizados: dict):
     """
     Guarda un snapshot de las métricas actuales en CSV
-    SE GUARDA CADA VEZ que se consulta /resources/summary
     """
     try:
         fecha = datetime.utcnow().strftime("%Y-%m-%d")
-        timestamp = datetime.utcnow(). strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         
         # Archivo CSV por día
         csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
@@ -177,7 +178,7 @@ def guardar_metricas_snapshot(metricas: dict, recursos_utilizados: dict):
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             
             if not file_exists:
-                writer. writeheader()
+                writer.writeheader()
             
             # Escribir una fila por worker
             if metricas and 'metrics' in metricas:
@@ -219,13 +220,12 @@ def guardar_metricas_snapshot(metricas: dict, recursos_utilizados: dict):
                         'qemu_count': data.get('qemu_count', 0)
                     })
         
-        print(f"💾 Snapshot guardado en {csv_file}")
+        print(f"💾 Snapshot guardado en {csv_file} - {timestamp}")
         return str(csv_file)
         
     except Exception as e:
         print(f"❌ Error guardando snapshot: {e}")
         return None
-
 
 def listar_archivos_metricas():
     """Lista todos los archivos CSV de métricas disponibles"""
@@ -249,7 +249,90 @@ def listar_archivos_metricas():
         return []
 
 # ======================================
-# ENDPOINTS
+# TAREA DE RECOLECCIÓN AUTOMÁTICA
+# ======================================
+
+async def recolectar_metricas_periodicamente():
+    """
+    Tarea en background que recolecta métricas cada 10 segundos
+    """
+    print("🔄 Iniciando recolección automática de métricas cada 10 segundos...")
+    print(f"📍 Guardando en: {METRICS_STORAGE_DIR}")
+    
+    # Esperar 5 segundos antes de empezar (dar tiempo a que todo arranque)
+    await asyncio.sleep(5)
+    
+    contador = 0
+    while True:
+        try:
+            contador += 1
+            print(f"\n🔍 Recolección #{contador} - {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Obtener datos
+            recursos_utilizados = obtener_recursos_utilizados_bd()
+            print(f"   📊 Recursos utilizados obtenidos: {len(recursos_utilizados)} workers")
+            
+            metricas = obtener_metricas_actuales()
+            
+            # Guardar snapshot
+            if metricas:
+                print(f"   📡 Métricas recibidas de monitoring service")
+                archivo = guardar_metricas_snapshot(metricas, recursos_utilizados)
+                if archivo:
+                    print(f"   ✅ Snapshot guardado exitosamente")
+                else:
+                    print(f"   ⚠️ Error al guardar snapshot")
+            else:
+                print(f"   ⚠️ No se pudieron obtener métricas del monitoring service")
+            
+        except Exception as e:
+            print(f"   ❌ Error en recolección automática: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Esperar 10 segundos
+        print(f"   ⏳ Esperando 10 segundos hasta próxima recolección...")
+        await asyncio.sleep(10)
+
+# ======================================
+# LIFECYCLE MANAGEMENT
+# ======================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Maneja el ciclo de vida de la aplicación
+    Inicia y detiene la tarea de recolección automática
+    """
+    global collection_task
+    
+    # Startup: Iniciar tarea de recolección
+    print("🚀 Iniciando Analytics Service...")
+    collection_task = asyncio.create_task(recolectar_metricas_periodicamente())
+    
+    yield
+    
+    # Shutdown: Cancelar tarea de recolección
+    print("🛑 Deteniendo Analytics Service...")
+    if collection_task:
+        collection_task.cancel()
+        try:
+            await collection_task
+        except asyncio.CancelledError:
+            print("✅ Tarea de recolección detenida")
+
+# ======================================
+# INICIALIZACIÓN DE FASTAPI
+# ======================================
+
+app = FastAPI(
+    title="Analytics Service",
+    version="1.0",
+    lifespan=lifespan
+)
+
+# ======================================
+# ENDPOINTS (SOLO LECTURA)
 # ======================================
 
 @app.get("/")
@@ -258,12 +341,13 @@ def root():
         "service": "Analytics Service",
         "version": "1.0",
         "status": "running",
+        "auto_collection": "enabled (every 10 seconds)",
         "endpoints": {
             "/resources/summary": "GET - Resumen completo de recursos (Dashboard Admin)",
-            "/resources/snapshot": "POST - Crear snapshot manual",
             "/metrics/files": "GET - Listar archivos CSV disponibles",
             "/metrics/export/{fecha}": "GET - Exportar métricas por fecha (YYYY-MM-DD)",
-            "/metrics/latest": "GET - Obtener últimas métricas guardadas"
+            "/metrics/latest": "GET - Obtener últimas métricas guardadas",
+            "/metrics/history": "GET - Obtener histórico de métricas"
         }
     }
 
@@ -273,7 +357,8 @@ def health_check():
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "database": "connected" if engine else "disconnected",
-        "metrics_storage": str(METRICS_STORAGE_DIR)
+        "metrics_storage": str(METRICS_STORAGE_DIR),
+        "auto_collection": "running" if collection_task and not collection_task.done() else "stopped"
     }
 
 @app.get("/resources/summary")
@@ -281,18 +366,14 @@ def get_resources_summary():
     """
     📊 Resumen completo de recursos para el dashboard de administrador
     
-    Combina:
-    - Capacidad total de workers (BD)
-    - Recursos utilizados por slices RUNNING (BD)
-    - Métricas en tiempo real del sistema (Monitoring Service)
+    SOLO LECTURA - Lee del CSV más reciente
     """
     try:
         capacidades = obtener_capacidad_total_workers()
         recursos_utilizados = obtener_recursos_utilizados_bd()
         metricas = obtener_metricas_actuales()
         
-        # Guardar snapshot automáticamente
-        guardar_metricas_snapshot(metricas, recursos_utilizados)
+        # NO guardamos aquí, solo leemos
         
         resumen = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -311,82 +392,91 @@ def get_resources_summary():
             }
         }
         
-        for worker_nombre, capacidad in capacidades.items():
-            utilizados = recursos_utilizados.get(worker_nombre, {
-                "cpu_utilizado": 0,
-                "ram_utilizado_gb": 0,
-                "storage_utilizado_gb": 0,
-                "num_instancias_running": 0,
-                "ip": capacidad.get("ip", "N/A"),
-                "slices_instancias": ""
-            })
-            
-            # Calcular disponible
-            cpu_disponible = capacidad["cpu_total"] - utilizados["cpu_utilizado"]
-            ram_disponible = capacidad["ram_total_gb"] - utilizados["ram_utilizado_gb"]
-            storage_disponible = capacidad["storage_total_gb"] - utilizados["storage_utilizado_gb"]
-            
-            # Métricas en tiempo real del sistema operativo
-            metricas_rt = {}
-            if metricas and "metrics" in metricas:
-                if worker_nombre in metricas["metrics"]:
-                    m = metricas["metrics"][worker_nombre]
-                    metricas_rt = {
-                        "cpu_percent_sistema": m.get("cpu_percent", 0),
-                        "ram_percent_sistema": m.get("ram_percent", 0),
-                        "disk_percent_sistema": m.get("disk_percent", 0),
-                        "disk_free_gb": m.get("disk_free_gb", 0),
-                        "qemu_count": m.get("qemu_count", 0),
-                        "timestamp_sent": m.get("timestamp_sent", ""),
-                        "received_at": m.get("received_at", "")
+        if metricas and "metrics" in metricas:
+            for worker_nombre, metric_data in metricas["metrics"].items():
+                if worker_nombre in capacidades:
+                    capacidad = capacidades[worker_nombre]
+                else:
+                    disk_free = metric_data.get('disk_free_gb', 0)
+                    disk_percent = metric_data.get('disk_percent', 0)
+                    if disk_percent < 100 and disk_percent > 0:
+                        disk_total = disk_free / (1 - disk_percent / 100)
+                    else:
+                        disk_total = 10
+                    
+                    capacidad = {
+                        "ip": f"N/A",
+                        "cpu_total": int(metric_data.get('cpu_count', 4)),
+                        "ram_total_gb": float(metric_data.get('ram_total_gb', 8)),
+                        "storage_total_gb": round(disk_total, 2)
                     }
-            
-            resumen["workers"][worker_nombre] = {
-                "ip": capacidad.get("ip", "N/A"),
-                "capacidad": {
-                    "cpu_total": capacidad["cpu_total"],
-                    "ram_total_gb": round(capacidad["ram_total_gb"], 2),
-                    "storage_total_gb": round(capacidad["storage_total_gb"], 2)
-                },
-                "utilizado_bd": {
-                    "cpu": utilizados["cpu_utilizado"],
-                    "ram_gb": round(utilizados["ram_utilizado_gb"], 2),
-                    "storage_gb": round(utilizados["storage_utilizado_gb"], 2),
-                    "instancias_running": utilizados["num_instancias_running"],
-                    "slices_detalle": utilizados["slices_instancias"]
-                },
-                "disponible": {
-                    "cpu": max(0, cpu_disponible),
-                    "ram_gb": round(max(0, ram_disponible), 2),
-                    "storage_gb": round(max(0, storage_disponible), 2)
-                },
-                "utilizacion_percent": {
-                    "cpu": round((utilizados["cpu_utilizado"] / capacidad["cpu_total"]) * 100, 2) if capacidad["cpu_total"] > 0 else 0,
-                    "ram": round((utilizados["ram_utilizado_gb"] / capacidad["ram_total_gb"]) * 100, 2) if capacidad["ram_total_gb"] > 0 else 0,
-                    "storage": round((utilizados["storage_utilizado_gb"] / capacidad["storage_total_gb"]) * 100, 2) if capacidad["storage_total_gb"] > 0 else 0
-                },
-                "metricas_sistema": metricas_rt,
-                "estado": "online" if metricas_rt else "offline"
-            }
-            
-            # Acumular totales del cluster
-            resumen["cluster_totals"]["cpu_total"] += capacidad["cpu_total"]
-            resumen["cluster_totals"]["cpu_utilizado"] += utilizados["cpu_utilizado"]
-            resumen["cluster_totals"]["cpu_disponible"] += max(0, cpu_disponible)
-            resumen["cluster_totals"]["ram_total_gb"] += capacidad["ram_total_gb"]
-            resumen["cluster_totals"]["ram_utilizado_gb"] += utilizados["ram_utilizado_gb"]
-            resumen["cluster_totals"]["ram_disponible_gb"] += max(0, ram_disponible)
-            resumen["cluster_totals"]["storage_total_gb"] += capacidad["storage_total_gb"]
-            resumen["cluster_totals"]["storage_utilizado_gb"] += utilizados["storage_utilizado_gb"]
-            resumen["cluster_totals"]["storage_disponible_gb"] += max(0, storage_disponible)
-            resumen["cluster_totals"]["instancias_running_total"] += utilizados["num_instancias_running"]
+                
+                utilizados = recursos_utilizados.get(worker_nombre, {
+                    "cpu_utilizado": 0,
+                    "ram_utilizado_gb": 0,
+                    "storage_utilizado_gb": 0,
+                    "num_instancias_running": 0,
+                    "ip": capacidad.get("ip", "N/A"),
+                    "slices_instancias": ""
+                })
+                
+                cpu_disponible = capacidad["cpu_total"] - utilizados["cpu_utilizado"]
+                ram_disponible = capacidad["ram_total_gb"] - utilizados["ram_utilizado_gb"]
+                storage_disponible = capacidad["storage_total_gb"] - utilizados["storage_utilizado_gb"]
+                
+                metricas_rt = {
+                    "cpu_percent_sistema": metric_data.get("cpu_percent", 0),
+                    "ram_percent_sistema": metric_data.get("ram_percent", 0),
+                    "disk_percent_sistema": metric_data.get("disk_percent", 0),
+                    "disk_free_gb": metric_data.get("disk_free_gb", 0),
+                    "qemu_count": metric_data.get("qemu_count", 0),
+                    "timestamp_sent": metric_data.get("timestamp_sent", ""),
+                    "received_at": metric_data.get("received_at", "")
+                }
+                
+                resumen["workers"][worker_nombre] = {
+                    "ip": capacidad.get("ip", "N/A"),
+                    "capacidad": {
+                        "cpu_total": capacidad["cpu_total"],
+                        "ram_total_gb": round(capacidad["ram_total_gb"], 2),
+                        "storage_total_gb": round(capacidad["storage_total_gb"], 2)
+                    },
+                    "utilizado_bd": {
+                        "cpu": utilizados["cpu_utilizado"],
+                        "ram_gb": round(utilizados["ram_utilizado_gb"], 2),
+                        "storage_gb": round(utilizados["storage_utilizado_gb"], 2),
+                        "instancias_running": utilizados["num_instancias_running"],
+                        "slices_detalle": utilizados["slices_instancias"]
+                    },
+                    "disponible": {
+                        "cpu": max(0, cpu_disponible),
+                        "ram_gb": round(max(0, ram_disponible), 2),
+                        "storage_gb": round(max(0, storage_disponible), 2)
+                    },
+                    "utilizacion_percent": {
+                        "cpu": round((utilizados["cpu_utilizado"] / capacidad["cpu_total"]) * 100, 2) if capacidad["cpu_total"] > 0 else 0,
+                        "ram": round((utilizados["ram_utilizado_gb"] / capacidad["ram_total_gb"]) * 100, 2) if capacidad["ram_total_gb"] > 0 else 0,
+                        "storage": round((utilizados["storage_utilizado_gb"] / capacidad["storage_total_gb"]) * 100, 2) if capacidad["storage_total_gb"] > 0 else 0
+                    },
+                    "metricas_sistema": metricas_rt,
+                    "estado": "online"
+                }
+                
+                resumen["cluster_totals"]["cpu_total"] += capacidad["cpu_total"]
+                resumen["cluster_totals"]["cpu_utilizado"] += utilizados["cpu_utilizado"]
+                resumen["cluster_totals"]["cpu_disponible"] += max(0, cpu_disponible)
+                resumen["cluster_totals"]["ram_total_gb"] += capacidad["ram_total_gb"]
+                resumen["cluster_totals"]["ram_utilizado_gb"] += utilizados["ram_utilizado_gb"]
+                resumen["cluster_totals"]["ram_disponible_gb"] += max(0, ram_disponible)
+                resumen["cluster_totals"]["storage_total_gb"] += capacidad["storage_total_gb"]
+                resumen["cluster_totals"]["storage_utilizado_gb"] += utilizados["storage_utilizado_gb"]
+                resumen["cluster_totals"]["storage_disponible_gb"] += max(0, storage_disponible)
+                resumen["cluster_totals"]["instancias_running_total"] += utilizados["num_instancias_running"]
         
-        # Redondear totales
         for key in ["ram_total_gb", "ram_utilizado_gb", "ram_disponible_gb", 
                     "storage_total_gb", "storage_utilizado_gb", "storage_disponible_gb"]:
             resumen["cluster_totals"][key] = round(resumen["cluster_totals"][key], 2)
         
-        # Calcular porcentajes totales
         resumen["cluster_totals"]["utilizacion_percent"] = {
             "cpu": round((resumen["cluster_totals"]["cpu_utilizado"] / resumen["cluster_totals"]["cpu_total"]) * 100, 2) if resumen["cluster_totals"]["cpu_total"] > 0 else 0,
             "ram": round((resumen["cluster_totals"]["ram_utilizado_gb"] / resumen["cluster_totals"]["ram_total_gb"]) * 100, 2) if resumen["cluster_totals"]["ram_total_gb"] > 0 else 0,
@@ -397,39 +487,6 @@ def get_resources_summary():
         
     except Exception as e:
         return {"error": str(e), "timestamp": datetime.utcnow().isoformat()}
-
-@app.post("/resources/snapshot")
-def create_snapshot():
-    """
-    💾 Crear snapshot manual de métricas
-    """
-    try:
-        recursos_utilizados = obtener_recursos_utilizados_bd()
-        metricas = obtener_metricas_actuales()
-        
-        if not metricas:
-            return {
-                "success": False,
-                "error": "No se pudieron obtener métricas del monitoring service"
-            }
-        
-        archivo = guardar_metricas_snapshot(metricas, recursos_utilizados)
-        
-        if archivo:
-            return {
-                "success": True,
-                "mensaje": "Snapshot creado exitosamente",
-                "archivo": archivo,
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        else:
-            return {
-                "success": False,
-                "error": "Error al guardar snapshot"
-            }
-            
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
 @app.get("/metrics/files")
 def list_metrics_files():
@@ -456,8 +513,6 @@ def export_metrics(fecha: str):
     
     Parámetro:
         fecha: Formato YYYY-MM-DD (ejemplo: 2025-11-24)
-    
-    Retorna el contenido del CSV para descargar
     """
     try:
         csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
@@ -468,7 +523,6 @@ def export_metrics(fecha: str):
                 "error": f"No se encontró archivo para la fecha {fecha}"
             }
         
-        # Leer contenido del CSV
         with open(csv_file, 'r') as f:
             contenido = f.read()
         
@@ -487,8 +541,6 @@ def export_metrics(fecha: str):
 def get_latest_metrics():
     """
     📊 Obtener las métricas más recientes guardadas
-    
-    Lee el último snapshot y retorna los datos en formato JSON
     """
     try:
         archivos = listar_archivos_metricas()
@@ -499,10 +551,8 @@ def get_latest_metrics():
                 "error": "No hay archivos de métricas disponibles"
             }
         
-        # Tomar el archivo más reciente
         ultimo_archivo = METRICS_STORAGE_DIR / archivos[0]["nombre"]
         
-        # Leer CSV y convertir a JSON
         metricas = []
         with open(ultimo_archivo, 'r') as f:
             reader = csv.DictReader(f)
@@ -520,24 +570,16 @@ def get_latest_metrics():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
-#extra
 @app.get("/metrics/history")
 def get_metrics_history(minutes: int = 30):
     """
-    Obtener histórico de métricas de los últimos N minutos
-    
-    Parámetros:
-        minutes: Minutos de histórico a obtener (default: 30)
-    
-    Retorna datos para graficar evolución temporal
+    📈 Obtener histórico de métricas de los últimos N minutos
     """
     try:
         from datetime import timedelta
-        import csv
         from collections import defaultdict
         
-        fecha = datetime.utcnow(). strftime("%Y-%m-%d")
+        fecha = datetime.utcnow().strftime("%Y-%m-%d")
         csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
         
         if not csv_file.exists():
@@ -546,7 +588,6 @@ def get_metrics_history(minutes: int = 30):
                 "error": "No hay datos históricos disponibles para hoy"
             }
         
-        # Leer CSV manualmente (sin pandas por ahora)
         cutoff_time = datetime.utcnow() - timedelta(minutes=minutes)
         
         history = defaultdict(lambda: {
@@ -561,19 +602,16 @@ def get_metrics_history(minutes: int = 30):
             reader = csv.DictReader(f)
             for row in reader:
                 try:
-                    # Parsear timestamp
                     row_time = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S')
                     
-                    # Filtrar por tiempo
                     if row_time >= cutoff_time:
                         worker = row['worker_nombre']
                         history[worker]["timestamps"].append(row['timestamp'])
-                        history[worker]["cpu_percent"].append(float(row. get('cpu_percent_sistema', 0)))
+                        history[worker]["cpu_percent"].append(float(row.get('cpu_percent_sistema', 0)))
                         history[worker]["ram_percent"].append(float(row.get('ram_percent_sistema', 0)))
                         history[worker]["disk_percent"].append(float(row.get('disk_percent_sistema', 0)))
-                        history[worker]["qemu_count"]. append(int(row.get('qemu_count', 0)))
+                        history[worker]["qemu_count"].append(int(row.get('qemu_count', 0)))
                 except Exception as e:
-                    print(f"Error procesando fila: {e}")
                     continue
         
         return {
@@ -583,13 +621,10 @@ def get_metrics_history(minutes: int = 30):
         }
         
     except Exception as e:
-        print(f"❌ Error obteniendo histórico: {e}")
         return {
             "success": False,
             "error": str(e)
         }
-
-
 
 # ======================================
 # MAIN
@@ -597,5 +632,9 @@ def get_metrics_history(minutes: int = 30):
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Analytics Service escuchando en 0.0.0.0:5030...")
-    uvicorn.run(app, host="0.0.0.0", port=5030)
+    print("🚀 Analytics Service con recolección automática cada 10 segundos...")
+    print(f"📁 Directorio de métricas: {METRICS_STORAGE_DIR}")
+    print(f"🔗 URL Monitoring: {MONITORING_URL}")
+    print(f"🗄️ Base de datos: {DATABASE_URL}")
+    print("-" * 60)
+    uvicorn.run(app, host="0.0.0.0", port=5030, log_level="info")
