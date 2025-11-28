@@ -582,7 +582,7 @@ def get_metrics_history(minutes: int = 30):
         from collections import defaultdict
         
         # HORA ACTUAL EN PERÚ PERO SIN TZINFO
-        ahora = datetime.now(ZoneInfo("America/Lima")).replace(tzinfo=None)
+        ahora = datetime.utcnow() - timedelta(hours=5)
         fecha = ahora.strftime("%Y-%m-%d")
         cutoff_time = ahora - timedelta(minutes=minutes)
 
