@@ -1476,7 +1476,7 @@ def api_analytics_summary():
     """Proxy para evitar CORS"""
     import requests
     try:
-        resp = requests.get('http://analytics_service:5030/resources/summary', timeout=10)
+        resp = requests.get('http://10.20.12.161:5030/resources/summary', timeout=10)
         return resp.json(), resp.status_code
     except Exception as e:
         return {"error": str(e)}, 500
@@ -1486,7 +1486,7 @@ def api_analytics_export(fecha):
     """Proxy para exportar CSV"""
     import requests
     try:
-        resp = requests.get(f'http://analytics_service:5030/metrics/export/{fecha}', timeout=10)
+        resp = requests.get(f'http://10.20.12.161:5030/metrics/export/{fecha}', timeout=10)
         from flask import Response
         return Response(
             resp.content,
@@ -1506,7 +1506,7 @@ def api_analytics_history():
     
     try:
         resp = requests.get(
-            f'http://analytics_service:5030/metrics/history?minutes={minutes}', 
+            f'http://10.20.12.161:5030/metrics/history?minutes={minutes}', 
             timeout=10
         )
         return resp.json(), resp.status_code
