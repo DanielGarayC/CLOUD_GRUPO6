@@ -162,7 +162,7 @@ CREATE TABLE `slice` (
 
 LOCK TABLES `slice` WRITE;
 /*!40000 ALTER TABLE `slice` DISABLE KEYS */;
-INSERT INTO `slice` VALUES (19,'oli','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"x\":100,\"y\":0},{\"id\":2,\"label\":\"VM2\",\"x\":-49.99999999999998,\"y\":86.60254037844388},{\"id\":3,\"label\":\"VM3\",\"x\":-50.00000000000004,\"y\":-86.60254037844383}],\"edges\":[{\"from\":1,\"to\":2,\"id\":\"f50e0b85-95e6-44bd-b6ea-9b9c7be57668\"},{\"from\":1,\"to\":3,\"id\":\"0689e997-4c3b-4a12-8def-26f5a3a3fed1\"},{\"from\":2,\"to\":3,\"id\":\"a43918b0-7509-45e3-aa16-a08e25af5749\"}]}','2025-10-12',NULL,'default');
+INSERT INTO `slice` VALUES (19,'oli','STOPPED','{\"nodes\":[{\"id\":1,\"label\":\"VM1\",\"x\":100,\"y\":0},{\"id\":2,\"label\":\"VM2\",\"x\":-49.99999999999998,\"y\":86.60254037844388},{\"id\":3,\"label\":\"VM3\",\"x\":-50.00000000000004,\"y\":-86.60254037844383}],\"edges\":[{\"from\":1,\"to\":2,\"id\":\"f50e0b85-95e6-44bd-b6ea-9b9c7be57668\"},{\"from\":1,\"to\":3,\"id\":\"0689e997-4c3b-4a12-8def-26f5a3a3fed1\"},{\"from\":2,\"to\":3,\"id\":\"a43918b0-7509-45e3-aa16-a08e25af5749\"}]}','2025-10-12',NULL,NULL,'default');
 /*!40000 ALTER TABLE `slice` ENABLE KEYS */;
 UNLOCK TABLES;
 
