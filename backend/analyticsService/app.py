@@ -581,7 +581,8 @@ def get_metrics_history(minutes: int = 30):
         from datetime import timedelta
         from collections import defaultdict
         
-        ahora = datetime.now(ZoneInfo("America/Lima"))
+        # HORA ACTUAL EN PERÚ PERO SIN TZINFO
+        ahora = datetime.now(ZoneInfo("America/Lima")).replace(tzinfo=None)
         fecha = ahora.strftime("%Y-%m-%d")
         cutoff_time = ahora - timedelta(minutes=minutes)
 
@@ -605,8 +606,10 @@ def get_metrics_history(minutes: int = 30):
             reader = csv.DictReader(f)
             for row in reader:
                 try:
-                    row_time = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("America/Lima"))
-                    
+                    # TIMESTAMP DEL CSV SIN TZINFO
+                    row_time = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S')
+
+                    # COMPARACIÓN NAIVE vs NAIVE = OK
                     if row_time >= cutoff_time:
                         worker = row['worker_nombre']
                         history[worker]["timestamps"].append(row['timestamp'])
@@ -614,7 +617,8 @@ def get_metrics_history(minutes: int = 30):
                         history[worker]["ram_percent"].append(float(row.get('ram_percent_sistema', 0)))
                         history[worker]["disk_percent"].append(float(row.get('disk_percent_sistema', 0)))
                         history[worker]["qemu_count"].append(int(row.get('qemu_count', 0)))
-                except Exception as e:
+
+                except Exception:
                     continue
         
         return {
@@ -628,6 +632,7 @@ def get_metrics_history(minutes: int = 30):
             "success": False,
             "error": str(e)
         }
+
 
 # ======================================
 # MAIN
