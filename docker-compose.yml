@@ -319,9 +319,9 @@ services:
       analytics-service:
         condition: service_healthy
     environment:
-      MODO=rabbit
-      RABBITMQ_HOST=rabbitmq
-      RPC_QUEUE_VMPLACEMENT=rpc_vm_placement
+      MODO: "rabbit"
+      RABBITMQ_HOST: "rabbitmq"
+      RPC_QUEUE_VMPLACEMENT: "rpc_vm_placement"
     volumes:
       - metrics_shared:/app/metrics_storage
     networks:
