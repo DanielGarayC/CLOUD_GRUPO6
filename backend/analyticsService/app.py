@@ -580,7 +580,9 @@ def get_metrics_history(minutes: int = 30):
     from datetime import timedelta
     from collections import defaultdict, deque
     
-    fecha = datetime.now().strftime("%Y-%m-%d")
+    # Usar zona horaria de Lima
+    lima_tz = ZoneInfo("America/Lima")
+    fecha = datetime.now(lima_tz).strftime("%Y-%m-%d")
     csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
     
     if not csv_file.exists():
@@ -607,7 +609,9 @@ def get_metrics_history(minutes: int = 30):
     for line in reversed(list(lines)[1:]):  # Empezar desde el final
         try:
             row = dict(zip(header, line.strip().split(',')))
+            # CORRECCIÓN: Crear datetime con zona horaria de Lima
             latest_time = datetime.strptime(row['timestamp'].strip(), '%Y-%m-%d %H:%M:%S')
+            latest_time = latest_time.replace(tzinfo=lima_tz)
             break
         except:
             continue
@@ -621,6 +625,8 @@ def get_metrics_history(minutes: int = 30):
     
     cutoff_time = latest_time - timedelta(minutes=minutes)
     
+    print(f"🔍 Buscando datos desde {cutoff_time} hasta {latest_time}")
+    
     # Ahora leer todo el archivo filtrando
     history = defaultdict(lambda: {
         "timestamps": [],
@@ -630,11 +636,15 @@ def get_metrics_history(minutes: int = 30):
         "qemu_count": []
     })
     
+    registros_encontrados = 0
+    
     with open(csv_file, 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
             try:
+                # CORRECCIÓN: Crear datetime con zona horaria de Lima
                 row_time = datetime.strptime(row['timestamp'].strip(), '%Y-%m-%d %H:%M:%S')
+                row_time = row_time.replace(tzinfo=lima_tz)
                 
                 if row_time >= cutoff_time:
                     worker = row['worker_nombre']
@@ -643,8 +653,12 @@ def get_metrics_history(minutes: int = 30):
                     history[worker]["ram_percent"].append(float(row.get('ram_percent_sistema', 0)))
                     history[worker]["disk_percent"].append(float(row.get('disk_percent_sistema', 0)))
                     history[worker]["qemu_count"].append(int(row.get('qemu_count', 0)))
-            except:
+                    registros_encontrados += 1
+            except Exception as e:
+                print(f"⚠️ Error procesando fila: {e}")
                 pass
+    
+    print(f"✅ {registros_encontrados} registros encontrados en los últimos {minutes} minutos")
     
     return {
         "success": True,
@@ -652,6 +666,7 @@ def get_metrics_history(minutes: int = 30):
         "latest_timestamp": latest_time.strftime('%Y-%m-%d %H:%M:%S'),
         "cutoff_timestamp": cutoff_time.strftime('%Y-%m-%d %H:%M:%S'),
         "total_workers": len(history),
+        "total_records": registros_encontrados,
         "data": dict(history)
     }
 # ======================================
