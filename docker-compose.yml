@@ -315,7 +315,10 @@ services:
     build: ./backend/vm_placement
     container_name: vm_placement
     ports:
-      - "8100:8100"
+      - "8110:8110"
+    depends_on:
+      analytics-service:
+        condition: service_healthy
     networks:
       - cloudnet 
 
