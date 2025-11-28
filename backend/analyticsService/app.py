@@ -578,21 +578,50 @@ def get_metrics_history(minutes: int = 30):
     📈 Obtener histórico de métricas de los últimos N minutos
     """
     from datetime import timedelta
-    from collections import defaultdict
+    from collections import defaultdict, deque
     
-    # OBLIGAMOS AHORA A MATCH COMPLETO CON EL CSV
-    ahora = datetime.now().replace(tzinfo=None)
-    fecha = ahora.strftime("%Y-%m-%d")
-    cutoff_time = ahora - timedelta(minutes=minutes)
-
+    fecha = datetime.now().strftime("%Y-%m-%d")
     csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
     
     if not csv_file.exists():
         return {
             "success": False,
-            "error": "No hay datos históricos disponibles para hoy"
+            "error": f"No hay datos históricos disponibles para {fecha}"
         }
-            
+    
+    # Leer el archivo en orden inverso para encontrar el timestamp más reciente
+    with open(csv_file, 'r') as f:
+        lines = deque(f, maxlen=1000)  # Mantener solo las últimas 1000 líneas
+    
+    if len(lines) <= 1:  # Solo header
+        return {
+            "success": True,
+            "period_minutes": minutes,
+            "data": {}
+        }
+    
+    # Parsear desde la última línea
+    header = lines[0].strip().split(',')
+    latest_time = None
+    
+    for line in reversed(list(lines)[1:]):  # Empezar desde el final
+        try:
+            row = dict(zip(header, line.strip().split(',')))
+            latest_time = datetime.strptime(row['timestamp'].strip(), '%Y-%m-%d %H:%M:%S')
+            break
+        except:
+            continue
+    
+    if not latest_time:
+        return {
+            "success": True,
+            "period_minutes": minutes,
+            "data": {}
+        }
+    
+    cutoff_time = latest_time - timedelta(minutes=minutes)
+    
+    # Ahora leer todo el archivo filtrando
     history = defaultdict(lambda: {
         "timestamps": [],
         "cpu_percent": [],
@@ -605,8 +634,8 @@ def get_metrics_history(minutes: int = 30):
         reader = csv.DictReader(f)
         for row in reader:
             try:
-                row_time = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S')
-
+                row_time = datetime.strptime(row['timestamp'].strip(), '%Y-%m-%d %H:%M:%S')
+                
                 if row_time >= cutoff_time:
                     worker = row['worker_nombre']
                     history[worker]["timestamps"].append(row['timestamp'])
@@ -614,16 +643,17 @@ def get_metrics_history(minutes: int = 30):
                     history[worker]["ram_percent"].append(float(row.get('ram_percent_sistema', 0)))
                     history[worker]["disk_percent"].append(float(row.get('disk_percent_sistema', 0)))
                     history[worker]["qemu_count"].append(int(row.get('qemu_count', 0)))
-
             except:
                 pass
     
     return {
         "success": True,
         "period_minutes": minutes,
+        "latest_timestamp": latest_time.strftime('%Y-%m-%d %H:%M:%S'),
+        "cutoff_timestamp": cutoff_time.strftime('%Y-%m-%d %H:%M:%S'),
+        "total_workers": len(history),
         "data": dict(history)
     }
-
 # ======================================
 # MAIN
 # ======================================
