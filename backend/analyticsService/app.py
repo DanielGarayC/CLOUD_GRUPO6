@@ -35,6 +35,7 @@ collection_task = None
 # FUNCIONES AUXILIARES
 # ======================================
 
+
 def parse_resource_value(value: str, resource_type: str) -> float:
     """Parsear valores como '8GB', '100GB', '4' a números"""
     if not value:
