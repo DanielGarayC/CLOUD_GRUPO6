@@ -605,7 +605,7 @@ def get_metrics_history(minutes: int = 30):
             reader = csv.DictReader(f)
             for row in reader:
                 try:
-                    row_time = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S')
+                    row_time = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("America/Lima"))
                     
                     if row_time >= cutoff_time:
                         worker = row['worker_nombre']
