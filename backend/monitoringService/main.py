@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import json
 import asyncio
 
@@ -18,7 +19,7 @@ latest_metrics = {}
 async def receive_metrics(request: Request):
     data = await request.json()
     hostname = data.get("hostname", "unknown")
-    data["received_at"] = datetime.utcnow().isoformat()
+    data["received_at"] = datetime.now(ZoneInfo("America/Lima")).isoformat()
     latest_metrics[hostname] = data   # almacena la última métrica de este worker
 
     print(f"📡 Métricas recibidas de {hostname}: CPU={data.get('cpu_percent')}%, RAM={data.get('ram_percent')}%")
