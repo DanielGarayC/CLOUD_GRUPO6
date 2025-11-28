@@ -72,7 +72,8 @@ LOCK TABLES `imagen` WRITE;
 /*!40000 ALTER TABLE `imagen` DISABLE KEYS */;
 INSERT INTO `imagen` VALUES 
 (1,'/var/lib/qemu-images/image-base/ubuntu.qcow2','ubuntu:latest', '56b9c357-4045-41b8-89f1-2d78e6ba7e64'),
-(2,'/var/lib/qemu-images/image-base/cirros-base.qcow2','cirros:latest', 'ad11fa04-b020-41f6-9cc3-7f7a589c6a2a');
+(2,'/var/lib/qemu-images/image-base/cirros-base.qcow2','cirros:latest', 'ad11fa04-b020-41f6-9cc3-7f7a589c6a2a'),
+(3,'/var/lib/qemu-images/image-base/debian-cloud.qcow2','debian-cloud:latest', 'oli');
 /*!40000 ALTER TABLE `imagen` ENABLE KEYS */;
 UNLOCK TABLES;
 
