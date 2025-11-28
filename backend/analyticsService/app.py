@@ -577,62 +577,52 @@ def get_metrics_history(minutes: int = 30):
     """
     📈 Obtener histórico de métricas de los últimos N minutos
     """
-    try:
-        from datetime import timedelta
-        from collections import defaultdict
-        
-        # HORA ACTUAL EN PERÚ PERO SIN TZINFO
-        ahora = datetime.utcnow() - timedelta(hours=5)
-        fecha = ahora.strftime("%Y-%m-%d")
-        cutoff_time = ahora - timedelta(minutes=minutes)
+    from datetime import timedelta
+    from collections import defaultdict
+    
+    # OBLIGAMOS AHORA A MATCH COMPLETO CON EL CSV
+    ahora = datetime.now().replace(tzinfo=None)
+    fecha = ahora.strftime("%Y-%m-%d")
+    cutoff_time = ahora - timedelta(minutes=minutes)
 
-        csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
-        
-        if not csv_file.exists():
-            return {
-                "success": False,
-                "error": "No hay datos históricos disponibles para hoy"
-            }
-                
-        history = defaultdict(lambda: {
-            "timestamps": [],
-            "cpu_percent": [],
-            "ram_percent": [],
-            "disk_percent": [],
-            "qemu_count": []
-        })
-        
-        with open(csv_file, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                try:
-                    # TIMESTAMP DEL CSV SIN TZINFO
-                    row_time = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S')
-
-                    # COMPARACIÓN NAIVE vs NAIVE = OK
-                    if row_time >= cutoff_time:
-                        worker = row['worker_nombre']
-                        history[worker]["timestamps"].append(row['timestamp'])
-                        history[worker]["cpu_percent"].append(float(row.get('cpu_percent_sistema', 0)))
-                        history[worker]["ram_percent"].append(float(row.get('ram_percent_sistema', 0)))
-                        history[worker]["disk_percent"].append(float(row.get('disk_percent_sistema', 0)))
-                        history[worker]["qemu_count"].append(int(row.get('qemu_count', 0)))
-
-                except Exception:
-                    continue
-        
-        return {
-            "success": True,
-            "period_minutes": minutes,
-            "data": dict(history)
-        }
-        
-    except Exception as e:
+    csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
+    
+    if not csv_file.exists():
         return {
             "success": False,
-            "error": str(e)
+            "error": "No hay datos históricos disponibles para hoy"
         }
+            
+    history = defaultdict(lambda: {
+        "timestamps": [],
+        "cpu_percent": [],
+        "ram_percent": [],
+        "disk_percent": [],
+        "qemu_count": []
+    })
+    
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                row_time = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S')
 
+                if row_time >= cutoff_time:
+                    worker = row['worker_nombre']
+                    history[worker]["timestamps"].append(row['timestamp'])
+                    history[worker]["cpu_percent"].append(float(row.get('cpu_percent_sistema', 0)))
+                    history[worker]["ram_percent"].append(float(row.get('ram_percent_sistema', 0)))
+                    history[worker]["disk_percent"].append(float(row.get('disk_percent_sistema', 0)))
+                    history[worker]["qemu_count"].append(int(row.get('qemu_count', 0)))
+
+            except:
+                pass
+    
+    return {
+        "success": True,
+        "period_minutes": minutes,
+        "data": dict(history)
+    }
 
 # ======================================
 # MAIN
