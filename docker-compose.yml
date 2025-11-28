@@ -311,6 +311,13 @@ services:
     networks:
       - cloudnet
   
+  vm_placement:
+    build: ./backend/vm_placement
+    container_name: vm_placement
+    ports:
+      - "8100:8100"
+    networks:
+      - cloudnet 
 
   analytics-service:
     build: ./backend/analyticsService  # ← Asegúrate que apunte al directorio correcto
