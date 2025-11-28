@@ -317,7 +317,7 @@ services:
     container_name: vm_placement
     depends_on:
       analytics-service:
-        condition: service_healthy
+        condition: service_started
     environment:
       MODO: "rabbit"
       RABBITMQ_HOST: "rabbitmq"
@@ -359,13 +359,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5030/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
   
-      
 networks:
   cloudnet:
     driver: bridge
