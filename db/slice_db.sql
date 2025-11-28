@@ -151,6 +151,7 @@ CREATE TABLE `slice` (
   `fecha_creacion` date DEFAULT NULL,
   `fecha_upload` date DEFAULT NULL,
   `zonadisponibilidad` varchar(45) DEFAULT NULL,
+  `platform` varchar(20) DEFAULT 'linux' COMMENT 'Plataforma: linux | openstack',
   PRIMARY KEY (`idslice`)
 ) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;

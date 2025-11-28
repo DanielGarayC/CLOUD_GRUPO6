@@ -399,6 +399,13 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list):
             "salidainternet": vm.get("salidainternet", False)
         })
     
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE slice 
+            SET platform = 'openstack'
+            WHERE idslice = :sid
+        """), {"sid": id_slice})
+        
     return {
         "timestamp": datetime.utcnow().isoformat(),
         "can_deploy": True,  # En OpenStack la verificación es diferente
@@ -956,9 +963,9 @@ def deploy_slice_openstack(id_slice: int, instancias: list):
     with engine.begin() as conn:
         conn.execute(text("""
             UPDATE slice 
-            SET estado = :e 
+            SET estado = :e, platform = :platform 
             WHERE idslice = :sid
-        """), {"e": estado_final, "sid": id_slice})
+        """), {"e": estado_final, "platform": "openstack", "sid": id_slice})
     
     return {
         "success": fallos == 0,
