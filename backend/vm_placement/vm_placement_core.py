@@ -1,5 +1,8 @@
 import pandas as pd
-from flask import Flask, request, jsonify
+from pathlib import Path
+
+
+METRICS_DIR = Path("/app/metrics_storage")
 
 # ================== CONFIGURACIÓN DE ZONAS ==================
 
@@ -54,9 +57,15 @@ ZONA_A_WORKER = {
     "HP": ["server3", "server4"],
     "UHP": ["worker1", "worker2", "worker3"]
 }
+# ================== FUNCIONES DE LECTURA ==================
+def obtener_unico_csv():
+    archivos = list(METRICS_DIR.glob("*.csv"))
+    if len(archivos) == 0:
+        return None
+    if len(archivos) > 1:
+        print(f"⚠️ Advertencia: hay más de un CSV, usando el primero: {archivos[0]}")
+    return archivos[0]
 
-# Ruta por defecto del CSV de métricas
-RUTA_CSV_DEFAULT = "metrics_2025-11-26 (1).csv"
 
 
 # ================== FUNCIONES DE CÁLCULO ==================
@@ -354,7 +363,7 @@ def competir_workers(file_path, workers_a_competir):
 
 # ================== PIPELINE COMPLETO ==================
 
-def run_vm_placement(slice_data, ruta_csv=RUTA_CSV_DEFAULT, imprimir=True):
+def run_vm_placement(slice_data, ruta_csv, imprimir=True):
     """
     Ejecuta TODO el flujo:
       - Evalúa recursos
@@ -589,7 +598,7 @@ def asignar_vms_max_localidad(vms, workers_libres, zona):
 
     ok = (len(vms_restantes) == 0)
     return ok, plan, vms_restantes
-def distribuir_vms_max_localidad(slice_data, ruta_csv=RUTA_CSV_DEFAULT, imprimir=True):
+def distribuir_vms_max_localidad(slice_data, ruta_csv, imprimir=True):
     """
     Calcula a qué worker iría cada VM del slice, buscando MÁXIMA LOCALIDAD.
 
@@ -676,98 +685,5 @@ def distribuir_vms_max_localidad(slice_data, ruta_csv=RUTA_CSV_DEFAULT, imprimir
     return ok, plan, vms_restantes, mensaje
 
 
-# ================== API HTTP (Flask) ==================
-
-app = Flask(__name__)
 
 
-@app.route("/vm-placement", methods=["POST"])
-def vm_placement_endpoint():
-    """
-    Endpoint que recibe el JSON del slice por POST y devuelve:
-      - worker ganador (si existe)
-      - plataforma (Linux u OpenStack)
-    """
-    try:
-        slice_data = request.get_json(force=True)
-    except Exception:
-        return jsonify({
-            "ok": False,
-            "worker": None,
-            "plataforma": None,
-            "mensaje": "Body JSON inválido."
-        }), 400
-
-    if not isinstance(slice_data, dict):
-        return jsonify({
-            "ok": False,
-            "worker": None,
-            "plataforma": None,
-            "mensaje": "El JSON del slice debe ser un objeto (dict)."
-        }), 400
-
-    ganador, plataforma, workers_aptos, workers_no_aptos = run_vm_placement(
-        slice_data,
-        ruta_csv=RUTA_CSV_DEFAULT,
-        imprimir=True  # 👈 esto deja todos tus prints como logs por request
-    )
-
-    if ganador is not None:
-        # Caso original: un worker puede con todo el slice
-        return jsonify({
-            "ok": True,
-            "modo": "single-worker",
-            "worker": ganador,
-            "plataforma": plataforma,
-            "workers_aptos": workers_aptos,
-            "workers_no_aptos": workers_no_aptos,
-            "mensaje": "Slice desplegado completo en un solo worker (máxima localidad)."
-        }), 200
-
-    # ===== FASE 2: no hay single-worker -> intentamos distribución por VM =====
-    ok_plan, plan, vms_restantes, msg_plan = distribuir_vms_max_localidad(
-        slice_data,
-        ruta_csv=RUTA_CSV_DEFAULT,
-        imprimir=True  # logs en consola
-    )
-
-    if not ok_plan:
-        # Ni por VM se pudo asignar todo el slice
-        return jsonify({
-            "ok": False,
-            "modo": "multi-worker",
-            "worker": None,
-            "plataforma": plataforma,
-            "workers_aptos": workers_aptos,
-            "workers_no_aptos": workers_no_aptos,
-            "plan": plan,  # puede tener algunas VMs asignadas
-            "vms_no_asignadas": [
-                {
-                    "index": vm["index"],
-                    "cpu": vm["cpu"],
-                    "ram": vm["ram"],
-                    "storage": vm["storage"]
-                }
-                for vm in vms_restantes
-            ],
-            "mensaje": msg_plan or "No se pudo desplegar el slice ni por worker ni por VM."
-        }), 200
-
-    # Aquí sí se pudo distribuir todas las VMs entre varios workers
-    return jsonify({
-        "ok": True,
-        "modo": "multi-worker",
-        "worker": None,
-        "plataforma": plataforma,
-        "workers_aptos": workers_aptos,
-        "workers_no_aptos": workers_no_aptos,
-        "plan": plan,  # {worker: [indices_vm]}
-        "mensaje": "Slice distribuido entre varios workers con máxima localidad."
-    }), 200
-
-
-# ================== ARRANQUE DEL SERVICIO ==================
-
-if __name__ == "__main__":
-    # Solo levanta el API. No ejecuta nada en consola al inicio.
-    app.run(host="0.0.0.0", port=5000, debug=True)

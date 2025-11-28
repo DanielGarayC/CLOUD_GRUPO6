@@ -224,6 +224,7 @@ services:
       RABBITMQ_USER: cloud
       RABBITMQ_PASS: cloud123
       RABBITMQ_QUEUE_NETWORK: network_rpc
+      RPC_QUEUE_VMPLACEMENT: rpc_vm_placement
     depends_on:
       slice_db:
         condition: service_healthy
@@ -314,11 +315,15 @@ services:
   vm_placement:
     build: ./backend/vm_placement
     container_name: vm_placement
-    ports:
-      - "8110:8110"
     depends_on:
       analytics-service:
         condition: service_healthy
+    environment:
+      MODO=rabbit
+      RABBITMQ_HOST=rabbitmq
+      RPC_QUEUE_VMPLACEMENT=rpc_vm_placement
+    volumes:
+      - metrics_shared:/app/metrics_storage
     networks:
       - cloudnet 
 
@@ -338,7 +343,7 @@ services:
       - MONITORING_URL=http://10.20.12.161:5010/metrics
     
     volumes:
-      - ./backend/analyticsService/metrics_storage:/app/metrics_storage
+      - metrics_shared:/app/metrics_storage
     
     networks:
       - cloudnet  # ← Cambio importante: usar la misma red que los demás servicios
@@ -365,3 +370,4 @@ volumes:
   grafana_data: {}
   prometheus_data: {}
   db_data: {}
+  metrics_shared:
