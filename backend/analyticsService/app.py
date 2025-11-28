@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import Response
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 import requests
 import csv
@@ -153,8 +154,9 @@ def guardar_metricas_snapshot(metricas: dict, recursos_utilizados: dict):
     Guarda un snapshot de las métricas actuales en CSV
     """
     try:
-        fecha = datetime.utcnow().strftime("%Y-%m-%d")
-        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        ahora = datetime.now(ZoneInfo("America/Lima"))
+        fecha = ahora.strftime("%Y-%m-%d")
+        timestamp = ahora.strftime("%Y-%m-%d %H:%M:%S")
         
         # Archivo CSV por día
         csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
@@ -266,7 +268,7 @@ async def recolectar_metricas_periodicamente():
     while True:
         try:
             contador += 1
-            print(f"\n🔍 Recolección #{contador} - {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"\n🔍 Recolección #{contador} - {datetime.now(ZoneInfo('America/Lima')).strftime('%Y-%m-%d %H:%M:%S')}")
             
             # Obtener datos
             recursos_utilizados = obtener_recursos_utilizados_bd()
@@ -355,7 +357,7 @@ def root():
 def health_check():
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(ZoneInfo("America/Lima")).isoformat(),
         "database": "connected" if engine else "disconnected",
         "metrics_storage": str(METRICS_STORAGE_DIR),
         "auto_collection": "running" if collection_task and not collection_task.done() else "stopped"
@@ -376,7 +378,7 @@ def get_resources_summary():
         # NO guardamos aquí, solo leemos
         
         resumen = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(ZoneInfo("America/Lima")).isoformat(),
             "workers": {},
             "cluster_totals": {
                 "cpu_total": 0,
@@ -579,7 +581,10 @@ def get_metrics_history(minutes: int = 30):
         from datetime import timedelta
         from collections import defaultdict
         
-        fecha = datetime.utcnow().strftime("%Y-%m-%d")
+        ahora = datetime.now(ZoneInfo("America/Lima"))
+        fecha = ahora.strftime("%Y-%m-%d")
+        cutoff_time = ahora - timedelta(minutes=minutes)
+
         csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
         
         if not csv_file.exists():
@@ -587,9 +592,7 @@ def get_metrics_history(minutes: int = 30):
                 "success": False,
                 "error": "No hay datos históricos disponibles para hoy"
             }
-        
-        cutoff_time = datetime.utcnow() - timedelta(minutes=minutes)
-        
+                
         history = defaultdict(lambda: {
             "timestamps": [],
             "cpu_percent": [],

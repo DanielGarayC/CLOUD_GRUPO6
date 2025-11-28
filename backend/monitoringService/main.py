@@ -38,7 +38,7 @@ def get_latest_metrics():
     if not latest_metrics:
         return {"status": "no_data", "message": "Aún no se han recibido métricas."}
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(ZoneInfo("America/Lima")).isoformat()
     return {
         "timestamp": now,
         "workers_count": len(latest_metrics),
