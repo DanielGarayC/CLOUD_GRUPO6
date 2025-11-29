@@ -24,7 +24,7 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
     logger.info(f"🌀 Creando túnel para {token}")
     logger.info(f"   Worker IP: {worker_ip} | VNC port: {vnc_port} | Local port: {local_port}")
 
-    # 1️⃣ Crear o reutilizar el túnel SSH
+    #Crear o reutilizar el túnel SSH (Hola daniel)
     try:
         # Chequear si ya hay un túnel abierto para ese puerto
         result = subprocess.run(["ss", "-tln"], capture_output=True, text=True)
