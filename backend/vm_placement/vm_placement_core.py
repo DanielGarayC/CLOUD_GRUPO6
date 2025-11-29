@@ -107,6 +107,14 @@ def obtener_libres_actual(ruta_csv):
 
     return libres
 
+def parse_ram_to_gb(ram_str):
+    s = str(ram_str).strip().lower()
+    if s.endswith("mb"):
+        return float(s.replace("mb", "").strip()) / 1024.0
+    if s.endswith("gb"):
+        return float(s.replace("gb", "").strip())
+    # fallback: si viene solo número, asumimos GB
+    return float(s)
 
 def evaluar_workers(slice_req, workers_libres, zona):
     """
@@ -177,7 +185,7 @@ def evaluar_slice_con_csv(ruta_csv, slice_data):
 
     # === Cálculo de recursos del slice =====
     total_cpu = sum(int(vm["cpu"]) for vm in slice_data["instancias"])
-    total_ram = sum(float(vm["ram"].lower().replace("gb", "")) for vm in slice_data["instancias"])
+    total_ram = sum(parse_ram_to_gb(vm["ram"]) for vm in slice_data["instancias"])
     total_storage = sum(float(vm["storage"].lower().replace("gb", "")) for vm in slice_data["instancias"])
 
     slice_req = {
