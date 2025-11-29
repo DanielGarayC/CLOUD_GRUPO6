@@ -820,12 +820,16 @@
 
         async function exportMetrics() {
             try {
-                const today = new Date().toISOString().split('T')[0];
-                window.location.href = `${ANALYTICS_URL}/metrics/export/${today}`;
+                const todayLocal = new Date().toLocaleDateString('en-CA', {
+                    timeZone: 'America/Lima'
+                });
+
+                window.location.href = `${ANALYTICS_URL}/metrics/export/${todayLocal}`;
             } catch (error) {
                 alert('Error al exportar métricas: ' + error.message);
             }
         }
+
     </script>
 </body>
 </html>

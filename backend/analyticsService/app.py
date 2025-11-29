@@ -577,11 +577,12 @@ def get_latest_metrics():
 def get_metrics_history(minutes: int = 30):
     """
     📈 Obtener histórico de métricas de los últimos N minutos
+    
+    Si no hay suficientes datos para el período solicitado, retorna todos los disponibles.
     """
     from datetime import timedelta
-    from collections import defaultdict, deque
+    from collections import defaultdict
     
-    # Usar zona horaria de Lima
     lima_tz = ZoneInfo("America/Lima")
     fecha = datetime.now(lima_tz).strftime("%Y-%m-%d")
     csv_file = METRICS_STORAGE_DIR / f"metrics_snapshot_{fecha}.csv"
@@ -592,43 +593,54 @@ def get_metrics_history(minutes: int = 30):
             "error": f"No hay datos históricos disponibles para {fecha}"
         }
     
-    # Leer el archivo en orden inverso para encontrar el timestamp más reciente
+    # Leer TODOS los registros primero
+    all_records = []
     with open(csv_file, 'r') as f:
-        lines = deque(f, maxlen=1000)  # Mantener solo las últimas 1000 líneas
+        reader = csv.DictReader(f)
+        for row in reader:
+            all_records.append(row)
     
-    if len(lines) <= 1:  # Solo header
+    if not all_records:
         return {
             "success": True,
             "period_minutes": minutes,
+            "warning": "No hay registros disponibles",
             "data": {}
         }
     
-    # Parsear desde la última línea
-    header = lines[0].strip().split(',')
-    latest_time = None
-    
-    for line in reversed(list(lines)[1:]):  # Empezar desde el final
-        try:
-            row = dict(zip(header, line.strip().split(',')))
-            # CORRECCIÓN: Crear datetime con zona horaria de Lima
-            latest_time = datetime.strptime(row['timestamp'].strip(), '%Y-%m-%d %H:%M:%S')
-            latest_time = latest_time.replace(tzinfo=lima_tz)
-            break
-        except:
-            continue
-    
-    if not latest_time:
+    # Obtener timestamps mínimo y máximo
+    try:
+        timestamps_parsed = []
+        for row in all_records:
+            ts = datetime.strptime(row['timestamp'].strip(), '%Y-%m-%d %H:%M:%S')
+            ts = ts.replace(tzinfo=lima_tz)
+            timestamps_parsed.append(ts)
+        
+        oldest_time = min(timestamps_parsed)
+        newest_time = max(timestamps_parsed)
+        available_minutes = (newest_time - oldest_time).total_seconds() / 60
+        
+    except Exception as e:
         return {
-            "success": True,
-            "period_minutes": minutes,
-            "data": {}
+            "success": False,
+            "error": f"Error parseando timestamps: {e}"
         }
     
-    cutoff_time = latest_time - timedelta(minutes=minutes)
+    # Determinar cutoff time
+    now = datetime.now(lima_tz)
+    requested_cutoff = now - timedelta(minutes=minutes)
     
-    print(f"🔍 Buscando datos desde {cutoff_time} hasta {latest_time}")
+    # Si el período solicitado es mayor al disponible, usar todos los datos
+    if available_minutes < minutes:
+        cutoff_time = oldest_time
+        actual_minutes = available_minutes
+        used_all_data = True
+    else:
+        cutoff_time = requested_cutoff
+        actual_minutes = minutes
+        used_all_data = False
     
-    # Ahora leer todo el archivo filtrando
+    # Filtrar y organizar datos
     history = defaultdict(lambda: {
         "timestamps": [],
         "cpu_percent": [],
@@ -637,39 +649,44 @@ def get_metrics_history(minutes: int = 30):
         "qemu_count": []
     })
     
-    registros_encontrados = 0
+    registros_incluidos = 0
     
-    with open(csv_file, 'r') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            try:
-                # CORRECCIÓN: Crear datetime con zona horaria de Lima
-                row_time = datetime.strptime(row['timestamp'].strip(), '%Y-%m-%d %H:%M:%S')
-                row_time = row_time.replace(tzinfo=lima_tz)
+    for i, row in enumerate(all_records):
+        try:
+            row_time = timestamps_parsed[i]
+            
+            if row_time >= cutoff_time:
+                worker = row['worker_nombre']
+                history[worker]["timestamps"].append(row['timestamp'])
+                history[worker]["cpu_percent"].append(float(row.get('cpu_percent_sistema', 0)))
+                history[worker]["ram_percent"].append(float(row.get('ram_percent_sistema', 0)))
+                history[worker]["disk_percent"].append(float(row.get('disk_percent_sistema', 0)))
+                history[worker]["qemu_count"].append(int(row.get('qemu_count', 0)))
+                registros_incluidos += 1
                 
-                if row_time >= cutoff_time:
-                    worker = row['worker_nombre']
-                    history[worker]["timestamps"].append(row['timestamp'])
-                    history[worker]["cpu_percent"].append(float(row.get('cpu_percent_sistema', 0)))
-                    history[worker]["ram_percent"].append(float(row.get('ram_percent_sistema', 0)))
-                    history[worker]["disk_percent"].append(float(row.get('disk_percent_sistema', 0)))
-                    history[worker]["qemu_count"].append(int(row.get('qemu_count', 0)))
-                    registros_encontrados += 1
-            except Exception as e:
-                print(f"⚠️ Error procesando fila: {e}")
-                pass
+        except Exception as e:
+            print(f"⚠️ Error procesando fila: {e}")
+            continue
     
-    print(f"✅ {registros_encontrados} registros encontrados en los últimos {minutes} minutos")
-    
-    return {
+    response = {
         "success": True,
-        "period_minutes": minutes,
-        "latest_timestamp": latest_time.strftime('%Y-%m-%d %H:%M:%S'),
+        "requested_minutes": minutes,
+        "actual_minutes": round(actual_minutes, 1),
+        "used_all_available_data": used_all_data,
+        "total_records_in_file": len(all_records),
+        "records_returned": registros_incluidos,
+        "oldest_timestamp": oldest_time.strftime('%Y-%m-%d %H:%M:%S'),
+        "newest_timestamp": newest_time.strftime('%Y-%m-%d %H:%M:%S'),
         "cutoff_timestamp": cutoff_time.strftime('%Y-%m-%d %H:%M:%S'),
         "total_workers": len(history),
-        "total_records": registros_encontrados,
         "data": dict(history)
     }
+    
+    # Agregar warning si se usaron todos los datos disponibles
+    if used_all_data:
+        response["warning"] = f"Solo hay {actual_minutes:.1f} minutos de datos disponibles (solicitaste {minutes})"
+    
+    return response
 # ======================================
 # MAIN
 # ======================================
