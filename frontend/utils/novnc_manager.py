@@ -79,7 +79,7 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
     return novnc_url
 
 
-def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url):
+def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url, gateway_ip=None):
     """
     Crea túnel SSH MULTISALTO para consolas OpenStack
     
@@ -89,6 +89,7 @@ def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url):
         slice_id: ID del slice
         instance_id: ID de la instancia
         console_url: URL de consola de OpenStack (ej: http://controller:6080/vnc_auto.html?path=...)
+        gateway_ip: IP del gateway (opcional, se obtiene de variable de entorno si no se proporciona)
     
     Returns:
         URL accesible desde el navegador local
@@ -109,7 +110,8 @@ def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url):
         logger.info(f"   Local port: {local_port}")
         
         # 🟢 OBTENER CONFIGURACIÓN DE LA PUERTA DE ENLACE
-        gateway_ip = os.getenv("GATEWAY_IP", "10.20.12.106")
+        if gateway_ip is None:
+            gateway_ip = os.getenv("GATEWAY_IP", "10.20.12.106")
         gateway_user = os.getenv("GATEWAY_USER", "ubuntu")
         gateway_ssh_key = os.getenv("GATEWAY_SSH_KEY", "/root/.ssh/id_rsa_novnc")  # 🟢 Usar id_rsa_novnc
         
