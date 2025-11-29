@@ -101,9 +101,11 @@ class Slice(db.Model):
     fecha_upload = db.Column(db.Date)
     zonadisponibilidad = db.Column(db.String(45))
     
+    platform = db.Column(db.String(20), default='linux', comment='Plataforma: linux | openstack')
+    
     # Relationships
     instancias = db.relationship('Instancia', backref='slice', cascade='all, delete-orphan')
-    enlaces = db.relationship('Enlace', backref='slice', cascade='all, delete-orphan')  # 🟢 NUEVO
+    enlaces = db.relationship('Enlace', backref='slice', cascade='all, delete-orphan')
     
     # Many-to-many relationship with users
     usuarios = db.relationship('User', secondary='usuario_has_slice', back_populates='slices')
@@ -144,6 +146,11 @@ class Instancia(db.Model):
     vnc_idvnc = db.Column('vnc_idvnc', db.Integer, db.ForeignKey('vnc.idvnc'), nullable=True)
     worker_idworker = db.Column('worker_idworker', db.Integer, db.ForeignKey('worker.idworker'), nullable=True)
     
+    platform = db.Column(db.String(20), default='linux', comment='Plataforma: linux | openstack')
+    instance_id = db.Column(db.String(100), nullable=True, comment='UUID de la instancia en OpenStack')
+    console_url = db.Column(db.String(500), nullable=True, comment='URL de consola VNC/noVNC para acceso remoto')
+    process_id = db.Column(db.Integer, nullable=True, comment='PID del proceso en Linux')
+    
     # Relationships
     imagen = db.relationship('Imagen', backref='instancias', foreign_keys=[imagen_idimagen])
     vnc = db.relationship('Vnc', backref='instancias', foreign_keys=[vnc_idvnc])
@@ -168,6 +175,11 @@ class Instancia(db.Model):
     @property
     def worker_id(self):
         return self.worker_idworker
+    
+    @property
+    def vnc_url(self):
+        """Alias para compatibilidad con OpenStack"""
+        return self.console_url
     
     def __repr__(self):
         return f'<Instancia {self.nombre}>'

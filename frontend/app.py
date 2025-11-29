@@ -546,8 +546,9 @@ def slice_topology(slice_id):
         flash('Access denied - You can only view your own slices', 'error')
         return redirect(url_for('dashboard'))
     
-    # OBTENER LA PLATAFORMA DEL SLICE
-    platform = getattr(slice_obj, 'platform', 'linux')
+    platform = slice_obj.platform if slice_obj.platform else 'linux'
+    
+    app.logger.info(f" Cargando topología del slice {slice_id} - Plataforma: {platform}")
     
     return render_template('slice_topology.html', 
                          slice=slice_obj, 
