@@ -1278,13 +1278,10 @@ def vnc_console(instance_id):
         flash(f'La VM debe estar en estado RUNNING. Estado actual: {instance.estado}', 'error')
         return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
     
-    #OBTENER PLATAFORMA DEL SLICE
     platform = getattr(slice_obj, 'platform', 'linux')
     
     # LÓGICA DIFERENCIADA POR PLATAFORMA
     if platform == 'openstack':
-        # Para OpenStack, usar la URL de consola almacenada en la instancia
-    
         console_url = getattr(instance, 'console_url', None) or getattr(instance, 'vnc_url', None)
         
         if not console_url:
@@ -1292,14 +1289,36 @@ def vnc_console(instance_id):
             return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
         
         app.logger.info(f"🌐 OpenStack VNC Console - VM: {instance.nombre}")
-        app.logger.info(f"   Console URL: {console_url}")
+        app.logger.info(f"   Console URL original: {console_url}")
         
-        return render_template('vnc_console.html', 
-                             instance=instance, 
-                             slice=slice_obj,
-                             novnc_url=console_url,
-                             platform='openstack',
-                             user=user)
+        try:
+            # 🟢 NUEVO: Crear túnel SSH para OpenStack
+            from utils.novnc_manager import ensure_openstack_tunnel_and_token
+            
+            # El gateway_ip se detecta automáticamente, pero puedes especificarlo
+            # Si hay problemas, ajusta aquí:
+            gateway_ip = os.getenv("GATEWAY_IP", "10.20.12.106")
+            
+            proxied_console_url = ensure_openstack_tunnel_and_token(
+                slice_id=slice_obj.idslice,
+                instance_id=instance.idinstancia,
+                console_url=console_url,
+                gateway_ip=gateway_ip
+            )
+            
+            app.logger.info(f"   Proxied URL: {proxied_console_url}")
+            
+            return render_template('vnc_console.html', 
+                                 instance=instance, 
+                                 slice=slice_obj,
+                                 novnc_url=proxied_console_url,
+                                 platform='openstack',
+                                 user=user)
+                                 
+        except Exception as e:
+            app.logger.error(f"❌ Error creando túnel OpenStack: {e}")
+            flash(f'Error al procesar la consola OpenStack: {str(e)}', 'error')
+            return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
     
     else:  # platform == 'linux'
         if not instance.vnc_idvnc:
@@ -1316,6 +1335,8 @@ def vnc_console(instance_id):
         vnc_display_port = vnc_obj.puerto  
         vnc_real_port = int(vnc_display_port) + 5900
         vnc_host = worker_obj.ip if worker_obj else 'localhost'
+        
+        from utils.novnc_manager import ensure_tunnel_and_token
         
         novnc_url = ensure_tunnel_and_token(
             slice_obj.idslice,
