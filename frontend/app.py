@@ -546,7 +546,15 @@ def slice_topology(slice_id):
         flash('Access denied - You can only view your own slices', 'error')
         return redirect(url_for('dashboard'))
     
-    return render_template('slice_topology.html', slice=slice_obj, user=user)
+    platform = slice_obj.platform if slice_obj.platform else 'linux'
+    
+    app.logger.info(f" Cargando topología del slice {slice_id} - Plataforma: {platform}")
+    
+    return render_template('slice_topology.html', 
+                         slice=slice_obj, 
+                         user=user,
+                         platform=platform)
+
 
 """@app.route('/users')
 def list_users():
@@ -1270,50 +1278,90 @@ def vnc_console(instance_id):
         flash(f'La VM debe estar en estado RUNNING. Estado actual: {instance.estado}', 'error')
         return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
     
-    if not instance.vnc_idvnc:
-        flash('Esta VM no tiene puerto VNC asignado', 'error')
-        return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
+    platform = getattr(slice_obj, 'platform', 'linux')
     
-    vnc_obj = Vnc.query.get(instance.vnc_idvnc)
-    if not vnc_obj:
-        flash('Puerto VNC no encontrado', 'error')
-        return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
+    # LÓGICA DIFERENCIADA POR PLATAFORMA
+    if platform == 'openstack':
+        console_url = getattr(instance, 'console_url', None) or getattr(instance, 'vnc_url', None)
+        
+        if not console_url:
+            flash('Esta VM no tiene URL de consola configurada', 'error')
+            return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
+        
+        app.logger.info(f"🌐 OpenStack VNC Console - VM: {instance.nombre}")
+        app.logger.info(f"   Console URL original: {console_url}")
+        
+        try:
+            # 🟢 NUEVO: Crear túnel SSH para OpenStack
+            from utils.novnc_manager import ensure_openstack_tunnel_and_token
+            
+            # El gateway_ip se detecta automáticamente, pero puedes especificarlo
+            # Si hay problemas, ajusta aquí:
+            gateway_ip = os.getenv("GATEWAY_IP", "10.20.12.106")
+            
+            app.logger.info(f"   Gateway config: IP={gateway_ip}")
+            
+            proxied_console_url = ensure_openstack_tunnel_and_token(
+                slice_id=slice_obj.idslice,
+                instance_id=instance.idinstancia,
+                console_url=console_url,
+                gateway_ip=gateway_ip
+            )
+            
+            app.logger.info(f"   Proxied URL: {proxied_console_url}")
+            
+            return render_template('vnc_console.html', 
+                                 instance=instance, 
+                                 slice=slice_obj,
+                                 novnc_url=proxied_console_url,
+                                 platform='openstack',
+                                 user=user)
+                                 
+        except Exception as e:
+            app.logger.error(f"❌ Error creando túnel OpenStack: {e}")
+            flash(f'Error al procesar la consola OpenStack: {str(e)}', 'error')
+            return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
     
-    worker_obj = Worker.query.get(instance.worker_idworker) if instance.worker_idworker else None
-    
-    #Puerto VNC real dentro del worker
-    vnc_real_port = int(vnc_obj.puerto)
+    else:  # platform == 'linux'
+        if not instance.vnc_idvnc:
+            flash('Esta VM no tiene puerto VNC asignado', 'error')
+            return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
+        
+        vnc_obj = Vnc.query.get(instance.vnc_idvnc)
+        if not vnc_obj:
+            flash('Puerto VNC no encontrado', 'error')
+            return redirect(url_for('slice_topology', slice_id=slice_obj.idslice))
+        
+        worker_obj = Worker.query.get(instance.worker_idworker) if instance.worker_idworker else None
+        
+        vnc_display_port = vnc_obj.puerto  
+        vnc_real_port = int(vnc_display_port) + 5900
+        vnc_host = worker_obj.ip if worker_obj else 'localhost'
+        
+        from utils.novnc_manager import ensure_tunnel_and_token
+        
+        novnc_url = ensure_tunnel_and_token(
+            slice_obj.idslice,
+            instance.idinstancia,
+            vnc_host,
+            vnc_real_port
+        )
+        
+        app.logger.info(f"🖥️ Linux VNC Console - VM: {instance.nombre}")
+        app.logger.info(f"   Worker IP: {vnc_host}")
+        app.logger.info(f"   Display Port (BD): {vnc_display_port}")
+        app.logger.info(f"   Real VNC Port: {vnc_real_port}")
+        app.logger.info(f"   noVNC URL: {novnc_url}")
 
-    # IP del worker (192.168.201.x) :D ola Roberto
-    vnc_host = worker_obj.ip if worker_obj else 'localhost'
-    vnc_display_port = vnc_obj.puerto  
-    vnc_real_port = int(vnc_display_port) + 5900
-    vnc_host = worker_obj.ip if worker_obj else 'localhost'
-    
-    novnc_url = ensure_tunnel_and_token(
-        slice_obj.idslice,
-        instance.idinstancia,
-        vnc_host,
-        vnc_real_port
-    )
-    
-    # Formato: http://localhost:6080/vnc.html?host=WORKER_IP&port=VNC_PORT
-    #novnc_url = f"http://localhost:6080/vnc.html?host={vnc_host}&port={vnc_real_port}&autoconnect=true&resize=scale&reconnect=true"
-    
-    app.logger.info(f"🖥️ VNC Console - VM: {instance.nombre}")
-    app.logger.info(f"   Worker IP: {vnc_host}")
-    app.logger.info(f"   Display Port (BD): {vnc_display_port}")
-    app.logger.info(f"   Real VNC Port: {vnc_real_port}")
-    app.logger.info(f"   noVNC URL: {novnc_url}")
-
-    return render_template('vnc_console.html', 
-                         instance=instance, 
-                         slice=slice_obj,
-                         vnc_display_port=vnc_obj.puerto,  # esto es solo para mostrar
-                         vnc_real_port=vnc_real_port,
-                         vnc_host=vnc_host,
-                         novnc_url=novnc_url,
-                         user=user)
+        return render_template('vnc_console.html', 
+                             instance=instance, 
+                             slice=slice_obj,
+                             vnc_display_port=vnc_obj.puerto,
+                             vnc_real_port=vnc_real_port,
+                             vnc_host=vnc_host,
+                             novnc_url=novnc_url,
+                             platform='linux',
+                             user=user)
 
 
 @app.route('/api/vnc/status/<int:instance_id>')
