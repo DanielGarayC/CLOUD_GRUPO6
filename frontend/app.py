@@ -1054,11 +1054,12 @@ def deploy_slice(slice_id):
                 'success': False,
                 'error': 'Solo administradores pueden desplegar en OpenStack'
             }), 403
-        
+        zona = slice_obj.zonadisponibilidad or 'HP'
         SLICE_MANAGER_URL = "http://slice-manager:8000"
         payload = {
             "id_slice": slice_id,
-            "platform": platform  
+            "platform": platform,
+            "zonadisponibilidad": zona
         }
         
         app.logger.info(f"🚀 Desplegando slice {slice_id} en plataforma: {platform.upper()}")
@@ -1090,14 +1091,37 @@ def deploy_slice(slice_id):
                 'platform': platform
             })
         
+        # Extraemos lo que decidió VM Placement del verify :D roberto kbro
+        placement_plan = verify_result.get('placement_plan', [])
+        modo = verify_result.get('modo', 'unknown')
+
+        if not placement_plan:
+            # Algo raro: dijo can_deploy=True pero no mandó plan
+            app.logger.error(f"[VERIFY ERROR] can_deploy=True PERO placement_plan vacío: {verify_result}")
+            return jsonify({
+                'success': False,
+                'error': 'VM Placement no devolvió un plan de despliegue válido',
+                'raw_backend': verify_result
+            })
+
+
         # 2️⃣ CAMBIAR ESTADO A DEPLOYING
         slice_obj.estado = 'DEPLOYING'
         db.session.commit()
         
+        #Payload pal deploy
+        deploy_payload = {
+            "id_slice": slice_id,
+            "platform": platform,
+            "zonadisponibilidad": zona,
+            "placement_plan": placement_plan,
+            "modo": modo
+        }
+
         # 3️⃣ DESPLEGAR
         deploy_response = requests.post(
             f"{SLICE_MANAGER_URL}/placement/deploy",
-            json=payload,
+            json=deploy_payload,
             timeout=120
         )
         

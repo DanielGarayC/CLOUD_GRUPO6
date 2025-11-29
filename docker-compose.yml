@@ -320,7 +320,9 @@ services:
         condition: service_started
     environment:
       MODO: "rabbit"
-      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_HOST: rabbitmq        # nombre del servicio
+      RABBITMQ_USER: cloud
+      RABBITMQ_PASS: cloud123
       RPC_QUEUE_VMPLACEMENT: "rpc_vm_placement"
     volumes:
       - metrics_shared:/app/metrics_storage

@@ -12,6 +12,8 @@ from vm_placement_core import (
 # CONFIG
 # =============================
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
+RABBITMQ_USER = os.getenv("RABBITMQ_USER", "admin")
+RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "admin")
 RPC_QUEUE_VMPLACEMENT = os.getenv("RPC_QUEUE_VMPLACEMENT", "rpc_vm_placement")
 
 print("🐇 Iniciando VM Placement RPC Consumer...")
@@ -22,62 +24,103 @@ print(f"Cola RPC: {RPC_QUEUE_VMPLACEMENT}")
 # HANDLER DEL RPC
 # =============================
 def on_request(ch, method, props, body):
-    print("📥 [RPC VM-PLACEMENT] Request recibido:", body)
+    print("[RPC VM-PLACEMENT] Request recibido:", body)
     
     try:
-        request_json = json.loads(body)
-    except:
-        response = {"ok": False, "error": "JSON inválido"}
+        slice_data = json.loads(body)
+    except Exception as e:
+        response = {"can_deploy": False,
+            "placement_plan": [],
+            "error": f"JSON inválido: {e}"
+            }
     else:
         ruta_csv = obtener_unico_csv()
 
         if ruta_csv is None:
             response = {
-                "ok": False,
+                "can_deploy": False,
+                "placement_plan": [],
                 "error": "No existe CSV de métricas aún"
             }
         else:
+            # Lista de VMs que vienen del Slice Manager
+            instancias_req = slice_data.get("instancias", [])
+
             ganador, plataforma, workers_aptos, workers_no_aptos = run_vm_placement(
-                request_json,
+                slice_data,
                 ruta_csv=ruta_csv,
                 imprimir=True
             )
 
             if ganador is not None:
+                if isinstance(ganador, list) and ganador:
+                    worker_ganador = ganador[0]
+                else:
+                    worker_ganador = ganador
+
+                placement_plan = [
+                    {
+                        "nombre_vm": vm["nombre"],
+                        "worker": worker_ganador
+                    }
+                    for vm in instancias_req
+                ]
+
                 response = {
-                    "ok": True,
+                    "can_deploy": True,
+                    "placement_plan": placement_plan,
                     "modo": "single-worker",
-                    "worker": ganador,
-                    "plataforma": plataforma,
-                    "workers_aptos": workers_aptos,
-                    "workers_no_aptos": workers_no_aptos
                 }
             else:
+
                 ok_plan, plan, vms_restantes, msg_plan = distribuir_vms_max_localidad(
-                    request_json,
+                    slice_data,
                     ruta_csv=ruta_csv,
                     imprimir=True
                 )
 
+                placement_plan = []
+
+                
+                if ok_plan:
+                    # plan: {worker_name: [indices_vm_asignadas]}
+                    for worker_name, indices in plan.items():
+                        for idx in indices:
+                            # Validamos índice
+                            if isinstance(idx, int) and 0 <= idx < len(instancias_req):
+                                vm_info = instancias_req[idx]
+                                placement_plan.append({
+                                    "nombre_vm": vm_info["nombre"],
+                                    "worker": worker_name
+                                })
+                # can_deploy = True solo si todas las VMs quedaron asignadas
+                can_deploy = bool(ok_plan and not vms_restantes)
+
+                vms_no_asignadas_detalle = []
+                for vm in vms_restantes:
+                    idx = vm.get("index")
+                    nombre_vm = None
+                    if isinstance(idx, int) and 0 <= idx < len(instancias_req):
+                        nombre_vm = instancias_req[idx]["nombre"]
+
+                    vms_no_asignadas_detalle.append({
+                        "index": idx,
+                        "nombre_vm": nombre_vm,
+                        "cpu": vm.get("cpu"),
+                        "ram": vm.get("ram"),
+                        "storage": vm.get("storage")
+                    })
+
                 response = {
-                    "ok": ok_plan,
+                    "can_deploy": can_deploy,
+                    "placement_plan": placement_plan if can_deploy else [],
                     "modo": "multi-worker",
-                    "worker": None,
-                    "plataforma": plataforma,
-                    "workers_aptos": workers_aptos,
-                    "workers_no_aptos": workers_no_aptos,
-                    "plan": plan,
-                    "vms_no_asignadas": [
-                        {
-                            "index": vm["index"],
-                            "cpu": vm["cpu"],
-                            "ram": vm["ram"],
-                            "storage": vm["storage"]
-                        }
-                        for vm in vms_restantes
-                    ],
-                    "mensaje": msg_plan
                 }
+
+                if not can_deploy:
+                    response["error"] = (
+                        "No se pudo asignar el slice completo con las restricciones actuales"
+                    )
 
     # RESPUESTA AL RPC
     ch.basic_publish(
@@ -93,11 +136,16 @@ def on_request(ch, method, props, body):
     print("📤 [RPC VM-PLACEMENT] Respuesta enviada.")
 
 
-# =============================
-# MAIN LOOP
-# =============================
+# ==============================
+# MAIN LOOP (CON CREDENCIALES)
+# ==============================
+credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
 connection = pika.BlockingConnection(
-    pika.ConnectionParameters(host=RABBITMQ_HOST)
+    pika.ConnectionParameters(
+        host=RABBITMQ_HOST,
+        credentials=credentials,
+        heartbeat=0
+    )
 )
 channel = connection.channel()
 

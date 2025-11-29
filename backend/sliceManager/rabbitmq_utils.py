@@ -9,7 +9,7 @@ RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
 RABBITMQ_USER = os.getenv("RABBITMQ_USER", "admin")
 RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "admin")
 RPC_QUEUE_NETWORK = os.getenv("RABBITMQ_QUEUE_NETWORK", "network_rpc")
-RPC_QUEUE_VMPLACEMENT = os.getenv("RABBITMQ_QUEUE_VMPLACEMENT", "vm_placement_rpc")
+RPC_QUEUE_VMPLACEMENT = os.getenv("RPC_QUEUE_VMPLACEMENT", "rpc_vm_placement")
 QUEUE_NETWORK = RPC_QUEUE_NETWORK
 
 

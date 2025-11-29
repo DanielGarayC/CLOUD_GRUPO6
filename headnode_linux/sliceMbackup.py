@@ -28,10 +28,7 @@ LINUX_DRIVER_URL = os.getenv("LINUX_DRIVER_URL", "http://linux-driver:9100")
 WORKER_IPS = {
     "server2": "192.168.201.2",
     "server3": "192.168.201.3",
-    "server4": "192.168.201.4",
-    "worker1": "192.168.202.2",
-    "worker2": "192.168.202.3",
-    "worker3": "192.168.202.4",
+    "server4": "192.168.201.4"
 }
 
 # ======================================
@@ -264,42 +261,33 @@ def obtener_zona_disponibilidad(id_slice: int):
 # PLANES DE DESPLIEGUE POR PLATAFORMA
 # ======================================
 
-def generar_plan_deploy_linux(id_slice: int, instancias: list,placement_plan_vm: list | None = None):
+def generar_plan_deploy_linux(id_slice: int, metrics_json: dict, instancias: list):
     """
     Plan de despliegue para plataforma LINUX (código original adaptado)
     """
-    print("[LINUX] Generando plan de despliegue...")
+    print("🐧 [LINUX] Generando plan de despliegue...")
     
-    if not placement_plan_vm:
-            return {
-                "can_deploy": False,
-                "error": "placement_plan_vm vacío. Debes ejecutar /placement/verify primero."
-            }
+    metrics = metrics_json.get("metrics", {})
+    workers = []
+
+    # Obtener recursos libres por worker
+    for host, data in metrics.items():
+        cpu_total = data.get("cpu_count", 1)
+        ram_total = data.get("ram_total_gb", 1)
+        cpu_free = cpu_total * (1 - data.get("cpu_percent", 0) / 100)
+        ram_free = ram_total * (1 - data.get("ram_percent", 0) / 100)
+        workers.append({
+            "nombre": host,
+            "ip": WORKER_IPS.get(host, "0.0.0.0"),
+            "cpu_free": round(cpu_free, 2),
+            "ram_free": round(ram_free, 2)
+        })
+
+    if not workers:
+        return {"can_deploy": False, "error": "No hay workers válidos."}
+
+    workers.sort(key=lambda w: w["nombre"])
     
-    vm_to_worker_name = {}
-
-    for entry in placement_plan_vm:
-        vm_name = entry.get("nombre_vm")
-        worker_name = entry.get("worker")
-        if vm_name and worker_name:
-            vm_to_worker_name[vm_name] = worker_name
-
-    # 🔹 2) Validar que todas las instancias tengan entrada en placement_plan
-    nombres_instancias = {inst["nombre"] for inst in instancias}
-    nombres_en_plan = set(vm_to_worker_name.keys())
-
-    faltantes = nombres_instancias - nombres_en_plan
-    if faltantes:
-        return {
-            "can_deploy": False,
-            "error": f"Las VMs {', '.join(faltantes)} no tienen asignación en placement_plan."
-        }
-
-    # 🔹 3) Mapa worker_name → IP (ya NO usamos métricas)
-    workers_by_name = {
-        name: {"ip": ip}
-        for name, ip in WORKER_IPS.items()
-    }
     # 🟢 ASIGNAR VLANs A ENLACES (solo para Linux)
     print(f"🔍 Obteniendo enlaces para slice {id_slice}...")
     enlaces = asignar_vlans_a_enlaces_linux(id_slice)
@@ -322,58 +310,53 @@ def generar_plan_deploy_linux(id_slice: int, instancias: list,placement_plan_vm:
     
     print(f"📋 Mapa de VLANs por VM: {vlans_por_vm}")
     
-    #Construcción del plan a partir del placement_plan de VM Placement
+    # Asignación Round-Robin
     plan = []
+    idx = 0
     
     for vm in instancias:
-        vm_name = vm["nombre"]
-        worker_name = vm_to_worker_name.get(vm_name)
-        worker_info = workers_by_name.get(worker_name)
-
-        if not worker_info:
-            return {
-                "can_deploy": False,
-                "error": f"El worker '{worker_name}' (desde VM Placement) no existe en WORKER_IPS."
-            }
-
-        worker_ip = worker_info["ip"]
-
+        w = workers[idx]
         ram_value = parse_ram_to_gb(vm["ram"])
         storage_value = float(str(vm["storage"]).replace("GB", "").strip())
+        
         vm_id = str(vm["idinstancia"])
         vlans_vm = list(set(vlans_por_vm.get(vm_id, [])))
-
+        
         # Salida a internet
         if vm.get("salidainternet"):
             vlan_int = solicitar_vlan_internet()
             if vlan_int and vlan_int.get("numero"):
                 vlan_internet_num = vlan_int["numero"]
-                vlans_vm = [vlan_internet_num] + [
-                    v for v in vlans_vm if v != vlan_internet_num
-                ]
-
+                vlans_vm = [vlan_internet_num] + [v for v in vlans_vm if v != vlan_internet_num]
+        
         # Solicitar VNC
         vnc_info = solicitar_vnc()
         puerto_vnc = vnc_info.get("puerto") if vnc_info else None
-
+        
         plan.append({
-            "nombre_vm": vm_name,
-            "worker": worker_ip,           # 👉 IP real para el driver
+            "nombre_vm": vm["nombre"],
+            "worker": w["ip"],
             "vlans": vlans_vm,
             "puerto_vnc": puerto_vnc,
-            "imagen": vm["imagen"],        # Ruta de imagen para Linux
+            "imagen": vm["imagen"],  # 🟢 Ruta del archivo para Linux
             "ram_gb": ram_value,
             "cpus": int(vm["cpu"]),
             "disco_gb": storage_value,
             "vm_id": vm_id
         })
-
+        
+        w["cpu_free"] -= int(vm["cpu"])
+        w["ram_free"] -= ram_value
+        idx = (idx + 1) % len(workers)
+    
+    puede = all(w["cpu_free"] >= 0 and w["ram_free"] >= 0 for w in workers)
+    
     return {
         "timestamp": datetime.utcnow().isoformat(),
-        "can_deploy": True,
+        "can_deploy": puede,
         "platform": "linux",
         "placement_plan": plan,
-        "workers_status": workers_by_name
+        "workers_status": workers
     }
 
 def generar_plan_deploy_openstack(id_slice: int, instancias: list):
@@ -450,26 +433,6 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list):
         "flavors_necesarios": list(flavors_necesarios.values())
     }
 
-# Construcción del plan de VM Placement :D
-def construir_payload_vm_placement(id_slice: int, zonadisponibilidad: str, instancias: list):
-    """
-    Construye el JSON que se envía al servicio de VM Placement.
-    Este formato debe coincidir con lo que espera tu VM Placement.
-    """
-    return {
-        "id_slice": id_slice,
-        "zonadisponibilidad": zonadisponibilidad,
-        "instancias": [
-            {
-                "nombre": inst["nombre"],
-                "cpu": int(inst["cpu"]),
-                "ram": str(inst["ram"]),
-                "storage": str(inst["storage"])
-            }
-            for inst in instancias
-        ]
-    }
-
 # ======================================
 # ENDPOINT: VERIFICAR VIABILIDAD
 # ======================================
@@ -483,67 +446,31 @@ def verificar_viabilidad_endpoint(data: dict = Body(...)):
     """
     id_slice = data.get("id_slice")
     platform = data.get("platform", "linux").lower()
-    zonadisponibilidad = data.get("zonadisponibilidad", "HP")
-
+    
     if not id_slice:
         return {"error": "Falta el parámetro 'id_slice'"}
 
     print(f"🛰️ Evaluando slice {id_slice} para plataforma {platform.upper()}...")
-    if not zonadisponibilidad:
-        zonadisponibilidad = obtener_zona_disponibilidad(id_slice) or "HP"
-    print(f"   Zona de disponibilidad: {zonadisponibilidad}")
 
     instancias = obtener_instancias_por_slice(id_slice)
     
     if not instancias:
-        return {"can_deploy": False, 
-                "platform": platform,
-                "error": "No se encontraron instancias para el slice."}
+        return {"can_deploy": False, "error": "No se encontraron instancias para el slice."}
 
-    payload = construir_payload_vm_placement(
-        id_slice=id_slice,
-        zonadisponibilidad=zonadisponibilidad,
-        instancias=instancias
-    )
-    print(f"📤 Enviando request a VM Placement por RabbitMQ: {payload}")
-
-    # 2) Llamar al servicio de VM Placement vía RPC
-    try:
-        resp_vm = rpc_call_vm_placement(payload, timeout=15)
-        print(f"📥 Respuesta de VM Placement: {resp_vm}")
-    except Exception as e:
-        print(f"Error CONEXIÓN con VM Placement: {e}")
-        return {
-            "can_deploy": False,
-            "platform": platform,
-            "error": f"Error comunicando con VM Placement: {str(e)}"
-        }
-
-    # 3) Validar respuesta
-    if not isinstance(resp_vm, dict):
-        return {
-            "can_deploy": False,
-            "platform": platform,
-            "error": "Respuesta inválida desde VM Placement (no es JSON dict)",
-            "vm_placement_raw": str(resp_vm)
-        }
-
-    if not resp_vm.get("can_deploy", False):
-        # VM Placement rechazó el slice
-        return {
-            "can_deploy": False,
-            "platform": platform,
-            "error": resp_vm.get("error", "VM Placement rechazó el slice"),
-            "vm_placement_raw": resp_vm
-        }
-
-    # 4) Si todo OK, devolver el plan
-    return {
-        "can_deploy": True,
-        "platform": platform,
-        "placement_plan": resp_vm.get("placement_plan", []),
-        "modo": resp_vm.get("modo", "unknown"),
-    }
+    if platform == "linux":
+        metrics = obtener_metricas_actuales()
+        if not metrics:
+            return {"can_deploy": False, "error": "No se pudo obtener métricas de los workers."}
+        
+        # Simulación sin asignar recursos reales
+        return generar_plan_verify_linux(id_slice, metrics, instancias)
+    
+    elif platform == "openstack":
+        # Para OpenStack, verificar imágenes y quotas
+        return generar_plan_verify_openstack(id_slice, instancias)
+    
+    else:
+        return {"can_deploy": False, "error": f"Plataforma no soportada: {platform}"}
     
 def parse_ram_to_gb(ram_str):
     """Convierte RAM en MB o GB a float en GB"""
@@ -647,24 +574,11 @@ def deploy_slice(data: dict = Body(...)):
     """
     id_slice = data.get("id_slice")
     platform = data.get("platform", "linux").lower()
-    placement_plan = data.get("placement_plan") 
-    modo = data.get("modo", "unknown") 
     
     if not id_slice:
         return {"error": "Falta el parámetro 'id_slice'"}
 
-    if not placement_plan:
-        return {
-            "success": False,
-            "error": "Falta 'placement_plan' en el body. Debes llamar a /placement/verify antes de /placement/deploy.",
-            "detalle": "VM Placement es la única fuente de asignación de workers."
-        }
-
-    print(f"Iniciando despliegue del slice {id_slice} en {platform.upper()}...")
-    print(f"Modo VM Placement: {modo}")
-    print(f"   Entradas en placement_plan: {len(placement_plan)}")
-
-    
+    print(f"🚀 Iniciando despliegue del slice {id_slice} en {platform.upper()}...")
 
     # Estado inicial
     with engine.begin() as conn:
@@ -680,7 +594,7 @@ def deploy_slice(data: dict = Body(...)):
             return {"error": "No se encontraron instancias"}
         
         if platform == "linux":
-            return deploy_slice_linux(id_slice, instancias, placement_plan)
+            return deploy_slice_linux(id_slice, instancias)
         elif platform == "openstack":
             return deploy_slice_openstack(id_slice, instancias)
         else:
@@ -735,16 +649,17 @@ def limpiar_estado_runtime_slice(id_slice: int):
     except Exception as e:
         print(f"⚠️ Error limpiando estado runtime del slice {id_slice}: {e}")
 
-def deploy_slice_linux(id_slice: int, instancias: list, placement_plan_vm: list | None = None):
+def deploy_slice_linux(id_slice: int, instancias: list):
     """Despliegue en plataforma Linux"""
-    print("[LINUX] Iniciando despliegue...")
+    print("🐧 [LINUX] Iniciando despliegue...")
     
+    metrics = obtener_metricas_actuales()
+    if not metrics:
+        return {"error": "No se pudo obtener métricas"}
 
-
-    plan = generar_plan_deploy_linux(id_slice, instancias, placement_plan_vm)
-    
+    plan = generar_plan_deploy_linux(id_slice, metrics, instancias)
     if not plan.get("can_deploy"):
-        return plan
+        return {"can_deploy": False, "error": "Recursos insuficientes"}
 
     resultados = []
     fallos = 0
