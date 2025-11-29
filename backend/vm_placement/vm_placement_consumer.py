@@ -78,56 +78,56 @@ def on_request(ch, method, props, body):
                             "placement_plan": placement_plan,
                             "modo": "single-worker",
                         }
-                    else:
-                        # modo multi-worker
-                        ok_plan, plan, vms_restantes, msg_plan = distribuir_vms_max_localidad(
-                            slice_data,
-                            ruta_csv=ruta_csv,
-                            imprimir=True
+                    
+                    # modo multi-worker
+                    ok_plan, plan, vms_restantes, msg_plan = distribuir_vms_max_localidad(
+                        slice_data,
+                        ruta_csv=ruta_csv,
+                        imprimir=True
+                    )
+
+                    placement_plan = []
+
+                    if ok_plan:
+                        # plan: {worker_name: [indices_vm_asignadas]}
+                        for worker_name, indices in plan.items():
+                            for idx in indices:
+                                if isinstance(idx, int) and 0 <= idx < len(instancias_req):
+                                    vm_info = instancias_req[idx]
+                                    placement_plan.append({
+                                        "nombre_vm": vm_info["nombre"],
+                                        "worker": worker_name
+                                    })
+
+                    # can_deploy = True solo si TODAS las VMs quedaron asignadas
+                    can_deploy = bool(ok_plan and not vms_restantes)
+
+                    # (opcional) detalle de VMs no asignadas
+                    vms_no_asignadas_detalle = []
+                    for vm in vms_restantes:
+                        idx = vm.get("index")
+                        nombre_vm = None
+                        if isinstance(idx, int) and 0 <= idx < len(instancias_req):
+                            nombre_vm = instancias_req[idx]["nombre"]
+
+                        vms_no_asignadas_detalle.append({
+                            "index": idx,
+                            "nombre_vm": nombre_vm,
+                            "cpu": vm.get("cpu"),
+                            "ram": vm.get("ram"),
+                            "storage": vm.get("storage")
+                        })
+
+                    response = {
+                        "can_deploy": can_deploy,
+                        "placement_plan": placement_plan if can_deploy else [],
+                        "modo": "multi-worker",
+                    }
+
+                    if not can_deploy:
+                        response["error"] = (
+                            "No se pudo asignar el slice completo con las restricciones actuales"
                         )
-
-                        placement_plan = []
-
-                        if ok_plan:
-                            # plan: {worker_name: [indices_vm_asignadas]}
-                            for worker_name, indices in plan.items():
-                                for idx in indices:
-                                    if isinstance(idx, int) and 0 <= idx < len(instancias_req):
-                                        vm_info = instancias_req[idx]
-                                        placement_plan.append({
-                                            "nombre_vm": vm_info["nombre"],
-                                            "worker": worker_name
-                                        })
-
-                        # can_deploy = True solo si TODAS las VMs quedaron asignadas
-                        can_deploy = bool(ok_plan and not vms_restantes)
-
-                        # (opcional) detalle de VMs no asignadas
-                        vms_no_asignadas_detalle = []
-                        for vm in vms_restantes:
-                            idx = vm.get("index")
-                            nombre_vm = None
-                            if isinstance(idx, int) and 0 <= idx < len(instancias_req):
-                                nombre_vm = instancias_req[idx]["nombre"]
-
-                            vms_no_asignadas_detalle.append({
-                                "index": idx,
-                                "nombre_vm": nombre_vm,
-                                "cpu": vm.get("cpu"),
-                                "ram": vm.get("ram"),
-                                "storage": vm.get("storage")
-                            })
-
-                        response = {
-                            "can_deploy": can_deploy,
-                            "placement_plan": placement_plan if can_deploy else [],
-                            "modo": "multi-worker",
-                        }
-
-                        if not can_deploy:
-                            response["error"] = (
-                                "No se pudo asignar el slice completo con las restricciones actuales"
-                            )
 
             except Exception as e:
                 # ⚠️ Cualquier error interno de VM Placement cae aquí
@@ -180,5 +180,5 @@ channel.basic_consume(
     on_message_callback=on_request
 )
 
-print("🔥 LISTO. Esperando requests RPC…")
+print("Esperando requests RPC…")
 channel.start_consuming()
