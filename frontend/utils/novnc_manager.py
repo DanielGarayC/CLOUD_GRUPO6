@@ -81,18 +81,7 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
 
 def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url, gateway_ip=None):
     """
-    Crea túnel SSH MULTISALTO para consolas OpenStack
-    
-    Flujo: app (localhost:16XXX) → SSH → gateway → SSH → controller:6080
-    
-    Args:
-        slice_id: ID del slice
-        instance_id: ID de la instancia
-        console_url: URL de consola de OpenStack (ej: http://controller:6080/vnc_auto.html?path=...)
-        gateway_ip: IP del gateway (opcional, se obtiene de variable de entorno si no se proporciona)
-    
-    Returns:
-        URL accesible desde el navegador local
+    Crea túnel SSH MULTISALTO para consolas OpenStack y registra token en noVNC
     """
     token = f"slice{slice_id}-vm{instance_id}-os"
     local_port = OPENSTACK_TUNNEL_BASE + int(instance_id)
@@ -103,17 +92,17 @@ def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url, gatewa
     try:
         # Parsear la URL de OpenStack
         parsed = urlparse(console_url)
-        controller_hostname = parsed.netloc.split(":")[0]  # "controller"
+        controller_hostname = parsed.netloc.split(":")[0]
         controller_port = parsed.port or 6080
         
         logger.info(f"   Controller: {controller_hostname}:{controller_port}")
         logger.info(f"   Local port: {local_port}")
         
-        # 🟢 OBTENER CONFIGURACIÓN DE LA PUERTA DE ENLACE
+        # Obtener configuración del gateway
         if gateway_ip is None:
             gateway_ip = os.getenv("GATEWAY_IP", "10.20.12.106")
         gateway_user = os.getenv("GATEWAY_USER", "ubuntu")
-        gateway_ssh_key = os.getenv("GATEWAY_SSH_KEY", "/root/.ssh/id_rsa_novnc")  # 🟢 Usar id_rsa_novnc
+        gateway_ssh_key = os.getenv("GATEWAY_SSH_KEY", "/root/.ssh/id_rsa_novnc")
         
         logger.info(f"   Gateway: {gateway_user}@{gateway_ip}")
         
@@ -121,43 +110,60 @@ def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url, gatewa
         result = subprocess.run(["ss", "-tln"], capture_output=True, text=True)
         if f":{local_port} " in result.stdout:
             logger.info(f"🔁 Túnel ya activo en localhost:{local_port}")
-            # Reconstruir URL de todas formas
-            path_and_query = parsed.path
-            if parsed.query:
-                path_and_query += "?" + parsed.query
+        else:
+            # Crear túnel SSH
+            logger.info(f"   🔗 Creando túnel: localhost:{local_port} → {gateway_ip} → {controller_hostname}:{controller_port}")
             
-            new_console_url = f"http://127.0.0.1:{local_port}{path_and_query}"
-            logger.info(f"✅ URL de consola (reutilizada): {new_console_url}")
-            return new_console_url
+            subprocess.run([
+                "ssh",
+                "-i", gateway_ssh_key,
+                "-o", "StrictHostKeyChecking=no",
+                "-o", "ExitOnForwardFailure=yes",
+                "-N", "-f",
+                "-L", f"0.0.0.0:{local_port}:{controller_hostname}:{controller_port}",
+                f"{gateway_user}@{gateway_ip}"
+            ], check=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            
+            logger.info(f"✅ Túnel SSH multisalto creado: localhost:{local_port} → {gateway_ip} → {controller_hostname}:{controller_port}")
         
-        # 🟢 CREAR TÚNEL MULTISALTO
-        # opción 1: Túnel simple si controller es accesible desde gateway
-        # app:16007 → SSH(gateway) → controller:6080
+        # 🟢 REGISTRAR TOKEN EN NOVNC (igual que Linux)
+        try:
+            lines = []
+            if os.path.exists(TOKENS_FILE):
+                with open(TOKENS_FILE, "r") as f:
+                    for line in f:
+                        if not line.startswith(token + ":"):
+                            lines.append(line.strip())
+
+            lines = [line for line in lines if line.strip()]
+            lines.append(f"{token}: web_app:{local_port}")
+
+            os.makedirs(os.path.dirname(TOKENS_FILE), exist_ok=True)
+            with open(TOKENS_FILE, "w") as f:
+                f.write("\n".join(lines) + "\n")
+
+            logger.info(f"✅ Token registrado: {token} → 127.0.0.1:{local_port}")
+        except Exception as e:
+            logger.error(f"❌ Error escribiendo token: {e}")
+            raise
         
-        logger.info(f"   🔗 Creando túnel: localhost:{local_port} → {gateway_ip} → {controller_hostname}:{controller_port}")
-        
-        subprocess.run([
-            "ssh",
-            "-i", gateway_ssh_key,
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "ExitOnForwardFailure=yes",
-            "-N", "-f",
-            "-L", f"0.0.0.0:{local_port}:{controller_hostname}:{controller_port}",
-            f"{gateway_user}@{gateway_ip}"
-        ], check=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        
-        logger.info(f"✅ Túnel SSH multisalto creado: localhost:{local_port} → {gateway_ip} → {controller_hostname}:{controller_port}")
-        
-        # 🟢 RECONSTRUIR LA URL APUNTANDO AL TÚNEL LOCAL
+        # 🟢 EXTRAER PATH Y QUERY DEL CONSOLE_URL ORIGINAL
         path_and_query = parsed.path
         if parsed.query:
             path_and_query += "?" + parsed.query
         
-        new_console_url = f"http://127.0.0.1:{local_port}{path_and_query}"
+        # 🟢 GENERAR URL NOVNC CON TOKEN (igual que Linux)
+        public_ip = get_public_host()
+        novnc_url = (
+            f"http://{public_ip}:6080/vnc.html"
+            f"?path=websockify?token={token}"
+            f"&autoconnect=true&resize=scale&reconnect=true"
+        )
         
-        logger.info(f"✅ Nueva URL de consola: {new_console_url}")
+        logger.info(f"🌐 URL generada: {novnc_url}")
+        logger.info(f"   (Túnel interno: localhost:{local_port} → {controller_hostname}:{controller_port}{path_and_query})")
         
-        return new_console_url
+        return novnc_url
         
     except subprocess.CalledProcessError as e:
         logger.error(f"❌ Error creando túnel OpenStack: {e}")
