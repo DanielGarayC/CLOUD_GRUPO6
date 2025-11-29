@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 TOKENS_FILE = "/opt/novnc/tokens"
 BASE_LOCAL_PORT = 15000
-OPENSTACK_TUNNEL_BASE = 16000  # Rango separado para túneles OpenStack
+OPENSTACK_TUNNEL_BASE = 16000
 SSH_KEY_PATH = "/root/.ssh/id_rsa_novnc"
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -27,7 +27,6 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
     logger.info(f"   Worker IP: {worker_ip} | VNC port: {vnc_port} | Local port: {local_port}")
 
     try:
-        # Chequear si ya hay un túnel abierto
         result = subprocess.run(["ss", "-tln"], capture_output=True, text=True)
         if f":{local_port} " in result.stdout:
             logger.info(f"🔁 Túnel ya activo en localhost:{local_port}, no se recrea")
@@ -49,7 +48,6 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
         logger.error("❌ Comando 'ssh' no encontrado")
         raise
 
-    # Actualizar archivo de tokens
     try:
         lines = []
         if os.path.exists(TOKENS_FILE):
@@ -70,7 +68,6 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
         logger.error(f"❌ Error escribiendo token: {e}")
         raise
 
-    # Generar URL para el navegador
     public_ip = get_public_host()
     novnc_url = (
         f"http://{public_ip}:6080/vnc.html"
@@ -82,22 +79,20 @@ def ensure_tunnel_and_token(slice_id, instance_id, worker_ip, vnc_port):
     return novnc_url
 
 
-def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url, gateway_ip=None):
+def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url):
     """
-    Crea túnel SSH para consolas OpenStack
+    Crea túnel SSH MULTISALTO para consolas OpenStack
+    
+    Flujo: app (localhost:16XXX) → SSH → gateway → SSH → controller:6080
     
     Args:
         slice_id: ID del slice
         instance_id: ID de la instancia
         console_url: URL de consola de OpenStack (ej: http://controller:6080/vnc_auto.html?path=...)
-        gateway_ip: IP del gateway (donde está el portforwarding). Default: se obtiene del request
     
     Returns:
         URL accesible desde el navegador local
     """
-    if gateway_ip is None:
-        gateway_ip = get_public_host()
-    
     token = f"slice{slice_id}-vm{instance_id}-os"
     local_port = OPENSTACK_TUNNEL_BASE + int(instance_id)
     
@@ -113,33 +108,45 @@ def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url, gatewa
         logger.info(f"   Controller: {controller_hostname}:{controller_port}")
         logger.info(f"   Local port: {local_port}")
         
-        # 1️⃣ Crear túnel SSH desde app hacia OpenStack controller
-        # La conexión será: app (localhost:local_port) → SSH → worker con acceso a controller
-        # IMPORTANTE: necesitas un worker que tenga acceso SSH al controller de OpenStack
+        # 🟢 OBTENER CONFIGURACIÓN DE LA PUERTA DE ENLACE
+        gateway_ip = os.getenv("GATEWAY_IP", "10.20.12.106")
+        gateway_user = os.getenv("GATEWAY_USER", "ubuntu")
+        gateway_ssh_key = os.getenv("GATEWAY_SSH_KEY", "/root/.ssh/id_rsa_novnc")  # 🟢 Usar id_rsa_novnc
         
-        # Opción A: Si el gateway tiene acceso directo a OpenStack
-        tunnel_target = gateway_ip  # o el IP del worker con acceso a controller
+        logger.info(f"   Gateway: {gateway_user}@{gateway_ip}")
         
+        # Verificar si el túnel ya existe
         result = subprocess.run(["ss", "-tln"], capture_output=True, text=True)
         if f":{local_port} " in result.stdout:
             logger.info(f"🔁 Túnel ya activo en localhost:{local_port}")
-        else:
-            # Crear túnel: localhost:local_port → controller:controller_port (a través de SSH)
-            subprocess.run([
-                "ssh",
-                "-i", SSH_KEY_PATH,
-                "-o", "StrictHostKeyChecking=no",
-                "-o", "ExitOnForwardFailure=yes",
-                "-N", "-f",
-                "-L", f"0.0.0.0:{local_port}:{controller_hostname}:{controller_port}",
-                f"ubuntu@{tunnel_target}"
-            ], check=True)
-            logger.info(f"✅ Túnel SSH creado: localhost:{local_port} → {controller_hostname}:{controller_port}")
+            # Reconstruir URL de todas formas
+            path_and_query = parsed.path
+            if parsed.query:
+                path_and_query += "?" + parsed.query
+            
+            new_console_url = f"http://127.0.0.1:{local_port}{path_and_query}"
+            logger.info(f"✅ URL de consola (reutilizada): {new_console_url}")
+            return new_console_url
         
-        # 2️⃣ Reconstruir la URL apuntando al túnel local
-        # URL original: http://controller:6080/vnc_auto.html?path=%3Ftoken%3Db0ed3813...
-        # URL nueva: http://127.0.0.1:local_port/vnc_auto.html?path=%3Ftoken%3Db0ed3813...
+        # 🟢 CREAR TÚNEL MULTISALTO
+        # opción 1: Túnel simple si controller es accesible desde gateway
+        # app:16007 → SSH(gateway) → controller:6080
         
+        logger.info(f"   🔗 Creando túnel: localhost:{local_port} → {gateway_ip} → {controller_hostname}:{controller_port}")
+        
+        subprocess.run([
+            "ssh",
+            "-i", gateway_ssh_key,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "ExitOnForwardFailure=yes",
+            "-N", "-f",
+            "-L", f"0.0.0.0:{local_port}:{controller_hostname}:{controller_port}",
+            f"{gateway_user}@{gateway_ip}"
+        ], check=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        
+        logger.info(f"✅ Túnel SSH multisalto creado: localhost:{local_port} → {gateway_ip} → {controller_hostname}:{controller_port}")
+        
+        # 🟢 RECONSTRUIR LA URL APUNTANDO AL TÚNEL LOCAL
         path_and_query = parsed.path
         if parsed.query:
             path_and_query += "?" + parsed.query
@@ -152,6 +159,8 @@ def ensure_openstack_tunnel_and_token(slice_id, instance_id, console_url, gatewa
         
     except subprocess.CalledProcessError as e:
         logger.error(f"❌ Error creando túnel OpenStack: {e}")
+        logger.error(f"   stderr: {e.stderr if hasattr(e, 'stderr') else 'N/A'}")
+        logger.error(f"   stdout: {e.stdout if hasattr(e, 'stdout') else 'N/A'}")
         raise
     except Exception as e:
         logger.error(f"❌ Error procesando consola OpenStack: {e}")

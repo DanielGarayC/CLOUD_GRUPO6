@@ -1299,6 +1299,8 @@ def vnc_console(instance_id):
             # Si hay problemas, ajusta aquí:
             gateway_ip = os.getenv("GATEWAY_IP", "10.20.12.106")
             
+            app.logger.info(f"   Gateway config: IP={gateway_ip}")
+            
             proxied_console_url = ensure_openstack_tunnel_and_token(
                 slice_id=slice_obj.idslice,
                 instance_id=instance.idinstancia,
