@@ -1301,13 +1301,16 @@ def vnc_console(instance_id):
             
             app.logger.info(f"   Gateway config: IP={gateway_ip}")
             
-            proxied_console_url = ensure_openstack_tunnel_and_token(
-                slice_id=slice_obj.idslice,
-                instance_id=instance.idinstancia,
-                console_url=console_url,
-                gateway_ip=gateway_ip
-            )
+            #proxied_console_url = ensure_openstack_tunnel_and_token(
+            #    slice_id=slice_obj.idslice,
+            #    instance_id=instance.idinstancia,
+            #    console_url=console_url,
+            #    gateway_ip=gateway_ip
+            #)
             
+            #app.logger.info(f"   Proxied URL: {proxied_console_url}")
+            proxied_console_url = console_url.replace("http://controller:", "http://localhost:")
+    
             app.logger.info(f"   Proxied URL: {proxied_console_url}")
             
             return render_template('vnc_console.html', 
