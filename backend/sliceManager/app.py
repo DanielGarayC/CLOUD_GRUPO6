@@ -996,48 +996,112 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                 "platform": "openstack",
                 "slice_id": id_slice,
                 "nombre_vm": vm["nombre_vm"],
-                #"worker": vm["worker"],
+                "vm_id": vm["vm_id"],  # 🔹 AGREGAR vm_id
                 "imagen_id": vm["imagen_id"],
                 "flavor_spec": vm["flavor_spec"],
                 "redes": vm["redes"],
                 "salidainternet": vm["salidainternet"]
-            }): vm["nombre_vm"]
+            }): vm
             for vm in plan["placement_plan"]
         }
 
         for future in as_completed(future_map):
-            vm_name = future_map[future]
+            vm = future_map[future]
+            vm_name = vm["nombre_vm"]
+            
             try:
                 result = future.result()
+                
                 if result.get("success"):
+                    print(f"✅ VM {vm_name} desplegada en OpenStack")
+                    
+                    # 🟢 ACTUALIZAR BD CON DATOS DE OPENSTACK
+                    with engine.begin() as conn:
+                        conn.execute(text("""
+                            UPDATE instancia
+                            SET estado = 'RUNNING',
+                                instance_id = :instance_id,
+                                platform = 'openstack',
+                                console_url = :console_url
+                            WHERE nombre = :vm_name AND slice_idslice = :sid
+                        """), {
+                            "instance_id": result.get("instance_id"),
+                            "console_url": result.get("console_url"),
+                            "vm_name": vm_name,
+                            "sid": id_slice
+                        })
+                    
                     vms_exitosas.append(vm_name)
-                    resultados.append({"vm": vm_name, "success": True, **result})
+                    resultados.append({
+                        "vm": vm_name,
+                        "success": True,
+                        "instance_id": result.get("instance_id"),
+                        "console_url": result.get("console_url"),
+                        "networks": result.get("networks", [])
+                    })
                 else:
                     fallos += 1
-                    resultados.append({"vm": vm_name, "success": False, "error": result.get("message")})
+                    print(f"❌ VM {vm_name} falló: {result.get('message')}")
+                    
+                    # 🟢 MARCAR INSTANCIA COMO FAILED
+                    with engine.begin() as conn:
+                        conn.execute(text("""
+                            UPDATE instancia
+                            SET estado = 'FAILED'
+                            WHERE nombre = :vm_name AND slice_idslice = :sid
+                        """), {"vm_name": vm_name, "sid": id_slice})
+                    
+                    resultados.append({
+                        "vm": vm_name,
+                        "success": False,
+                        "error": result.get("message")
+                    })
+                    
             except Exception as e:
                 fallos += 1
-                resultados.append({"vm": vm_name, "success": False, "error": str(e)})
+                print(f"❌ Excepción desplegando {vm_name}: {e}")
+                
+                # 🟢 MARCAR INSTANCIA COMO FAILED
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        UPDATE instancia
+                        SET estado = 'FAILED'
+                        WHERE nombre = :vm_name AND slice_idslice = :sid
+                    """), {"vm_name": vm_name, "sid": id_slice})
+                
+                resultados.append({
+                    "vm": vm_name,
+                    "success": False,
+                    "error": str(e)
+                })
 
     # 3) Actualizar estado del slice en BD
     estado_final = "RUNNING" if fallos == 0 else ("PARTIAL" if vms_exitosas else "FAILED")
 
     with engine.begin() as conn:
         conn.execute(text("""
-            UPDATE slice SET estado=:e WHERE idslice=:sid
+            UPDATE slice 
+            SET estado = :e, platform = 'openstack'
+            WHERE idslice = :sid
         """), {"e": estado_final, "sid": id_slice})
 
     return {
         "success": fallos == 0,
+        "timestamp": datetime.utcnow().isoformat(),
         "slice_id": id_slice,
         "platform": "openstack",
         "estado_final": estado_final,
         "resumen": {
             "total_vms": len(plan["placement_plan"]),
             "exitosas": len(vms_exitosas),
-            "fallidas": fallos
+            "fallidas": fallos,
+            "porcentaje_exito": round((len(vms_exitosas) / len(plan["placement_plan"])) * 100, 2)
         },
-        "detalle_completo": resultados
+        "vms_exitosas": vms_exitosas,
+        "topologia_redes": plan["topologia_redes"],
+        "flavors_creados": plan.get("flavors_necesarios", []),
+        "detalle_completo": resultados,
+        "message": f"Despliegue {'completo' if fallos == 0 else 'parcial' if len(vms_exitosas) > 0 else 'fallido'} del slice {id_slice} en OpenStack"
     }
 
 
