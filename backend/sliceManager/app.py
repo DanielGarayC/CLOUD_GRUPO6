@@ -406,23 +406,49 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list, placement_pla
 
     # Construir plan final
     plan = []
+    flavors_necesarios = {}
     for vm in instancias:
         vm_name = vm["nombre"]
         worker_host = vm_to_worker[vm_name]  # Ej: "server2"
         worker_ip = WORKER_IPS.get(worker_host, "0.0.0.0")  # IP física real donde OpenStack la lanzará
+
+        vm_id = str(vm["idinstancia"])
+        ram_gb = parse_ram_to_gb(vm["ram"])
+        storage_gb = float(str(vm["storage"]).replace("GB", "").strip())
+        cpus = int(vm["cpu"])
+
+        # 🟢 VERIFICAR QUE TENGA ID DE OPENSTACK
+        imagen_id_openstack = vm.get("imagen_id_openstack")
+        if not imagen_id_openstack:
+            print(f"⚠️ VM {vm['nombre']} no tiene imagen OpenStack asignada, usando imagen por defecto")
+            # Aquí podrías tener una imagen por defecto o marcar como error
+            imagen_id_openstack = "default-image-id"
+
+        # 🟢 IDENTIFICAR FLAVOR (o crearlo dinámicamente)
+        flavor_key = f"{cpus}cpu_{int(ram_gb)}ram_{int(storage_gb)}disk"
+        
+        if flavor_key not in flavors_necesarios:
+            # Este flavor será creado/buscado por el driver
+            flavors_necesarios[flavor_key] = {
+                "cpus": cpus,
+                "ram_gb": ram_gb,
+                "disk_gb": storage_gb,
+                "nombre": f"custom_{flavor_key}"
+            }
 
         plan.append({
             "nombre_vm": vm_name,
             "worker": worker_ip,  # 👈 Aquí se define el equivalente físico
             "vm_id": vm["idinstancia"],
             "imagen_id": vm.get("imagen_id_openstack", "default-image-id"),
-            "flavor_spec": {
-                "nombre": vm.get("flavor_name", f"custom_{worker_host}")
-            },
+            "flavor_spec": flavors_necesarios[flavor_key],
             "redes": [
                 r for r in topologia["redes"]
                 if vm_name in r["vms"]
             ],
+            "ram_gb": ram_gb,
+            "cpus": cpus,
+            "disco_gb": storage_gb,
             "salidainternet": vm.get("salidainternet", False)
         })
 
