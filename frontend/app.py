@@ -479,7 +479,7 @@ def create_slice():
                         db.session.add(enlace)
             
             db.session.commit()
-            flash('Slice \"{slice_name}\" creado exitosamente en zona \"{zonadisponibilidad_bd}\" con plataforma {platform_bd} y {len(topology_dict.get(\"edges\", []))} enlaces! success')
+            flash(f'Slice "{slice_name}" creado exitosamente con {len(topology_dict.get("edges", []))} enlaces!', 'success')
             return redirect(url_for('dashboard'))
             
         except Exception as e:
@@ -1059,31 +1059,37 @@ def deploy_slice(slice_id):
         return jsonify({
             'error': f'El slice debe estar en estado DRAW para desplegarse. Estado actual: {slice_obj.estado}'
         }), 400
-    
+
+    # 🔹 Tomamos plataforma y zona DESDE LA BD
+    platform = (slice_obj.platform or 'linux').lower()
+    zona = slice_obj.zonadisponibilidad or 'HP'
+    SLICE_MANAGER_URL = "http://slice-manager:8000"
+
     try:
-        data = request.get_json() or {}
-        platform = data.get('platform', 'linux')  
+        # Si en el futuro mandas más datos en el body, los puedes leer igual:
+        data = request.get_json(silent=True) or {}
+
         valid_platforms = ['linux', 'openstack']
         if platform not in valid_platforms:
             return jsonify({
                 'success': False,
-                'error': f'Plataforma inválida: {platform}. Opciones válidas: {", ".join(valid_platforms)}'
+                'error': f'Plataforma inválida en el slice: {platform}. Opciones válidas: {", ".join(valid_platforms)}'
             }), 400
         
+        # 🔐 Restricción: solo admin puede desplegar en OpenStack
         if platform == 'openstack' and not is_admin_user(user):
             return jsonify({
                 'success': False,
                 'error': 'Solo administradores pueden desplegar en OpenStack'
             }), 403
-        zona = slice_obj.zonadisponibilidad or 'HP'
-        SLICE_MANAGER_URL = "http://slice-manager:8000"
+
         payload = {
             "id_slice": slice_id,
             "platform": platform,
             "zonadisponibilidad": zona
         }
         
-        app.logger.info(f"🚀 Desplegando slice {slice_id} en plataforma: {platform.upper()}")
+        app.logger.info(f"🚀 Desplegando slice {slice_id} en plataforma: {platform.upper()} (zona {zona})")
         
         # 1️⃣ VERIFICAR VIABILIDAD
         verify_response = requests.post(
@@ -1102,7 +1108,6 @@ def deploy_slice(slice_id):
         verify_result = verify_response.json()
         
         if not verify_result.get('can_deploy', False):
-            print("🔍 DEBUG verify_result:", verify_result)
             app.logger.error(f"[VERIFY ERROR] {verify_result}")
             return jsonify({
                 'success': False,
@@ -1112,12 +1117,11 @@ def deploy_slice(slice_id):
                 'platform': platform
             })
         
-        # Extraemos lo que decidió VM Placement del verify :D roberto kbro
+        # Extraemos lo que decidió VM Placement del verify
         placement_plan = verify_result.get('placement_plan', [])
         modo = verify_result.get('modo', 'unknown')
 
         if not placement_plan:
-            # Algo raro: dijo can_deploy=True pero no mandó plan
             app.logger.error(f"[VERIFY ERROR] can_deploy=True PERO placement_plan vacío: {verify_result}")
             return jsonify({
                 'success': False,
@@ -1125,12 +1129,11 @@ def deploy_slice(slice_id):
                 'raw_backend': verify_result
             })
 
-
         # 2️⃣ CAMBIAR ESTADO A DEPLOYING
         slice_obj.estado = 'DEPLOYING'
         db.session.commit()
         
-        #Payload pal deploy
+        # Payload para /deploy
         deploy_payload = {
             "id_slice": slice_id,
             "platform": platform,
@@ -1169,7 +1172,7 @@ def deploy_slice(slice_id):
         if success:
             return jsonify({
                 'success': True,
-                'message': f'Slice "{slice_obj.nombre}" desplegado exitosamente en {platform.upper()}',
+                'message': f'Slice \"{slice_obj.nombre}\" desplegado exitosamente en {platform.upper()}',
                 'new_status': final_state,
                 'platform': platform,
                 'deployment_summary': deploy_result.get('resumen', {}),
@@ -1185,6 +1188,7 @@ def deploy_slice(slice_id):
             })
             
     except requests.exceptions.ConnectionError as e:
+        # Volver a estado DRAW si ya lo habías pasado a DEPLOYING
         try:
             slice_obj.estado = 'DRAW'
             db.session.commit()
@@ -1220,6 +1224,7 @@ def deploy_slice(slice_id):
             'details': str(e),
             'platform': platform
         }), 500
+
 
 @app.route('/debug_slice_manager')
 def debug_slice_manager():
