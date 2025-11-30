@@ -970,7 +970,7 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                 "platform": "openstack",
                 "slice_id": id_slice,
                 "nombre_vm": vm["nombre_vm"],
-                "worker": vm["worker"],
+                #"worker": vm["worker"],
                 "imagen_id": vm["imagen_id"],
                 "flavor_spec": vm["flavor_spec"],
                 "redes": vm["redes"],
