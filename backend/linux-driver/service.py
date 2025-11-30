@@ -307,6 +307,7 @@ async def create_vm_openstack(data):
     flavor_spec = data.get("flavor_spec")  
     redes = data.get("redes", [])  
     salida_internet = data.get("salidainternet", False)
+    target_host = data.get("target_host")
     
     # Validaciones
     if not all([nombre_vm, slice_id, imagen_id, flavor_spec]):
@@ -323,7 +324,8 @@ async def create_vm_openstack(data):
         "imagen_id": imagen_id,
         "flavor_spec": flavor_spec,
         "redes": redes,
-        "salidainternet": salida_internet
+        "salidainternet": salida_internet,
+        "target_host": target_host
     }
     
     print(f"[OPENSTACK] Desplegando VM {nombre_vm}...")

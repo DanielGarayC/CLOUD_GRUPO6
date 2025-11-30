@@ -501,6 +501,7 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list, placement_pla
         plan.append({
             "nombre_vm": vm_name,
             "worker": worker_ip,  # 👈 Aquí se define el equivalente físico
+            "worker_hostname": worker_host,
             "vm_id": vm["idinstancia"],
             "imagen_id": vm.get("imagen_id_openstack", "default-image-id"),
             "flavor_spec": flavors_necesarios[flavor_key],
@@ -1073,7 +1074,8 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                 "imagen_id": vm["imagen_id"],
                 "flavor_spec": vm["flavor_spec"],
                 "redes": vm["redes"],
-                "salidainternet": vm["salidainternet"]
+                "salidainternet": vm["salidainternet"],
+                "target_host": vm.get("worker_hostname")
             }): vm
             for vm in plan["placement_plan"]
         }
