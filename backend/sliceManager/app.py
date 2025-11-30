@@ -175,17 +175,6 @@ def asignar_vlans_a_enlaces_linux(id_slice: int):
 def generar_topologia_redes_openstack(id_slice: int, instancias: list):
     """
     Genera la estructura de redes necesaria para OpenStack basada en los enlaces.
-    
-    En OpenStack:
-    - Cada enlace entre VMs representa una RED COMPARTIDA
-    - Se crea 1 red por cada enlace único
-    - Cada VM se conecta a las redes de sus enlaces
-    
-    Returns:
-        dict: {
-            "redes": [{"enlace_id": ..., "vms": [...], "cidr": ...}],
-            "vm_networks": {vm_id: [network_ids]}
-        }
     """
     enlaces = obtener_enlaces_por_slice(id_slice)
     
@@ -195,43 +184,61 @@ def generar_topologia_redes_openstack(id_slice: int, instancias: list):
         return {
             "redes": [{
                 "enlace_id": "default",
-                "vms": [inst["idinstancia"] for inst in instancias],
+                "vms": [inst["nombre"] for inst in instancias],  # ✅ USAR NOMBRES
                 "cidr": "10.0.1.0/24",
                 "nombre": f"net_slice_{id_slice}_default"
             }],
             "vm_networks": {
-                str(inst["idinstancia"]): ["default"] 
+                inst["nombre"]: ["default"]  # ✅ USAR NOMBRES
                 for inst in instancias
             }
         }
     
+    # 🔍 CREAR MAPA DE ID → NOMBRE DE VMs
+    id_to_nombre = {
+        inst["idinstancia"]: inst["nombre"]
+        for inst in instancias
+    }
+    
+    print(f"🔍 Mapa ID → Nombre: {id_to_nombre}")
+    
     # 🟢 CREAR MAPA DE REDES BASADO EN ENLACES
     redes = []
-    vm_networks = {}  # {vm_id: [red_ids]}
+    vm_networks = {}  # {vm_nombre: [red_ids]}
     
     for idx, enlace in enumerate(enlaces):
-        vm1 = str(enlace["vm1"])
-        vm2 = str(enlace["vm2"])
+        vm1_id = enlace["vm1"]
+        vm2_id = enlace["vm2"]
         enlace_id = str(enlace["idenlace"])
         
-        # Crear red para este enlace
+        # 🔥 CONVERTIR IDs A NOMBRES
+        vm1_nombre = id_to_nombre.get(vm1_id)
+        vm2_nombre = id_to_nombre.get(vm2_id)
+        
+        if not vm1_nombre or not vm2_nombre:
+            print(f"⚠️ Enlace {enlace_id}: No se encontraron nombres para VMs {vm1_id}/{vm2_id}")
+            continue
+        
+        print(f"🔗 Enlace {enlace_id}: {vm1_nombre} ({vm1_id}) ↔ {vm2_nombre} ({vm2_id})")
+        
+        # Crear red para este enlace (CON NOMBRES)
         red = {
             "enlace_id": enlace_id,
-            "vms": [vm1, vm2],
-            "cidr": f"10.0.{100 + idx}.0/24",  # CIDR único por enlace
+            "vms": [vm1_nombre, vm2_nombre],  # ✅ USAR NOMBRES, NO IDs
+            "cidr": f"10.0.{100 + idx}.0/24",
             "nombre": f"net_slice_{id_slice}_link_{enlace_id}",
-            "vlan_ref": enlace.get("numero")  # Referencia a VLAN original (metadata)
+            "vlan_ref": enlace.get("numero")
         }
         redes.append(red)
         
-        # Asignar red a cada VM del enlace
-        if vm1 not in vm_networks:
-            vm_networks[vm1] = []
-        if vm2 not in vm_networks:
-            vm_networks[vm2] = []
+        # Asignar red a cada VM del enlace (CON NOMBRES)
+        if vm1_nombre not in vm_networks:
+            vm_networks[vm1_nombre] = []
+        if vm2_nombre not in vm_networks:
+            vm_networks[vm2_nombre] = []
         
-        vm_networks[vm1].append(enlace_id)
-        vm_networks[vm2].append(enlace_id)
+        vm_networks[vm1_nombre].append(enlace_id)
+        vm_networks[vm2_nombre].append(enlace_id)
     
     print(f"🌐 Topología OpenStack generada:")
     print(f"   • {len(redes)} redes a crear")
