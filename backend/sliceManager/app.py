@@ -376,79 +376,65 @@ def generar_plan_deploy_linux(id_slice: int, instancias: list,placement_plan_vm:
         "workers_status": workers_by_name
     }
 
-def generar_plan_deploy_openstack(id_slice: int, instancias: list):
-    """
-    Plan de despliegue para plataforma OPENSTACK
-    
-    Diferencias clave con Linux:
-    - NO usa VLANs individuales, usa REDES VIRTUALES
-    - Usa imagen_id_openstack en lugar de ruta
-    - Necesita crear/encontrar flavors dinámicamente
-    """
-    print("☁️ [OPENSTACK] Generando plan de despliegue...")
-    
-    # 🟢 GENERAR TOPOLOGÍA DE REDES
+def generar_plan_deploy_openstack(id_slice: int, instancias: list, placement_plan_vm: list | None = None):
+    print("☁️ [OPENSTACK] Generando plan de despliegue con placement físico...")
+
+    if not placement_plan_vm:
+        return {
+            "can_deploy": False,
+            "error": "placement_plan_vm vacío. Debes ejecutar /placement/verify primero."
+        }
+
+    # Mapeo: nombre_vm -> worker físico (hostname)
+    vm_to_worker = {
+        e["nombre_vm"]: e["worker"]
+        for e in placement_plan_vm
+        if e.get("nombre_vm") and e.get("worker")
+    }
+
+    # Validar que todas las VMs tengan placement
+    nombres_instancias = {inst["nombre"] for inst in instancias}
+    faltantes = nombres_instancias - vm_to_worker.keys()
+    if faltantes:
+        return {
+            "can_deploy": False,
+            "error": f"Las VMs {', '.join(faltantes)} no tienen asignación en placement_plan."
+        }
+
+    # Generar topología de redes (para OpenStack)
     topologia = generar_topologia_redes_openstack(id_slice, instancias)
-    
+
+    # Construir plan final
     plan = []
-    flavors_necesarios = {}  # Cache de flavors para no crearlos múltiples veces
-    
     for vm in instancias:
-        vm_id = str(vm["idinstancia"])
-        ram_gb = parse_ram_to_gb(vm["ram"])
-        storage_gb = float(str(vm["storage"]).replace("GB", "").strip())
-        cpus = int(vm["cpu"])
-        
-        # 🟢 VERIFICAR QUE TENGA ID DE OPENSTACK
-        imagen_id_openstack = vm.get("imagen_id_openstack")
-        if not imagen_id_openstack:
-            print(f"⚠️ VM {vm['nombre']} no tiene imagen OpenStack asignada, usando imagen por defecto")
-            # Aquí podrías tener una imagen por defecto o marcar como error
-            imagen_id_openstack = "default-image-id"
-        
-        # 🟢 OBTENER REDES DE ESTA VM
-        redes_vm = topologia["vm_networks"].get(vm_id, [])
-        redes_info = [r for r in topologia["redes"] if r["enlace_id"] in redes_vm]
-        
-        # 🟢 IDENTIFICAR FLAVOR (o crearlo dinámicamente)
-        flavor_key = f"{cpus}cpu_{int(ram_gb)}ram_{int(storage_gb)}disk"
-        
-        if flavor_key not in flavors_necesarios:
-            # Este flavor será creado/buscado por el driver
-            flavors_necesarios[flavor_key] = {
-                "cpus": cpus,
-                "ram_gb": ram_gb,
-                "disk_gb": storage_gb,
-                "nombre": f"custom_{flavor_key}"
-            }
-        
+        vm_name = vm["nombre"]
+        worker_host = vm_to_worker[vm_name]  # Ej: "server2"
+        worker_ip = WORKER_IPS.get(worker_host, "0.0.0.0")  # IP física real donde OpenStack la lanzará
+
         plan.append({
-            "nombre_vm": vm["nombre"],
-            "vm_id": vm_id,
-            "imagen_id": imagen_id_openstack,  # 🟢 UUID de OpenStack
-            "flavor_spec": flavors_necesarios[flavor_key],  # 🟢 Especificación del flavor
-            "redes": redes_info,  # 🟢 Lista de redes a las que se conectará
-            "ram_gb": ram_gb,
-            "cpus": cpus,
-            "disco_gb": storage_gb,
+            "nombre_vm": vm_name,
+            "worker": worker_ip,  # 👈 Aquí se define el equivalente físico
+            "vm_id": vm["idinstancia"],
+            "imagen_id": vm.get("imagen_id_openstack", "default-image-id"),
+            "flavor_spec": {
+                "nombre": vm.get("flavor_name", f"custom_{worker_host}")
+            },
+            "redes": [
+                r for r in topologia["redes"]
+                if vm_name in r["vms"]
+            ],
             "salidainternet": vm.get("salidainternet", False)
         })
-    
-    with engine.begin() as conn:
-        conn.execute(text("""
-            UPDATE slice 
-            SET platform = 'openstack'
-            WHERE idslice = :sid
-        """), {"sid": id_slice})
-        
+
     return {
         "timestamp": datetime.utcnow().isoformat(),
-        "can_deploy": True,  # En OpenStack la verificación es diferente
+        "can_deploy": True,
         "platform": "openstack",
-        "placement_plan": plan,
+        "placement_plan": plan,  # 👈 Este es el que usa deploy_slice_openstack
         "topologia_redes": topologia["redes"],
-        "flavors_necesarios": list(flavors_necesarios.values())
+        "flavors_necesarios": topologia.get("flavors", [])
     }
+
 
 # Construcción del plan de VM Placement :D
 def construir_payload_vm_placement(id_slice: int, zonadisponibilidad: str, instancias: list):
@@ -682,7 +668,7 @@ def deploy_slice(data: dict = Body(...)):
         if platform == "linux":
             return deploy_slice_linux(id_slice, instancias, placement_plan)
         elif platform == "openstack":
-            return deploy_slice_openstack(id_slice, instancias)
+            return deploy_slice_openstack(id_slice, instancias, placement_plan)
         else:
             return {"error": f"Plataforma no soportada: {platform}"}
             
@@ -956,138 +942,78 @@ def deploy_slice_linux(id_slice: int, instancias: list, placement_plan_vm: list 
         "detalle_completo": resultados
     }
 
-def deploy_slice_openstack(id_slice: int, instancias: list):
-    """Despliegue en plataforma OpenStack"""
-    print("☁️ [OPENSTACK] Iniciando despliegue...")
-    
-    # Generar plan específico para OpenStack
-    plan = generar_plan_deploy_openstack(id_slice, instancias)
-    
-    # 🟢 DESPLIEGUE CON DRIVER HÍBRIDO
+def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: list | None = None):
+    print("☁️ [OPENSTACK] Iniciando despliegue híbrido...")
+
+    if not placement_plan_vm:
+        return {
+            "success": False,
+            "slice_id": id_slice,
+            "platform": "openstack",
+            "error": "Falta placement_plan. Llama a /placement/verify primero."
+        }
+
+    # 1) Generar plan final usando placement físico
+    plan = generar_plan_deploy_openstack(id_slice, instancias, placement_plan_vm)
+
+    if not plan.get("can_deploy"):
+        return plan
+
+    # 2) Desplegar cada VM en paralelo
     resultados = []
     vms_exitosas = []
     fallos = 0
-    
+
     with ThreadPoolExecutor(max_workers=3) as executor:
-        future_map = {}
-        
-        for vm in plan["placement_plan"]:
-            # 🟢 PAYLOAD PARA OPENSTACK
-            vm_req = {
-                "platform": "openstack",  # 🟢 CLAVE: Especificar plataforma
+        future_map = {
+            executor.submit(desplegar_vm_en_driver, {
+                "platform": "openstack",
                 "slice_id": id_slice,
                 "nombre_vm": vm["nombre_vm"],
-                "vm_id": vm["vm_id"],
-                "imagen_id": vm["imagen_id"],  # 🟢 UUID de OpenStack
-                "flavor_spec": vm["flavor_spec"],  # 🟢 Specs para crear/buscar flavor
-                "redes": vm["redes"],  # 🟢 Lista de redes a crear
-                "salidainternet": vm.get("salidainternet", False)
-            }
-            
-            print(f"☁️ Enviando VM {vm['nombre_vm']} a OpenStack")
-            print(f"   Imagen: {vm['imagen_id']}, Flavor: {vm['flavor_spec']['nombre']}")
-            print(f"   Redes: {len(vm['redes'])}")
-            
-            future = executor.submit(desplegar_vm_en_driver, vm_req)
-            future_map[future] = vm
-        
-        # Procesar resultados
+                "worker": vm["worker"],
+                "imagen_id": vm["imagen_id"],
+                "flavor_spec": vm["flavor_spec"],
+                "redes": vm["redes"],
+                "salidainternet": vm["salidainternet"]
+            }): vm["nombre_vm"]
+            for vm in plan["placement_plan"]
+        }
+
         for future in as_completed(future_map):
-            vm = future_map[future]
-            vm_name = vm["nombre_vm"]
-            
+            vm_name = future_map[future]
             try:
                 result = future.result()
-                
                 if result.get("success"):
-                    print(f"✅ VM {vm_name} desplegada en OpenStack")
-                    
-                    # 🟢 ACTUALIZAR BD CON DATOS DE OPENSTACK
-                    with engine.begin() as conn:
-                        conn.execute(text("""
-                            UPDATE instancia
-                            SET estado = 'RUNNING',
-                                instance_id = :instance_id,
-                                platform = 'openstack',
-                                console_url = :console_url
-                            WHERE nombre = :vm_name AND slice_idslice = :sid
-                        """), {
-                            "instance_id": result.get("instance_id"),
-                            "console_url": result.get("console_url"),
-                            "vm_name": vm_name,
-                            "sid": id_slice
-                        })
-                    
                     vms_exitosas.append(vm_name)
-                    resultados.append({
-                        "vm": vm_name,
-                        "success": True,
-                        "instance_id": result.get("instance_id"),
-                        "console_url": result.get("console_url"),
-                        "networks": result.get("networks", [])
-                    })
+                    resultados.append({"vm": vm_name, "success": True, **result})
                 else:
                     fallos += 1
-                    print(f"❌ VM {vm_name} falló: {result.get('message')}")
-                    
-                    with engine.begin() as conn:
-                        conn.execute(text("""
-                            UPDATE instancia
-                            SET estado = 'FAILED'
-                            WHERE nombre = :vm_name AND slice_idslice = :sid
-                        """), {"vm_name": vm_name, "sid": id_slice})
-                    
-                    resultados.append({
-                        "vm": vm_name,
-                        "success": False,
-                        "error": result.get("message")
-                    })
-                    
+                    resultados.append({"vm": vm_name, "success": False, "error": result.get("message")})
             except Exception as e:
                 fallos += 1
-                print(f"❌ Excepción desplegando {vm_name}: {e}")
-                
-                with engine.begin() as conn:
-                    conn.execute(text("""
-                        UPDATE instancia
-                        SET estado = 'FAILED'
-                        WHERE nombre = :vm_name AND slice_idslice = :sid
-                    """), {"vm_name": vm_name, "sid": id_slice})
-                
-                resultados.append({
-                    "vm": vm_name,
-                    "success": False,
-                    "error": str(e)
-                })
-    
-    # Estado final del slice
-    estado_final = "RUNNING" if fallos == 0 else ("PARTIAL" if len(vms_exitosas) > 0 else "FAILED")
-    
+                resultados.append({"vm": vm_name, "success": False, "error": str(e)})
+
+    # 3) Actualizar estado del slice en BD
+    estado_final = "RUNNING" if fallos == 0 else ("PARTIAL" if vms_exitosas else "FAILED")
+
     with engine.begin() as conn:
         conn.execute(text("""
-            UPDATE slice 
-            SET estado = :e, platform = :platform 
-            WHERE idslice = :sid
-        """), {"e": estado_final, "platform": "openstack", "sid": id_slice})
-    
+            UPDATE slice SET estado=:e WHERE idslice=:sid
+        """), {"e": estado_final, "sid": id_slice})
+
     return {
         "success": fallos == 0,
-        "timestamp": datetime.utcnow().isoformat(),
         "slice_id": id_slice,
         "platform": "openstack",
         "estado_final": estado_final,
         "resumen": {
             "total_vms": len(plan["placement_plan"]),
             "exitosas": len(vms_exitosas),
-            "fallidas": fallos,
-            "porcentaje_exito": round((len(vms_exitosas) / len(plan["placement_plan"])) * 100, 2)
+            "fallidas": fallos
         },
-        "vms_exitosas": vms_exitosas,
-        "topologia_redes": plan["topologia_redes"],
-        "flavors_creados": plan["flavors_necesarios"],
-        "detalle_completo": resultados,
-        "message": f"Despliegue {'completo' if fallos == 0 else 'parcial' if len(vms_exitosas) > 0 else 'fallido'} del slice {id_slice} en OpenStack"
+        "detalle_completo": resultados
     }
+
 
 def desplegar_vm_en_driver(vm_data: dict):
     """
