@@ -180,69 +180,88 @@ def generar_topologia_redes_openstack(id_slice: int, instancias: list):
     
     if not enlaces:
         print("ℹ️ No hay enlaces definidos, se creará una red por defecto")
-        # Red por defecto para slices sin topología
         return {
             "redes": [{
                 "enlace_id": "default",
-                "vms": [inst["nombre"] for inst in instancias],  # ✅ USAR NOMBRES
+                "vms": [inst["nombre"] for inst in instancias],
                 "cidr": "10.0.1.0/24",
                 "nombre": f"net_slice_{id_slice}_default"
             }],
             "vm_networks": {
-                inst["nombre"]: ["default"]  # ✅ USAR NOMBRES
+                inst["nombre"]: ["default"]
                 for inst in instancias
             }
         }
     
-    # 🔍 CREAR MAPA DE ID → NOMBRE DE VMs
-    id_to_nombre = {
-        inst["idinstancia"]: inst["nombre"]
-        for inst in instancias
-    }
+    # 🔥 CREAR MAPA ID → NOMBRE (robusto para int y str)
+    id_to_nombre = {}
+    for inst in instancias:
+        inst_id = inst["idinstancia"]
+        inst_nombre = inst["nombre"]
+        
+        # Guardar múltiples representaciones
+        id_to_nombre[inst_id] = inst_nombre                    # int puro: 4
+        id_to_nombre[str(inst_id)] = inst_nombre               # str sin espacios: '4'
+        id_to_nombre[str(inst_id).strip()] = inst_nombre       # str limpio: '4'
     
-    print(f"🔍 Mapa ID → Nombre: {id_to_nombre}")
+    print(f"🔍 Mapa ID → Nombre creado con {len(instancias)} VMs")
     
     # 🟢 CREAR MAPA DE REDES BASADO EN ENLACES
     redes = []
-    vm_networks = {}  # {vm_nombre: [red_ids]}
+    vm_networks = {}
     
     for idx, enlace in enumerate(enlaces):
-        vm1_id = enlace["vm1"]
-        vm2_id = enlace["vm2"]
         enlace_id = str(enlace["idenlace"])
         
-        # 🔥 CONVERTIR IDs A NOMBRES
-        vm1_nombre = id_to_nombre.get(vm1_id)
-        vm2_nombre = id_to_nombre.get(vm2_id)
+        # 🔥 LIMPIAR Y NORMALIZAR vm1 y vm2
+        vm1_raw = enlace["vm1"]
+        vm2_raw = enlace["vm2"]
         
-        if not vm1_nombre or not vm2_nombre:
-            print(f"⚠️ Enlace {enlace_id}: No se encontraron nombres para VMs {vm1_id}/{vm2_id}")
+        # Convertir a string limpio y luego a int
+        try:
+            vm1_clean = str(vm1_raw).strip()
+            vm2_clean = str(vm2_raw).strip()
+            
+            vm1_int = int(vm1_clean)
+            vm2_int = int(vm2_clean)
+        except (ValueError, TypeError) as e:
+            print(f"⚠️ Enlace {enlace_id}: Error convirtiendo IDs '{vm1_raw}'/'{vm2_raw}': {e}")
             continue
         
-        print(f"🔗 Enlace {enlace_id}: {vm1_nombre} ({vm1_id}) ↔ {vm2_nombre} ({vm2_id})")
+        # Buscar nombres usando el ID entero
+        vm1_nombre = id_to_nombre.get(vm1_int)
+        vm2_nombre = id_to_nombre.get(vm2_int)
         
-        # Crear red para este enlace (CON NOMBRES)
+        if not vm1_nombre or not vm2_nombre:
+            print(f"⚠️ Enlace {enlace_id}: No se encontraron nombres")
+            print(f"   vm1={vm1_int} → {vm1_nombre}")
+            print(f"   vm2={vm2_int} → {vm2_nombre}")
+            print(f"   IDs disponibles: {[k for k in id_to_nombre.keys() if isinstance(k, int)]}")
+            continue
+        
+        print(f"✅ Enlace {enlace_id}: {vm1_nombre} (ID:{vm1_int}) ↔ {vm2_nombre} (ID:{vm2_int})")
+        
+        # Crear red para este enlace
         red = {
             "enlace_id": enlace_id,
-            "vms": [vm1_nombre, vm2_nombre],  # ✅ USAR NOMBRES, NO IDs
+            "vms": [vm1_nombre, vm2_nombre],
             "cidr": f"10.0.{100 + idx}.0/24",
             "nombre": f"net_slice_{id_slice}_link_{enlace_id}",
             "vlan_ref": enlace.get("numero")
         }
         redes.append(red)
         
-        # Asignar red a cada VM del enlace (CON NOMBRES)
-        if vm1_nombre not in vm_networks:
-            vm_networks[vm1_nombre] = []
-        if vm2_nombre not in vm_networks:
-            vm_networks[vm2_nombre] = []
-        
-        vm_networks[vm1_nombre].append(enlace_id)
-        vm_networks[vm2_nombre].append(enlace_id)
+        # Asignar red a cada VM
+        for vm_nombre in [vm1_nombre, vm2_nombre]:
+            if vm_nombre not in vm_networks:
+                vm_networks[vm_nombre] = []
+            vm_networks[vm_nombre].append(enlace_id)
     
     print(f"🌐 Topología OpenStack generada:")
-    print(f"   • {len(redes)} redes a crear")
+    print(f"   • {len(redes)} redes creadas")
     print(f"   • {len(vm_networks)} VMs con conectividad")
+    for vm, nets in vm_networks.items():
+        print(f"      └─ {vm}: {len(nets)} red(es)")
     
     return {
         "redes": redes,
