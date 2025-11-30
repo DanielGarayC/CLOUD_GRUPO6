@@ -301,7 +301,13 @@ def generar_plan_deploy_linux(id_slice: int, instancias: list,placement_plan_vm:
                 "can_deploy": False,
                 "error": "placement_plan_vm vacío. Debes ejecutar /placement/verify primero."
             }
-    
+    print("=" * 40)
+    print("PLACEMENT PLAN RECIBIDO DESDE VM PLACEMENT")
+    print(f"Total de entradas: {len(placement_plan_vm)}")
+    for entry in placement_plan_vm:
+        print(f"   • VM: {entry.get('nombre_vm')} → Worker: {entry.get('worker')}")
+    print("=" * 40)
+
     vm_to_worker_name = {}
 
     for entry in placement_plan_vm:
@@ -418,6 +424,11 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list, placement_pla
         if e.get("nombre_vm") and e.get("worker")
     }
 
+    print("\n🔍 MAPEO VM → WORKER (después de procesar)")
+    for vm_name, worker in vm_to_worker.items():
+        print(f"   • {vm_name} → {worker}")
+    print()
+
     # Validar que todas las VMs tengan placement
     nombres_instancias = {inst["nombre"] for inst in instancias}
     faltantes = nombres_instancias - vm_to_worker.keys()
@@ -449,6 +460,10 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list, placement_pla
         vm_name = vm["nombre"]
         worker_host = vm_to_worker[vm_name]  # Ej: "server2"
         worker_ip = WORKER_IPS.get(worker_host, "0.0.0.0")  # IP física real donde OpenStack la lanzará
+
+        print(f"🔍 VM '{vm_name}':")
+        print(f"   • Worker hostname: {worker_host}")
+        print(f"   • Worker IP: {worker_ip}") 
 
         vm_id = str(vm["idinstancia"])
         ram_gb = parse_ram_to_gb(vm["ram"])
@@ -499,12 +514,16 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list, placement_pla
             "salidainternet": vm.get("salidainternet", False)
         })
 
-    print("=" * 60)
-    print("PLAN COMPLETO GENERADO")
-    print(f"Total VMs en plan: {len(plan)}")
+    print("\n" + "=" * 70)
+    print("📦 PLAN DE DESPLIEGUE FINAL (OPENSTACK)")
+    print(f"📊 Total VMs en el plan: {len(plan)}")
     for vm_plan in plan:
-        print(f"   • {vm_plan['nombre_vm']}: {len(vm_plan['redes'])} red(es)")
-    print("=" * 60)
+        print(f"\n   VM: {vm_plan['nombre_vm']}")
+        print(f"      • Worker IP: {vm_plan['worker']}")
+        print(f"      • Redes: {len(vm_plan['redes'])}")
+        print(f"      • CPUs: {vm_plan['cpus']}, RAM: {vm_plan['ram_gb']}GB, Disco: {vm_plan['disco_gb']}GB")
+        print(f"      • Internet: {vm_plan['salidainternet']}")
+    print("=" * 70 + "\n")
 
     return {
         "timestamp": datetime.utcnow().isoformat(),
