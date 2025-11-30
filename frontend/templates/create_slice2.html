@@ -526,19 +526,30 @@
                 </div>
                 
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <div class="form-floating">
                             <input type="text" class="form-control" id="slice-name" name="slice_name" placeholder="Nombre del slice" required>
                             <label for="slice-name">Nombre del Slice</label>
                         </div>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <div class="form-floating">
                             <input type="number" class="form-control" id="vm-count" name="num_vms" placeholder="Número de VMs" min="2" max="20" value="3" required>
                             <label for="vm-count">Número de VMs</label>
                         </div>
                     </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="form-floating">
+                            <select class="form-select" id="zona_disponibilidad" name="zona_disponibilidad" required>
+                                {% for z in zonas %}
+                                    <option value="{{ z }}">{{ z }}</option>
+                                {% endfor %}
+                            </select>
+                            <label for="zona_disponibilidad">Zona de Disponibilidad</label>
+                        </div>
+                    </div>
                 </div>
+
                 
                 <div class="form-floating mb-3">
                     <textarea class="form-control" id="slice-description" name="slice_description" placeholder="Descripción" style="height: 100px"></textarea>
@@ -712,6 +723,7 @@
                             <h5><i class="fas fa-info-circle me-2"></i>Información del Slice</h5>
                             <p><strong>Nombre:</strong> <span id="review-name"></span></p>
                             <p><strong>VMs:</strong> <span id="review-vm-count"></span></p>
+                            <p><strong>Zona de Disponibilidad:</strong> <span id="review-zone"></span></p>
                             <p><strong>Descripción:</strong> <span id="review-description"></span></p>
                         </div>
                     </div>
@@ -1075,12 +1087,14 @@
                         <div class="col-md-2 mb-3">
                             <div class="form-floating">
                                 <select class="form-select" id="vm_${i}_image" name="vm_${i}_image" required>
-                                    <option value="ubuntu:latest">Ubuntu</option>
-                                    <option value="cirros:latest">CirrOS</option>
+                                    <option value="1">Ubuntu</option>
+                                    <option value="2">CirrOS</option>
+                                    <option value="3">Ubuntu Clouding</option>
                                 </select>
                                 <label for="vm_${i}_image">Imagen</label>
                             </div>
                         </div>
+
                         <div class="col-md-2 mb-3 d-flex align-items-center">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="vm_${i}_internet" name="vm_${i}_internet">
@@ -1368,6 +1382,7 @@
         function generateReview() {
             document.getElementById('review-name').textContent = document.getElementById('slice-name').value;
             document.getElementById('review-vm-count').textContent = document.getElementById('vm-count').value;
+            document.getElementById('review-zone').textContent =  document.getElementById('zona_disponibilidad').value;
             document.getElementById('review-description').textContent = document.getElementById('slice-description').value || 'Sin descripción';
             document.getElementById('review-nodes').textContent = nodes.length;
             document.getElementById('review-connections').textContent = edges.length;

@@ -73,7 +73,7 @@ LOCK TABLES `imagen` WRITE;
 INSERT INTO `imagen` VALUES 
 (1,'/var/lib/qemu-images/image-base/ubuntu.qcow2','ubuntu:latest', '56b9c357-4045-41b8-89f1-2d78e6ba7e64'),
 (2,'/var/lib/qemu-images/image-base/cirros-base.qcow2','cirros:latest', 'ad11fa04-b020-41f6-9cc3-7f7a589c6a2a'),
-(3,'/var/lib/qemu-images/image-base/debian-cloud.qcow2','debian-cloud:latest', 'oli');
+(3,'/var/lib/qemu-images/image-base/ubuntu-clouding.qcow2','ubuntu-clouding:latest', 'oli');
 /*!40000 ALTER TABLE `imagen` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -127,12 +127,12 @@ CREATE TABLE `worker` (
 LOCK TABLES `worker` WRITE;
 /*!40000 ALTER TABLE `worker` DISABLE KEYS */;
 INSERT INTO worker (nombre, ip, cpu, ram, storage) VALUES
-('server2', '192.168.201.2', '4', '8GB', '100GB'),
-('server3', '192.168.201.3', '4', '8GB', '100GB'),
-('server4', '192.168.201.4', '4', '8GB', '100GB'),
-('worker1', '192.168.202.2', '4', '8GB', '100GB'),
-('worker2', '192.168.202.3', '4', '8GB', '100GB'),
-('worker3', '192.168.202.4', '4', '8GB', '100GB');
+('server2', '192.168.201.2', '4', '4GB', '15GB'),
+('server3', '192.168.201.3', '4', '4GB', '15GB'),
+('server4', '192.168.201.4', '4', '4GB', '15GB'),
+('worker1', '192.168.202.2', '4', '4GB', '15GB'),
+('worker2', '192.168.202.3', '4', '4GB', '15GB'),
+('worker3', '192.168.202.4', '4', '4GB', '15GB');
 /*!40000 ALTER TABLE `worker` ENABLE KEYS */;
 UNLOCK TABLES;
 

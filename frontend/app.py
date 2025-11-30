@@ -351,13 +351,29 @@ def create_slice():
             num_vms = int(request.form['num_vms'])
             topology_type = request.form['topology_type']
             topology_data = request.form.get('topology_data', '')
-            zona_disponibilidad = request.form.get('zona_disponibilidad', 'default')
+            zona_front = request.form.get('zona_disponibilidad', 'az-1')  # viene az-1 / az-2 / az-3
+            
+            # 🔁 MAPEOS: front → BD
+            zona_map = {
+                'az-1': 'BE',
+                'az-2': 'HP',
+                'az-3': 'UHP'
+            }
+            platform_map = {
+                'az-1': 'linux',
+                'az-2': 'linux',
+                'az-3': 'openstack'
+            }
+            
+            zonadisponibilidad_bd = zona_map.get(zona_front, 'BE')      # valor que se guarda en la BD
+            platform_bd = platform_map.get(zona_front, 'linux')         # platform para slice e instancias
             
             # Crear slice
             new_slice = Slice(
                 nombre=slice_name,
                 estado='DRAW',
-                zonadisponibilidad=zona_disponibilidad,
+                zonadisponibilidad=zonadisponibilidad_bd,
+                platform=platform_bd,
                 fecha_creacion=datetime.now().date()
             )
             
@@ -397,12 +413,12 @@ def create_slice():
             new_slice.set_topology_data(topology_dict)
             
             db.session.add(new_slice)
-            db.session.flush()  # 🟢 IMPORTANTE: flush para obtener el ID del slice
+            db.session.flush()  # flush para obtener el ID del slice
             
             # Add current user to slice
             new_slice.usuarios.append(user)
             
-            # 🟢 MAPEO: Diccionario para mapear nodo_id -> instancia_id
+            # MAPEO nodo_id -> instancia_id
             node_to_instance_map = {}
             
             # Crear instancias
@@ -412,20 +428,18 @@ def create_slice():
                 vm_ram = request.form.get(f'vm_{i}_ram', '1GB')
                 vm_storage = request.form.get(f'vm_{i}_storage', '10GB')
                 vm_internet = request.form.get(f'vm_{i}_internet') == 'on'
-                vm_image_name = request.form.get(f'vm_{i}_image', 'ubuntu:latest')
                 
-                # Obtener o crear la imagen
-                imagen = Imagen.query.filter_by(nombre=vm_image_name).first()
+                # 🔵 AHORA EL COMBO MANDA EL ID DE LA IMAGEN: 1, 2, 3
+                vm_image_id_raw = request.form.get(f'vm_{i}_image', '1')
+                try:
+                    vm_image_id = int(vm_image_id_raw)
+                except ValueError:
+                    vm_image_id = 1  # fallback seguro
+
+                # Validar que la imagen exista (opcional pero recomendable)
+                imagen = Imagen.query.get(vm_image_id)
                 if not imagen:
-                    max_id = db.session.query(db.func.max(Imagen.idimagen)).scalar()
-                    next_id = (max_id or 0) + 1
-                    imagen = Imagen(
-                        idimagen=next_id,
-                        nombre=vm_image_name,
-                        ruta=f'default'
-                    )
-                    db.session.add(imagen)
-                    db.session.flush()
+                    raise ValueError(f'Imagen con id {vm_image_id} no existe en la tabla imagen')
                 
                 instance = Instancia(
                     slice_idslice=new_slice.idslice,
@@ -434,29 +448,27 @@ def create_slice():
                     ram=vm_ram,
                     storage=vm_storage,
                     salidainternet=vm_internet,
-                    imagen_idimagen=imagen.idimagen,
-                    ip=None,  # Se asignará después
+                    imagen_idimagen=vm_image_id,
+                    ip=None,         # Se asignará después
                     vnc_idvnc=None,
-                    worker_idworker=None
+                    worker_idworker=None,
+                    platform=platform_bd  # la instancia hereda platform según la AZ
                 )
                 db.session.add(instance)
-                db.session.flush()  # 🟢 Flush para obtener el ID de la instancia
+                db.session.flush()  # obtener idinstancia
                 
-                # 🟢 MAPEAR: nodo_id (i) -> instancia_id real
                 node_to_instance_map[i] = instance.idinstancia
             
-            # 🟢 CREAR ENLACES en la tabla enlace
+            # Crear enlaces en la tabla enlace
             if 'edges' in topology_dict:
                 for edge in topology_dict['edges']:
                     from_node = edge.get('from')
                     to_node = edge.get('to')
                     
                     if from_node and to_node and from_node in node_to_instance_map and to_node in node_to_instance_map:
-                        # Obtener los IDs reales de las instancias
                         vm1_id = node_to_instance_map[from_node]
                         vm2_id = node_to_instance_map[to_node]
                         
-                        # Crear enlace sin VLAN (se asignará después)
                         enlace = Enlace(
                             vm1=str(vm1_id),
                             vm2=str(vm2_id),
@@ -467,7 +479,7 @@ def create_slice():
                         db.session.add(enlace)
             
             db.session.commit()
-            flash(f'Slice "{slice_name}" creado exitosamente con {len(topology_dict.get("edges", []))} enlaces!', 'success')
+            flash('Slice \"{slice_name}\" creado exitosamente en zona \"{zonadisponibilidad_bd}\" con plataforma {platform_bd} y {len(topology_dict.get(\"edges\", []))} enlaces! success')
             return redirect(url_for('dashboard'))
             
         except Exception as e:
@@ -475,14 +487,15 @@ def create_slice():
             flash(f'Error creando slice: {str(e)}', 'error')
             return redirect(url_for('create_slice'))
     
-    # Pasar datos al template
+    # Pasar datos al template (aunque puedes no usarlos si el combo es fijo)
     imagenes_disponibles = Imagen.query.all()
-    zonas_disponibles = ['us-east-1', 'us-west-1', 'eu-west-1', 'default']
+    zonas_disponibles = ['az-1', 'az-2', 'az-3']
     
-    return render_template('create_slice2.html', 
-                         imagenes=imagenes_disponibles,
-                         zonas=zonas_disponibles)
-
+    return render_template(
+        'create_slice2.html', 
+        imagenes=imagenes_disponibles,
+        zonas=zonas_disponibles
+    )
 
 
 
