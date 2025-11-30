@@ -404,6 +404,18 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list, placement_pla
     # Generar topología de redes (para OpenStack)
     topologia = generar_topologia_redes_openstack(id_slice, instancias)
 
+    print("=" * 60)
+    print("🔍 DEBUG: TOPOLOGÍA GENERADA")
+    print(f"📊 Total de redes: {len(topologia['redes'])}")
+    print(f"📋 Detalle de redes:")
+    for idx, red in enumerate(topologia['redes'], 1):
+        print(f"   Red {idx}:")
+        print(f"      • Nombre: {red.get('nombre', 'N/A')}")
+        print(f"      • CIDR: {red.get('cidr', 'N/A')}")
+        print(f"      • VMs: {red.get('vms', [])}")
+        print(f"      • Enlace ID: {red.get('enlace_id', 'N/A')}")
+    print("=" * 60)
+
     # Construir plan final
     plan = []
     flavors_necesarios = {}
@@ -416,6 +428,15 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list, placement_pla
         ram_gb = parse_ram_to_gb(vm["ram"])
         storage_gb = float(str(vm["storage"]).replace("GB", "").strip())
         cpus = int(vm["cpu"])
+
+        redes_de_vm = [
+            r for r in topologia["redes"]
+            if vm_name in r["vms"]
+        ]
+        
+        print(f"🔍 VM '{vm_name}' conectada a {len(redes_de_vm)} red(es):")
+        for red in redes_de_vm:
+            print(f"   └─ {red.get('nombre')} ({red.get('cidr')})")
 
         # 🟢 VERIFICAR QUE TENGA ID DE OPENSTACK
         imagen_id_openstack = vm.get("imagen_id_openstack")
@@ -451,6 +472,13 @@ def generar_plan_deploy_openstack(id_slice: int, instancias: list, placement_pla
             "disco_gb": storage_gb,
             "salidainternet": vm.get("salidainternet", False)
         })
+
+    print("=" * 60)
+    print("PLAN COMPLETO GENERADO")
+    print(f"Total VMs en plan: {len(plan)}")
+    for vm_plan in plan:
+        print(f"   • {vm_plan['nombre_vm']}: {len(vm_plan['redes'])} red(es)")
+    print("=" * 60)
 
     return {
         "timestamp": datetime.utcnow().isoformat(),
