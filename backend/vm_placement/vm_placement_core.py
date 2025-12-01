@@ -553,8 +553,22 @@ def normalizar_instancias(instancias):
     vms = []
     for idx, vm in enumerate(instancias):
         cpu = int(vm["cpu"])
-        ram_gb = float(str(vm["ram"]).lower().replace("gb", ""))
-        sto_gb = float(str(vm["storage"]).lower().replace("gb", ""))
+        
+        # 🟢 USAR parse_ram_to_gb EN LUGAR DE CONVERSIÓN MANUAL
+        ram_gb = parse_ram_to_gb(vm["ram"])
+        
+        # 🟢 MEJORAR PARSEO DE STORAGE
+        storage_str = str(vm["storage"]).strip().lower().replace(" ", "")
+        if "gb" in storage_str:
+            sto_gb = float(storage_str.replace("gb", ""))
+        elif "mb" in storage_str:
+            sto_gb = float(storage_str.replace("mb", "")) / 1024.0
+        else:
+            try:
+                sto_gb = float(storage_str)
+            except ValueError:
+                print(f"⚠️ Error parseando storage: '{vm['storage']}'")
+                sto_gb = 10.0  # Default 10GB
 
         vms.append({
             "index": idx,
