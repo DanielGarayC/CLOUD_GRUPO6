@@ -206,7 +206,6 @@
                     </div>
                 </div>
             </div>
-
             <!-- Alertas de Flask -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -219,7 +218,18 @@
                     {% endfor %}
                 {% endif %}
             {% endwith %}
-            
+
+             <!-- 🟢 BOTÓN IMPORTAR TOPOLOGÍA -->
+            <div class="mb-3 text-end">
+                <button class="btn btn-outline-success" onclick="document.getElementById('import-file-input').click()">
+                    <i class="fas fa-upload me-2"></i>Importar Topología
+                </button>
+                <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleFileImport(event)">
+            </div>
+
+
+            <!-- me referia a poner el boton por aqui -->
+
             <div class="content-card">
                 <table class="table data-table">
                     <thead>
@@ -279,6 +289,13 @@
                                     <a href="{{ url_for('slice_topology', slice_id=slice.idslice) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-project-diagram me-1"></i>Topología
                                     </a>
+
+                                    <!-- 🟢 NUEVO: Botón Exportar -->
+                                    <button class="btn btn-sm btn-outline-info" 
+                                            onclick="exportTopology({{ slice.idslice }}, '{{ slice.nombre or 'Slice #' + slice.idslice|string }}')"
+                                            id="export-btn-{{ slice.idslice }}">
+                                        <i class="fas fa-download me-1"></i>Exportar
+                                    </button>
                                     
                                     {% if slice.estado in ['STOPPED', 'DRAW'] %}
                                         <a href="{{ url_for('edit_slice', slice_id=slice.idslice) }}" class="btn btn-sm btn-outline-warning">
@@ -441,8 +458,8 @@
         let confirmMessage;
         if (sliceStatus === 'DRAW') {
             confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\nEstado: DRAW\nEl slice será eliminado de la base de datos únicamente.\n\nEsta acción no se puede deshacer.`;
-        } else if (sliceStatus === 'STOPPED') {
-            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\nEstado: STOPPED\nADVERTENCIA: Esto eliminará TODA la infraestructura desplegada:\n\n• Máquinas virtuales\n• Recursos de red (VLANs, puertos VNC)\n• Configuraciones de red\n• Procesos del sistema\n\nEsta acción no se puede deshacer.`;
+        } else if (sliceStatus === 'RUNNING') {
+            confirmMessage = `¿Estás seguro de que quieres eliminar el slice "${sliceName}"?\n\nEstado: RUNNING\nADVERTENCIA: Esto eliminará TODA la infraestructura desplegada:\n\n• Máquinas virtuales\n• Recursos de red (VLANs, puertos VNC)\n• Configuraciones de red\n• Procesos del sistema\n\nEsta acción no se puede deshacer.`;
         }
         
         if (!confirm(confirmMessage)) {
@@ -495,8 +512,14 @@
             setTimeout(() => alert.remove(), 300);
         });
         
-        const alertClass = type === 'success' ? 'alert-success' : type === 'warning' ? 'alert-warning' : 'alert-danger';
-        const iconClass = type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-times-circle';
+        const alertClass = type === 'success' ?  'alert-success' : 
+                    type === 'warning' ? 'alert-warning' : 
+                    type === 'info' ? 'alert-info' : 
+                    'alert-danger';
+        const iconClass = type === 'success' ? 'fa-check-circle' : 
+                   type === 'warning' ? 'fa-exclamation-triangle' : 
+                   type === 'info' ? 'fa-info-circle' : 
+                   'fa-times-circle';
         const formattedMessage = message.replace(/\n/g, '<br>');
         
         const alertHtml = `
@@ -586,6 +609,134 @@
         if (detailsPanel) {
             detailsPanel.style.display = 'block';
         }
+    }
+
+    // 🟢 FUNCIÓN PARA EXPORTAR TOPOLOGÍA
+    function exportTopology(sliceId, sliceName) {
+        const exportBtn = document.getElementById(`export-btn-${sliceId}`);
+        if (!exportBtn) {
+            console.error(`No se encontró el botón export-btn-${sliceId}`);
+            return;
+        }
+        
+        const originalHtml = exportBtn.innerHTML;
+        exportBtn.disabled = true;
+        exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exportando...';
+        
+        // Crear enlace temporal para forzar descarga
+        fetch(`/export_topology/${sliceId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response. status}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Crear URL del blob y descargar
+                const url = window.URL.createObjectURL(blob);
+                const a = document. createElement('a');
+                a. style.display = 'none';
+                a.href = url;
+                
+                // Nombre del archivo
+                const cleanName = sliceName.replace(/[^a-zA-Z0-9_-]/g, '_');
+                a.download = `${cleanName}_topology.json`;
+                
+                document.body.appendChild(a);
+                a.click();
+                
+                // Limpiar
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showAlert('success', `✅ Topología de "${sliceName}" exportada exitosamente.\n📄 El archivo se descargó en formato JSON con estado DRAW.`);
+                
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = originalHtml;
+            })
+            .catch(error => {
+                console. error('Error:', error);
+                showAlert('error', `❌ Error exportando topología: ${error.message}`);
+                exportBtn.disabled = false;
+                exportBtn. innerHTML = originalHtml;
+            });
+    }
+
+
+    // 🟢 FUNCIÓN PARA MANEJAR IMPORTACIÓN DE TOPOLOGÍA
+    function handleFileImport(event) {
+        const file = event.target.files[0];
+        
+        if (!file) {
+            return;
+        }
+        
+        // Validar que sea un archivo JSON
+        if (! file.name.endsWith('.json')) {
+            showAlert('error', '❌ Error: El archivo debe ser formato JSON (. json)');
+            event.target.value = ''; // Limpiar input
+            return;
+        }
+        
+        // Validar tamaño (máximo 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            showAlert('error', '❌ Error: El archivo es demasiado grande (máximo 5MB)');
+            event.target.value = '';
+            return;
+        }
+        
+        // Confirmar importación
+        if (! confirm(
+            `¿Deseas importar la topología desde "${file.name}"?\n\n` +
+            `Esto creará un nuevo slice en estado DRAW con todas las VMs y conexiones del archivo.`
+        )) {
+            event.target.value = '';
+            return;
+        }
+        
+        // Crear FormData y enviar archivo
+        const formData = new FormData();
+        formData.append('topology_file', file);
+        
+        // Mostrar indicador de carga
+        showAlert('info', '⏳ Importando topología, por favor espera...');
+        
+        fetch('/import_topology', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const details = data.details;
+                showAlert(
+                    'success', 
+                    `✅ ¡Topología importada exitosamente!\n\n` +
+                    `📦 Slice: "${data.slice_name}"\n` +
+                    `🖥️ VMs creadas: ${details.vms_creadas}\n` +
+                    `🔗 Enlaces creados: ${details.enlaces_creados}\n` +
+                    `📍 Zona: ${details.zona}\n` +
+                    `⚙️ Platform: ${details.platform}\n\n` +
+                    `Redirigiendo al dashboard...`
+                );
+                
+                // Recargar página después de 3 segundos
+                setTimeout(() => {
+                    location.reload();
+                }, 3000);
+            } else {
+                showAlert('error', `❌ Error importando topología:\n${data.error}`);
+            }
+            
+            // Limpiar input file
+            event.target.value = '';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('error', `❌ Error de comunicación con el servidor:\n${error.message}`);
+            event.target.value = '';
+        });
     }
     </script>
 </body>

@@ -1607,6 +1607,363 @@ def api_analytics_history():
         return {"error": str(e)}, 500
      
 
+@app.route('/export_topology/<int:slice_id>')
+def export_topology(slice_id):
+    """Exportar topología de un slice como JSON descargable (siempre en estado DRAW)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autenticado'}), 401
+    
+    user = User.query. get(session['user_id'])
+    if not user:
+        return jsonify({'error': 'Usuario no encontrado'}), 401
+    
+    slice_obj = Slice.query.get_or_404(slice_id)
+    
+    # Verificar permisos de acceso
+    if not can_access_slice(user, slice_obj):
+        return jsonify({'error': 'Acceso denegado'}), 403
+    
+    try:
+        # 🔵 EXTRAER TODA LA INFORMACIÓN DEL SLICE
+        
+        # Información básica del slice
+        slice_info = {
+            'nombre': slice_obj.nombre or f'Slice_{slice_id}',
+            'estado': 'DRAW',  # 🟢 SIEMPRE DRAW al exportar
+            'zonadisponibilidad': slice_obj. zonadisponibilidad or 'BE',
+            'platform': slice_obj.platform or 'linux',
+            'descripcion': f'Exportado desde slice #{slice_id} - Estado original: {slice_obj.estado}'
+        }
+        
+        # 🔵 MAPEO INVERSO: BD → Front (para zona de disponibilidad)
+        zona_bd_to_front = {
+            'BE': 'az-1',
+            'HP': 'az-2',
+            'UHP': 'az-3'
+        }
+        slice_info['zona_disponibilidad_front'] = zona_bd_to_front.get(
+            slice_obj.zonadisponibilidad, 
+            'az-1'
+        )
+        
+        # Extraer VMs con toda su configuración
+        vms_data = []
+        for instance in slice_obj.instancias:
+            # 🟢 OBTENER NOMBRE E ID DE IMAGEN
+            imagen_id = instance.imagen_idimagen or 1
+            imagen_nombre = 'ubuntu:latest'  # Default
+            
+            if instance.imagen:
+                imagen_nombre = instance.imagen.nombre
+            else:
+                # Si no hay relación, intentar buscar la imagen directamente
+                imagen_obj = Imagen.query.get(imagen_id)
+                if imagen_obj:
+                    imagen_nombre = imagen_obj.nombre
+            
+            vm_info = {
+                'nombre': instance.nombre,
+                'cpu': instance.cpu or '1',
+                'ram': instance.ram or '1GB',
+                'storage': instance.storage or '10GB',
+                'imagen_id': imagen_id,
+                'imagen_nombre': imagen_nombre,
+                'salidainternet': bool(instance.salidainternet),
+                'original_id': instance.idinstancia  # Para mapeo de enlaces
+            }
+            vms_data.append(vm_info)
+        
+        # Extraer enlaces (conexiones entre VMs)
+        enlaces_data = []
+        enlaces = Enlace.query.filter_by(slice_idslice=slice_id).all()
+        
+        # Crear mapeo de ID original -> índice en la lista de VMs (base 1)
+        id_to_index = {vm['original_id']: idx + 1 for idx, vm in enumerate(vms_data)}
+        
+        for enlace in enlaces:
+            try:
+                vm1_id = int(enlace.vm1)
+                vm2_id = int(enlace.vm2)
+                
+                # Solo incluir el enlace si ambas VMs existen en el mapeo
+                if vm1_id in id_to_index and vm2_id in id_to_index:
+                    enlace_info = {
+                        'from': id_to_index[vm1_id],
+                        'to': id_to_index[vm2_id]
+                    }
+                    enlaces_data.append(enlace_info)
+            except (ValueError, TypeError) as e:
+                app.logger.warning(f"⚠️ Enlace inválido en slice {slice_id}: {enlace.idenlace} - {str(e)}")
+                continue
+        
+        # Extraer topología visual (si existe)
+        topology_visual = slice_obj.get_topology_data()
+        if not topology_visual or not isinstance(topology_visual, dict):
+            # Generar topología visual básica si no existe
+            topology_visual = {
+                'nodes': [
+                    {
+                        'id': idx + 1,
+                        'label': vm['nombre'],
+                        'color': '#28a745'
+                    }
+                    for idx, vm in enumerate(vms_data)
+                ],
+                'edges': enlaces_data
+            }
+        else:
+            # 🟢 SINCRONIZAR NODOS CON VMS REALES
+            topology_visual['nodes'] = [
+                {
+                    'id': idx + 1,
+                    'label': vm['nombre'],
+                    'color': '#28a745'
+                }
+                for idx, vm in enumerate(vms_data)
+            ]
+            # Actualizar los edges con los enlaces reales de la BD
+            topology_visual['edges'] = enlaces_data
+        
+        # 🔵 CONSTRUIR JSON FINAL
+        export_data = {
+            'metadata': {
+                'version': '1.0',
+                'exported_at': datetime.now().isoformat(),
+                'exported_by': user.nombre,
+                'original_slice_id': slice_id,
+                'original_estado': slice_obj.estado,
+                'total_vms': len(vms_data),
+                'total_enlaces': len(enlaces_data)
+            },
+            'slice_info': slice_info,
+            'vms': vms_data,
+            'enlaces': enlaces_data,
+            'topology_data': topology_visual
+        }
+        
+        # 🔵 CREAR RESPUESTA COMO ARCHIVO DESCARGABLE
+        from flask import Response
+        import json
+        
+        slice_name_clean = slice_obj.nombre. replace(' ', '_') if slice_obj.nombre else f'slice_{slice_id}'
+        # Remover caracteres especiales del nombre del archivo
+        slice_name_clean = ''.join(c for c in slice_name_clean if c.isalnum() or c in ('_', '-'))
+        filename = f'{slice_name_clean}_topology.json'
+        
+        json_str = json.dumps(export_data, indent=2, ensure_ascii=False)
+        
+        app.logger.info(f"📤 Usuario {user.nombre} exportó topología del slice #{slice_id} ({slice_obj.nombre}) - {len(vms_data)} VMs, {len(enlaces_data)} enlaces")
+        
+        return Response(
+            json_str,
+            mimetype='application/json',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'application/json; charset=utf-8'
+            }
+        )
+        
+    except Exception as e:
+        app.logger.error(f"❌ Error exportando topología del slice {slice_id}: {str(e)}")
+        import traceback
+        app.logger.error(traceback. format_exc())
+        return jsonify({
+            'success': False,
+            'error': f'Error exportando topología: {str(e)}'
+        }), 500
+
+
+@app.route('/import_topology', methods=['POST'])
+def import_topology():
+    """Importar topología desde un archivo JSON"""
+    from datetime import datetime  # ← Importar aquí por seguridad
+    
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autenticado'}), 401
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'error': 'Usuario no encontrado'}), 401
+    
+    # Verificar que se subió un archivo
+    if 'topology_file' not in request.files:
+        return jsonify({'error': 'No se proporcionó ningún archivo'}), 400
+    
+    file = request.files['topology_file']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No se seleccionó ningún archivo'}), 400
+    
+    if not file.filename.endswith('.json'):
+        return jsonify({'error': 'El archivo debe ser formato JSON'}), 400
+    
+    try:
+        # Leer y parsear el JSON
+        file_content = file.read().decode('utf-8')
+        import_data = json.loads(file_content)
+        
+        # 🔵 VALIDAR ESTRUCTURA DEL JSON
+        required_keys = ['metadata', 'slice_info', 'vms', 'enlaces', 'topology_data']
+        for key in required_keys:
+            if key not in import_data:
+                return jsonify({'error': f'JSON inválido: falta la clave "{key}"'}), 400
+        
+        slice_info = import_data['slice_info']
+        vms_data = import_data['vms']
+        enlaces_data = import_data['enlaces']
+        topology_data = import_data['topology_data']
+        metadata = import_data['metadata']
+        
+        # Validar que haya al menos 1 VM
+        if not vms_data or len(vms_data) == 0:
+            return jsonify({'error': 'El archivo no contiene VMs para importar'}), 400
+        
+        # 🔵 CREAR NUEVO SLICE
+        slice_name = slice_info. get('nombre', 'Topología Importada')
+        
+        # Verificar si ya existe un slice con ese nombre
+        existing_slice = Slice.query. filter_by(nombre=slice_name).first()
+        if existing_slice:
+            # Agregar timestamp al nombre para evitar duplicados
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            slice_name = f"{slice_name}_{timestamp}"
+        
+        # Obtener zona de disponibilidad
+        zona_bd = slice_info.get('zonadisponibilidad', 'BE')
+        platform = slice_info.get('platform', 'linux')
+        
+        # El estado SIEMPRE debe ser DRAW al importar
+        new_slice = Slice(
+            nombre=slice_name,
+            estado='DRAW',
+            zonadisponibilidad=zona_bd,
+            platform=platform,
+            fecha_creacion=datetime. now().date()
+        )
+        
+        # Guardar topología
+        new_slice.set_topology_data(topology_data)
+        
+        db.session.add(new_slice)
+        db.session.flush()  # Obtener ID del slice
+        
+        # Asociar usuario actual al slice
+        new_slice.usuarios.append(user)
+        
+        # 🔵 CREAR INSTANCIAS (VMs)
+        # Mapeo: índice en el JSON (1-based) -> ID de instancia en BD
+        node_to_instance_map = {}
+        created_vms = []
+        
+        for idx, vm_data in enumerate(vms_data, start=1):
+            vm_name = vm_data.get('nombre', f'VM{idx}')
+            vm_cpu = vm_data.get('cpu', '1')
+            vm_ram = vm_data.get('ram', '1GB')
+            vm_storage = vm_data.get('storage', '10GB')
+            vm_internet = vm_data.get('salidainternet', False)
+            vm_image_id = vm_data.get('imagen_id', 1)
+            
+            # Validar que la imagen existe
+            imagen = Imagen.query.get(vm_image_id)
+            if not imagen:
+                # Si no existe, intentar buscar por nombre
+                imagen_nombre = vm_data.get('imagen_nombre', 'ubuntu:latest')
+                imagen = Imagen.query.filter_by(nombre=imagen_nombre).first()
+                
+                if not imagen:
+                    # Si aún no existe, usar imagen por defecto (ID 1)
+                    app.logger.warning(f"⚠️ Imagen {vm_image_id} no encontrada, usando imagen por defecto")
+                    vm_image_id = 1
+                    imagen = Imagen. query.get(1)
+                    
+                    if not imagen:
+                        raise ValueError('No hay imágenes disponibles en la base de datos')
+                else:
+                    vm_image_id = imagen.idimagen
+            
+            # Crear instancia
+            instance = Instancia(
+                slice_idslice=new_slice.idslice,
+                nombre=vm_name,
+                cpu=vm_cpu,
+                ram=vm_ram,
+                storage=vm_storage,
+                salidainternet=vm_internet,
+                imagen_idimagen=vm_image_id,
+                ip=None,
+                vnc_idvnc=None,
+                worker_idworker=None,
+                platform=platform
+            )
+            
+            db.session.add(instance)
+            db.session.flush()  # Obtener ID de instancia
+            
+            # Guardar mapeo
+            node_to_instance_map[idx] = instance. idinstancia
+            created_vms.append(vm_name)
+        
+        # 🔵 CREAR ENLACES
+        created_enlaces = 0
+        for enlace_data in enlaces_data:
+            from_node = enlace_data.get('from')
+            to_node = enlace_data.get('to')
+            
+            # Validar que los nodos existen en el mapeo
+            if from_node in node_to_instance_map and to_node in node_to_instance_map:
+                vm1_id = node_to_instance_map[from_node]
+                vm2_id = node_to_instance_map[to_node]
+                
+                # Crear enlace
+                enlace = Enlace(
+                    vm1=str(vm1_id),
+                    vm2=str(vm2_id),
+                    slice_idslice=new_slice.idslice,
+                    vlan=None,
+                    vlan_idvlan=None
+                )
+                db.session.add(enlace)
+                created_enlaces += 1
+            else:
+                app.logger.warning(f"⚠️ Enlace inválido: from={from_node}, to={to_node}")
+        
+        # 🔵 COMMIT A LA BASE DE DATOS
+        db. session.commit()
+        
+        app.logger.info(f"✅ Usuario {user.nombre} importó topología: Slice '{slice_name}' (ID: {new_slice.idslice}) con {len(created_vms)} VMs y {created_enlaces} enlaces")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Topología importada exitosamente como "{slice_name}"',
+            'slice_id': new_slice. idslice,
+            'slice_name': slice_name,
+            'details': {
+                'vms_creadas': len(created_vms),
+                'enlaces_creados': created_enlaces,
+                'zona': zona_bd,
+                'platform': platform,
+                'imported_from': metadata.get('original_slice_id', 'Desconocido')
+            }
+        })
+        
+    except json.JSONDecodeError as e:
+        app.logger.error(f"❌ Error parseando JSON: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Archivo JSON inválido o corrupto',
+            'details': str(e)
+        }), 400
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"❌ Error importando topología: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': f'Error importando topología: {str(e)}'
+        }), 500 
+
 if __name__ == '__main__':
     initialize_database()
     app.run(debug=True, host='0.0.0.0', port=5000)
