@@ -1086,10 +1086,22 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
         for future in as_completed(future_map):
             vm = future_map[future]
             vm_name = vm["nombre_vm"]
-            
+            worker_name = vm.get("worker_hostname")
             try:
                 result = future.result()
                 
+                worker_id = None
+                if worker_name:
+                    with engine.begin() as conn:
+                        row = conn.execute(text("""
+                            SELECT idworker
+                            FROM worker
+                            WHERE nombre = :nombre
+                        """), {"nombre": worker_name}).fetchone()
+                        if row:
+                            worker_id = row[0]
+
+
                 # 🔥 VALIDACIÓN MEJORADA DE RESPUESTA
                 if result.get("success"):
                     # Verificar si hay errores ocultos
@@ -1117,13 +1129,15 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                                 SET estado = 'RUNNING',
                                     instance_id = :instance_id,
                                     platform = 'openstack',
+                                    worker_idworker = :worker_id,
                                     console_url = :console_url
                                 WHERE nombre = :vm_name AND slice_idslice = :sid
                             """), {
                                 "instance_id": result.get("instance_id"),
                                 "console_url": result.get("console_url"),
                                 "vm_name": vm_name,
-                                "sid": id_slice
+                                "sid": id_slice,
+                                "worker_id": worker_id
                             })
                         
                         vms_exitosas.append(vm_name)
@@ -1132,13 +1146,10 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                             "success": True,
                             "instance_id": result.get("instance_id"),
                             "console_url": result.get("console_url"),
-<<<<<<< HEAD
                             "vm_name": vm_name,
                             "sid": id_slice,
-                            "worker_id": worker_id
-=======
+                            "worker_id": worker_id,
                             "topology_validated": result.get("topology_validation", {}).get("valid", False)
->>>>>>> c3d4cf98a035d04cd66f361b47b121de93192b85
                         })
                 else:
                     # Error explícito
