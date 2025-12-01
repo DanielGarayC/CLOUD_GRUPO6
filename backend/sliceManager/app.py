@@ -1059,10 +1059,13 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
     if not plan.get("can_deploy"):
         return plan
 
-    # 2) Desplegar cada VM en paralelo
+    # 2) Variables para tracking
     resultados = []
     vms_exitosas = []
+    vms_fallidas = []
     fallos = 0
+    project_name = f"slice_{id_slice}"
+    requires_rollback = False
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         future_map = {
@@ -1070,7 +1073,7 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                 "platform": "openstack",
                 "slice_id": id_slice,
                 "nombre_vm": vm["nombre_vm"],
-                "vm_id": vm["vm_id"],  # 🔹 AGREGAR vm_id
+                "vm_id": vm["vm_id"],
                 "imagen_id": vm["imagen_id"],
                 "flavor_spec": vm["flavor_spec"],
                 "redes": vm["redes"],
@@ -1083,60 +1086,68 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
         for future in as_completed(future_map):
             vm = future_map[future]
             vm_name = vm["nombre_vm"]
-            worker_name = vm.get("worker_hostname")
             
             try:
                 result = future.result()
                 
-                # 🔹 Resolver idworker a partir del nombre
-                worker_id = None
-                if worker_name:
-                    with engine.begin() as conn:
-                        row = conn.execute(text("""
-                            SELECT idworker
-                            FROM worker
-                            WHERE nombre = :nombre
-                        """), {"nombre": worker_name}).fetchone()
-                        if row:
-                            # row puede ser tupla o Row; ambas soportan [0]
-                            worker_id = row[0]
-
+                # 🔥 VALIDACIÓN MEJORADA DE RESPUESTA
                 if result.get("success"):
-                    print(f"✅ VM {vm_name} desplegada en OpenStack")
-                    
-                    # 🟢 ACTUALIZAR BD CON DATOS DE OPENSTACK
-                    with engine.begin() as conn:
-                        conn.execute(text("""
-                            UPDATE instancia
-                            SET estado = 'RUNNING',
-                                instance_id = :instance_id,
-                                platform = 'openstack',
-                                worker_idworker = :worker_id,
-                                console_url = :console_url
-                            WHERE nombre = :vm_name AND slice_idslice = :sid
-                        """), {
+                    # Verificar si hay errores ocultos
+                    if result.get("should_rollback", False):
+                        print(f"❌ VM {vm_name}: Despliegue requiere rollback")
+                        print(f"   Razón: {result.get('error', 'Unknown')}")
+                        fallos += 1
+                        requires_rollback = True
+                        vms_fallidas.append(vm_name)
+                        
+                        resultados.append({
+                            "vm": vm_name,
+                            "success": False,
+                            "error": result.get("error"),
+                            "error_type": result.get("error_type"),
+                            "instance_id": result.get("instance_id")
+                        })
+                    else:
+                        print(f"✅ VM {vm_name} desplegada correctamente")
+                        
+                        # Actualizar BD
+                        with engine.begin() as conn:
+                            conn.execute(text("""
+                                UPDATE instancia
+                                SET estado = 'RUNNING',
+                                    instance_id = :instance_id,
+                                    platform = 'openstack',
+                                    console_url = :console_url
+                                WHERE nombre = :vm_name AND slice_idslice = :sid
+                            """), {
+                                "instance_id": result.get("instance_id"),
+                                "console_url": result.get("console_url"),
+                                "vm_name": vm_name,
+                                "sid": id_slice
+                            })
+                        
+                        vms_exitosas.append(vm_name)
+                        resultados.append({
+                            "vm": vm_name,
+                            "success": True,
                             "instance_id": result.get("instance_id"),
                             "console_url": result.get("console_url"),
+<<<<<<< HEAD
                             "vm_name": vm_name,
                             "sid": id_slice,
                             "worker_id": worker_id
+=======
+                            "topology_validated": result.get("topology_validation", {}).get("valid", False)
+>>>>>>> c3d4cf98a035d04cd66f361b47b121de93192b85
                         })
-                    
-                    vms_exitosas.append(vm_name)
-                    resultados.append({
-                        "vm": vm_name,
-                        "success": True,
-                        "instance_id": result.get("instance_id"),
-                        "console_url": result.get("console_url"),
-                        "networks": result.get("networks", []),
-                        "worker_name": worker_name,
-                        "worker_id": worker_id
-                    })
                 else:
+                    # Error explícito
                     fallos += 1
-                    print(f"❌ VM {vm_name} falló: {result.get('message')}")
+                    requires_rollback = True
+                    vms_fallidas.append(vm_name)
+                    print(f"❌ VM {vm_name} falló: {result.get('error')}")
                     
-                    # 🟢 MARCAR INSTANCIA COMO FAILED
+                    # Marcar en BD
                     with engine.begin() as conn:
                         conn.execute(text("""
                             UPDATE instancia
@@ -1147,14 +1158,16 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                     resultados.append({
                         "vm": vm_name,
                         "success": False,
-                        "error": result.get("message")
+                        "error": result.get("error"),
+                        "error_type": result.get("error_type", "UNKNOWN")
                     })
                     
             except Exception as e:
                 fallos += 1
+                requires_rollback = True
+                vms_fallidas.append(vm_name)
                 print(f"❌ Excepción desplegando {vm_name}: {e}")
                 
-                # 🟢 MARCAR INSTANCIA COMO FAILED
                 with engine.begin() as conn:
                     conn.execute(text("""
                         UPDATE instancia
@@ -1165,38 +1178,109 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                 resultados.append({
                     "vm": vm_name,
                     "success": False,
-                    "error": str(e)
+                    "error": str(e),
+                    "error_type": "EXCEPTION"
                 })
 
-    # 3) Actualizar estado del slice en BD
-    estado_final = "RUNNING" if fallos == 0 else ("PARTIAL" if vms_exitosas else "FAILED")
+    # 🔥 DECISIÓN DE ROLLBACK
+    if requires_rollback or fallos > 0:
+        print(f"\n🚨 INICIANDO ROLLBACK - {fallos} VM(s) fallaron")
+        print(f"   VMs exitosas a eliminar: {vms_exitosas}")
+        print(f"   VMs fallidas: {vms_fallidas}")
+        
+        # Eliminar proyecto completo
+        rollback_result = execute_project_rollback(id_slice, project_name)
+        
+        # Actualizar estado del slice
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE slice 
+                SET estado = 'DRAW'
+                WHERE idslice = :sid
+            """), {"sid": id_slice})
+        
+        # Limpiar registros de BD
+        limpiar_registros_bd(id_slice)
+        
+        return {
+            "success": False,
+            "timestamp": datetime.utcnow().isoformat(),
+            "slice_id": id_slice,
+            "platform": "openstack",
+            "estado_final": "DRAW",
+            "error": "Una o más VMs fallaron - Rollback ejecutado",
+            "resumen": {
+                "total_vms": len(plan["placement_plan"]),
+                "exitosas_antes_rollback": len(vms_exitosas),
+                "fallidas": len(vms_fallidas),
+                "vms_fallidas": vms_fallidas
+            },
+            "rollback": rollback_result,
+            "detalle_completo": resultados
+        }
 
+    # 3) Actualizar estado - TODO OK
     with engine.begin() as conn:
         conn.execute(text("""
             UPDATE slice 
-            SET estado = :e, platform = 'openstack'
+            SET estado = 'RUNNING', platform = 'openstack'
             WHERE idslice = :sid
-        """), {"e": estado_final, "sid": id_slice})
+        """), {"sid": id_slice})
 
     return {
-        "success": fallos == 0,
+        "success": True,
         "timestamp": datetime.utcnow().isoformat(),
         "slice_id": id_slice,
         "platform": "openstack",
-        "estado_final": estado_final,
+        "estado_final": "RUNNING",
         "resumen": {
             "total_vms": len(plan["placement_plan"]),
             "exitosas": len(vms_exitosas),
-            "fallidas": fallos,
-            "porcentaje_exito": round((len(vms_exitosas) / len(plan["placement_plan"])) * 100, 2)
+            "fallidas": 0
         },
         "vms_exitosas": vms_exitosas,
         "topologia_redes": plan["topologia_redes"],
-        "flavors_creados": plan.get("flavors_necesarios", []),
-        "detalle_completo": resultados,
-        "message": f"Despliegue {'completo' if fallos == 0 else 'parcial' if len(vms_exitosas) > 0 else 'fallido'} del slice {id_slice} en OpenStack"
+        "detalle_completo": resultados
     }
 
+def execute_project_rollback(id_slice: int, project_name: str):
+    """
+    Ejecuta rollback eliminando el proyecto completo de OpenStack
+    """
+    print(f"🧹 Ejecutando rollback del proyecto {project_name}...")
+    
+    delete_args = {
+        "project_name": project_name,
+        "slice_id": id_slice
+    }
+    
+    try:
+        url = f"{LINUX_DRIVER_URL}/delete_project_openstack"
+        resp = requests.post(url, json=delete_args, timeout=180)
+        
+        if resp.status_code == 200:
+            result = resp.json()
+            if result.get("success"):
+                print(f"✅ Proyecto {project_name} eliminado en rollback")
+                return {
+                    "success": True,
+                    "message": "Proyecto eliminado correctamente",
+                    "details": result.get("details", {})
+                }
+        
+        print(f"⚠️ Rollback parcial - Proyecto puede no haberse eliminado")
+        return {
+            "success": False,
+            "message": "Error en rollback de proyecto",
+            "http_status": resp.status_code
+        }
+        
+    except Exception as e:
+        print(f"❌ Error en rollback: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 def desplegar_vm_en_driver(vm_data: dict):
     """
