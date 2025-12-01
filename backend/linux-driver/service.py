@@ -285,16 +285,55 @@ async def create_vm_linux(data):
 
 
 def parse_ram_to_mb(ram_input):
-    """Convierte RAM (GB, MB o float) a MB para QEMU"""
-    if isinstance(ram_input, (int, float)):
-        return int(ram_input * 1024)  # Asume GB si es número
+    """
+    Convierte RAM en MB o GB a MB para QEMU
+    Maneja: "512MB", "1GB", 0.5 (GB), 512 (MB), etc.
+    """
+    # Si es None o vacío, default 1GB
+    if not ram_input:
+        return 1024
     
-    ram_str = str(ram_input).strip().upper()
-    if "MB" in ram_str:
-        return int(float(ram_str.replace("MB", "")))
-    elif "GB" in ram_str:
-        return int(float(ram_str.replace("GB", "")) * 1024)
-    return 1024  # default 1GB
+    # Si es string
+    if isinstance(ram_input, str):
+        ram_str = ram_input.strip().upper()
+        
+        # Detectar MB
+        if "MB" in ram_str:
+            try:
+                return int(float(ram_str.replace("MB", "").strip()))
+            except ValueError:
+                return 1024
+        
+        # Detectar GB
+        elif "GB" in ram_str:
+            try:
+                return int(float(ram_str.replace("GB", "").strip()) * 1024)
+            except ValueError:
+                return 1024
+        
+        # String sin unidad (asumir MB si < 100, GB si >= 100)
+        else:
+            try:
+                valor = float(ram_str)
+                if valor < 100:  # Probablemente GB
+                    return int(valor * 1024)
+                else:  # Probablemente MB
+                    return int(valor)
+            except ValueError:
+                return 1024
+    
+    # Si es número (int o float)
+    elif isinstance(ram_input, (int, float)):
+        # Si el número es pequeño (< 100), asumir GB
+        # Si es grande (>= 100), asumir MB
+        if ram_input < 100:
+            return int(ram_input * 1024) 
+        else:
+            return int(ram_input)  
+    
+    
+    return 1024
+
 # --- Implementación OpenStack ---
 async def create_vm_openstack(data):
     """

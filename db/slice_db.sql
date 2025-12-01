@@ -73,7 +73,7 @@ LOCK TABLES `imagen` WRITE;
 INSERT INTO `imagen` VALUES 
 (1,'/var/lib/qemu-images/image-base/ubuntu.qcow2','ubuntu:latest', '56b9c357-4045-41b8-89f1-2d78e6ba7e64'),
 (2,'/var/lib/qemu-images/image-base/cirros-base.qcow2','cirros:latest', 'ad11fa04-b020-41f6-9cc3-7f7a589c6a2a'),
-(3,'/var/lib/qemu-images/image-base/ubuntu-clouding.qcow2','ubuntu-clouding:latest', 'oli');
+(3,'/var/lib/qemu-images/image-base/ubuntu-clouding.qcow2','ubuntu-clouding:latest', '7d52c5d3-03c1-465a-874c-b4512f49b636');
 /*!40000 ALTER TABLE `imagen` ENABLE KEYS */;
 UNLOCK TABLES;
 
