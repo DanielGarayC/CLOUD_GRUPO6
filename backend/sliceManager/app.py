@@ -1211,7 +1211,7 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
             """), {"sid": id_slice})
         
         # Limpiar registros de BD
-        limpiar_registros_bd(id_slice)
+        #limpiar_registros_bd(id_slice)
         
         return {
             "success": False,
