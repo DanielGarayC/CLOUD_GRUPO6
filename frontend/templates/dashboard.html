@@ -406,7 +406,7 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showAlert('success', `¡Slice "${sliceName}" desplegado exitosamente en ${platformName}!`);
+                showAlert('success', `¡Slice "${sliceName}" desplegado exitosamente!`);
                 deployBtn.innerHTML = '<i class="fas fa-cogs"></i> Desplegando';
                 deployBtn.className = 'btn btn-info btn-sm';
                 deployBtn.disabled = true;
@@ -417,7 +417,7 @@
                     location.reload();
                 }, 3000);
             } else {
-                showAlert('error', `Error desplegando slice en ${platformName}: ${data.error}`);
+                showAlert('error', `Error desplegando slice: ${data.error}`);
                 deployBtn.disabled = false;
                 deployBtn.innerHTML = originalHtml;
             }
