@@ -384,7 +384,6 @@
 
         if (!confirm(
             `¿Estás seguro de que quieres desplegar el slice "${sliceName}"?\n\n` +
-            `Plataforma: ${platformName}\n\n` +
             `Esto enviará el slice al orquestador para su implementación.`
         )) {
             return;
@@ -394,7 +393,7 @@
         deployBtn.disabled = true;
 
         const platformIcon = platform === 'openstack' ? 'fa-cloud' : 'fa-server';
-        deployBtn.innerHTML = `<i class="fas ${platformIcon} fa-spin"></i> Desplegando en ${platformName}...`;
+        deployBtn.innerHTML = `<i class="fas fa-server fa-spin"></i> Desplegando`;
 
         // 👉 Ya NO mandamos platform al backend, este la lee de slice.platform
         fetch(`/deploy_slice/${sliceId}`, {
