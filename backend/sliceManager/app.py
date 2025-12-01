@@ -1118,7 +1118,8 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                             "instance_id": result.get("instance_id"),
                             "console_url": result.get("console_url"),
                             "vm_name": vm_name,
-                            "sid": id_slice
+                            "sid": id_slice,
+                            "worker_id": worker_id
                         })
                     
                     vms_exitosas.append(vm_name)
