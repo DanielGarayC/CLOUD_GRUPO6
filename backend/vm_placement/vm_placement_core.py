@@ -108,13 +108,45 @@ def obtener_libres_actual(ruta_csv):
     return libres
 
 def parse_ram_to_gb(ram_str):
+    """
+    Convierte RAM en MB o GB a float en GB.
+    Maneja: "512MB", "512mb", "1GB", "1gb", "512 MB", 512, 1.5, etc.
+    """
+    if ram_str is None:
+        return 1.0  # Default 1GB
+    
+    # Convertir a string y limpiar
     s = str(ram_str).strip().lower()
-    if s.endswith("mb"):
-        return float(s.replace("mb", "").strip()) / 1024.0
-    if s.endswith("gb"):
-        return float(s.replace("gb", "").strip())
-    # fallback: si viene solo número, asumimos GB
-    return float(s)
+    
+    # Remover espacios internos (ej: "512 mb" -> "512mb")
+    s = s.replace(" ", "")
+    
+    # Detectar unidad y extraer número
+    if "mb" in s:
+        try:
+            # Extraer solo la parte numérica antes de "mb"
+            num_str = s.replace("mb", "").strip()
+            return float(num_str) / 1024.0
+        except ValueError:
+            print(f"⚠️ Error parseando RAM MB: '{ram_str}' -> '{num_str}'")
+            return 1.0
+    
+    elif "gb" in s:
+        try:
+            # Extraer solo la parte numérica antes de "gb"
+            num_str = s.replace("gb", "").strip()
+            return float(num_str)
+        except ValueError:
+            print(f"⚠️ Error parseando RAM GB: '{ram_str}' -> '{num_str}'")
+            return 1.0
+    
+    else:
+        # Sin unidad: asumir que es un número puro (GB)
+        try:
+            return float(s)
+        except ValueError:
+            print(f"⚠️ Error parseando RAM sin unidad: '{ram_str}'")
+            return 1.0
 
 def evaluar_workers(slice_req, workers_libres, zona):
     """
