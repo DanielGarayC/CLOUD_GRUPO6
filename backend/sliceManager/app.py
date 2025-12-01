@@ -1083,10 +1083,24 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
         for future in as_completed(future_map):
             vm = future_map[future]
             vm_name = vm["nombre_vm"]
+            worker_name = vm.get("worker_hostname")
             
             try:
                 result = future.result()
                 
+                # 🔹 Resolver idworker a partir del nombre
+                worker_id = None
+                if worker_name:
+                    with engine.begin() as conn:
+                        row = conn.execute(text("""
+                            SELECT idworker
+                            FROM worker
+                            WHERE nombre = :nombre
+                        """), {"nombre": worker_name}).fetchone()
+                        if row:
+                            # row puede ser tupla o Row; ambas soportan [0]
+                            worker_id = row[0]
+
                 if result.get("success"):
                     print(f"✅ VM {vm_name} desplegada en OpenStack")
                     
@@ -1097,6 +1111,7 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                             SET estado = 'RUNNING',
                                 instance_id = :instance_id,
                                 platform = 'openstack',
+                                worker_idworker = :worker_id,
                                 console_url = :console_url
                             WHERE nombre = :vm_name AND slice_idslice = :sid
                         """), {
@@ -1112,7 +1127,9 @@ def deploy_slice_openstack(id_slice: int, instancias: list, placement_plan_vm: l
                         "success": True,
                         "instance_id": result.get("instance_id"),
                         "console_url": result.get("console_url"),
-                        "networks": result.get("networks", [])
+                        "networks": result.get("networks", []),
+                        "worker_name": worker_name,
+                        "worker_id": worker_id
                     })
                 else:
                     fallos += 1
